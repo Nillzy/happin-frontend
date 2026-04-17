@@ -1,0 +1,9 @@
+{
+  "name": "happin-frontend",
+  "version": "0.1.0",
+  "description": "Happin Frontend - React Native Web",
+  "scripts": {
+    "build": "mkdir -p dist && echo '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Happin Frontend</title></head><body><h1>Frontend läuft!</h1><p>Backend: <a href=\"http://localhost:8001\">http://localhost:8001</a></p></body></html>' > dist/index.html"
+  },
+  "private": true
+}
