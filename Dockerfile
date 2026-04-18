@@ -1,22 +1,14 @@
 # Multi-stage build for React Native Web Frontend
-# Stage 1: Install dependencies
-FROM node:20-alpine AS dependencies
-
-WORKDIR /app
-
-# Copy package files (will be added later)
-COPY package*.json ./
-
-# Install dependencies
-RUN npm install --production
-
-# Stage 2: Build application
+# Stage 1: Build application
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependencies from previous stage
-COPY --from=dependencies /app/node_modules ./node_modules
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies (if any exist)
+RUN npm install --production || true
 
 # Copy application source
 COPY . .
