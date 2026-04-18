@@ -56,4 +56,4 @@ deploy:
     - main
   environment:
     name: production
-    url: http://vm552.ipp-vps.net:3000
+    url: http://vm552.ipp-vps.net
