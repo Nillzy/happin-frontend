@@ -51,7 +51,7 @@ deploy:
     - chmod 700 ~/.ssh
     - ssh-keyscan -H vm552.ipp-vps.net >> ~/.ssh/known_hosts
   script:
-    - ssh happin-deploy@vm552.ipp-vps.net "echo $GITLAB_DEPLOY_TOKEN | docker login registry.gitlab.com -u $GITLAB_DEPLOY_USERNAME --password-stdin && cd /home/shared/deployment/frontend && git pull origin main && cd /home/shared/deployment && docker compose pull frontend && docker compose up -d frontend"
+    - ssh happin-deploy@vm552.ipp-vps.net "echo $GITLAB_DEPLOY_TOKEN | docker login registry.gitlab.com -u $GITLAB_DEPLOY_USERNAME --password-stdin && cd /home/shared/deployment && docker compose down frontend && docker rmi registry.gitlab.com/dhbw-se/se-tinf24b2/happin/frontend/frontend:latest || true && cd /home/shared/deployment/frontend && git pull origin main && cd /home/shared/deployment && docker compose pull frontend && docker compose up -d frontend"
   only:
     - main
   environment:
