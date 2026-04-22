@@ -1,0 +1,9 @@
+# Documentation Index
+
+This is the central index for all project documentation in the `documentation/` folder.
+
+
+| File                                               | Description                                                                                                           |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| [00-index.md](./00-index.md)                       | This file. Central index of all documentation.                                                                        |
+| [01-project-overview.md](./01-project-overview.md) | High-level overview of the Happin frontend: goals, tech stack, project structure, and how it connects to the backend. |
