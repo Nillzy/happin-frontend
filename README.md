@@ -19,6 +19,33 @@ cp .env.example .env
 npm start
 ```
 
+## Lokale Entwicklung
+
+Nach `npm install` den Dev-Server starten:
+
+```bash
+# Interaktiver Modus (alle Plattformen wählbar)
+npm start
+
+# Direkt im Browser starten
+npm run web
+
+# Direkt auf iOS Simulator
+npm run ios
+
+# Direkt auf Android Emulator
+npm run android
+```
+
+Der Server läuft auf **http://localhost:8081**. Änderungen am Code werden automatisch per Hot Reload übernommen.
+
+### Voraussetzungen
+
+- **Node.js 20** oder höher
+- **Web:** Kein weiteres Setup nötig
+- **iOS:** macOS + Xcode
+- **Android:** Android Studio + Emulator
+
 ## Tech Stack
 
 - **Framework:** React Native 0.81 + Expo SDK 54
@@ -69,9 +96,9 @@ happin-frontend/
 
 See [`.env.example`](.env.example) for required variables:
 
-- `REACT_APP_BACKEND_URL` - Backend API URL
-- `REACT_APP_SUPABASE_URL` - Supabase URL for Realtime Features
-- `REACT_APP_SUPABASE_ANON_KEY` - Supabase Public Key
+- `EXPO_PUBLIC_BACKEND_URL` - Backend API URL
+- `EXPO_PUBLIC_SUPABASE_URL` - Supabase URL for Realtime Features
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY` - Supabase Public Key
 
 **Important:** Never commit `.env` files to git!
 

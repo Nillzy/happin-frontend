@@ -1,39 +1,36 @@
 # Multi-stage build for React Native Web Frontend
+
 # Stage 1: Build application
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+ARG EXPO_PUBLIC_BACKEND_URL
+ARG EXPO_PUBLIC_SUPABASE_URL
+ARG EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL
+ENV EXPO_PUBLIC_SUPABASE_URL=$EXPO_PUBLIC_SUPABASE_URL
+ENV EXPO_PUBLIC_SUPABASE_ANON_KEY=$EXPO_PUBLIC_SUPABASE_ANON_KEY
+
 COPY package*.json ./
 
-# Install dependencies (if any exist)
-RUN npm install --production || true
+RUN npm ci
 
-# Copy application source
 COPY . .
 
-# Build for production (React Native Web)
 RUN npm run build
 
-# Stage 3: Production server with nginx
+# Stage 2: Production server with nginx
 FROM nginx:alpine
 
-# Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy built static files from builder
-# Adjust path based on build output (dist/ or build/)
-# When implementing: set BUILD_OUTPUT_DIR to match your build script output
-ARG BUILD_OUTPUT_DIR=dist
-COPY --from=builder /app/${BUILD_OUTPUT_DIR} /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Expose port 80
 EXPOSE 80
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
 
-# Start nginx in foreground
 CMD ["nginx", "-g", "daemon off;"]
