@@ -38,6 +38,7 @@ Thumbs.db
 !.env.example
 
 # IDE
+.cursor/
 .vscode/
 .idea/
 *.swp
