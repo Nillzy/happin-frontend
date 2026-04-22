@@ -1,50 +1,104 @@
-# Welcome to your Expo app 👋
+# Happin Frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+React Native Web Frontend für die Happin Event-Discovery Plattform (Web, iOS, Android).
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Quick Start
 
 ```bash
-npm run reset-project
+# 1. Repository clonen
+git clone https://gitlab.com/dhbw-se/se-tinf24b2/happin/frontend.git
+cd frontend
+
+# 2. Dependencies installieren
+npm install
+
+# 3. Environment Variables einrichten
+cp .env.example .env
+
+# 4. Development Server starten
+npm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Tech Stack
 
-## Learn more
+- **Framework:** React Native 0.81 + Expo SDK 54
+- **Language:** TypeScript (strict mode)
+- **Routing:** Expo Router (file-based)
+- **Navigation:** React Navigation (bottom tabs)
+- **Animations:** React Native Reanimated
+- **Build:** Metro Bundler
+- **Server:** Nginx (Production)
+- **Backend:** FastAPI (Python) — separate repository
 
-To learn more about developing your project with Expo, look at the following resources:
+## Available Scripts
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+| Command | Description |
+|---------|-------------|
+| `npm start` | Start the Expo dev server |
+| `npm run android` | Start on Android emulator |
+| `npm run ios` | Start on iOS simulator |
+| `npm run web` | Start in the browser |
+| `npm run lint` | Run ESLint |
+| `npm run build` | Export web build to `dist/` |
+| `npm run reset-project` | Reset to a blank starting point |
 
-## Join the community
+## Project Structure
 
-Join our community of developers creating universal apps.
+```
+happin-frontend/
+├── app/                    # Screens and routing (file-based with Expo Router)
+│   ├── _layout.tsx         # Root layout
+│   ├── modal.tsx           # Modal screen
+│   └── (tabs)/             # Tab-based navigation group
+│       ├── _layout.tsx     # Tab bar configuration
+│       ├── index.tsx       # Home tab
+│       └── explore.tsx     # Explore tab
+├── components/             # Reusable UI components
+├── constants/              # Theme colors (light/dark)
+├── hooks/                  # Custom React hooks
+├── assets/                 # Images, fonts, static files
+├── scripts/                # Utility scripts
+├── documentation/          # Project documentation
+├── Dockerfile              # Multi-stage Docker build (node + nginx)
+├── nginx.conf              # Production web server config
+├── .gitlab-ci.yml          # CI/CD pipeline
+└── .env.example            # Environment variable template
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Environment Variables
+
+See [`.env.example`](.env.example) for required variables:
+
+- `REACT_APP_BACKEND_URL` - Backend API URL
+- `REACT_APP_SUPABASE_URL` - Supabase URL for Realtime Features
+- `REACT_APP_SUPABASE_ANON_KEY` - Supabase Public Key
+
+**Important:** Never commit `.env` files to git!
+
+## Docker
+
+```bash
+# Build image
+docker build -t happin-frontend .
+
+# Run container
+docker run -p 80:80 happin-frontend
+```
+
+Or with Docker Compose:
+
+```bash
+cd ..  # Root directory
+docker compose up frontend
+```
+
+## CI/CD
+
+GitLab CI/CD pipeline automatically builds Docker images on push to `main`:
+
+- **Build Stage:** Docker image built and pushed to GitLab Container Registry
+- **Deploy Stage:** Deployment to VM (`vm552.ipp-vps.net`)
+
+## License
+
+DHBW SE Project - Happin Team
