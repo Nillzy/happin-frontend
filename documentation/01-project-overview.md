@@ -21,33 +21,30 @@ Happin is a mobile application built with React Native and Expo. This repository
 
 ```
 happin-frontend/
-├── app/                    # Screens and routing (file-based with Expo Router)
+├── app/                    # Expo Router entry points (minimal — delegates to src/)
 │   ├── _layout.tsx         # Root layout (stack navigator, fonts, splash screen)
-│   ├── modal.tsx           # Modal screen
-│   └── (tabs)/             # Tab-based navigation group
-│       ├── _layout.tsx     # Tab bar configuration
-│       ├── index.tsx       # Home tab screen
-│       └── explore.tsx     # Explore tab screen
-├── components/             # Reusable UI components
-│   ├── external-link.tsx   # Opens URLs in an in-app browser
-│   ├── haptic-tab.tsx      # Tab bar button with haptic feedback
-│   ├── hello-wave.tsx      # Animated waving hand emoji
-│   ├── parallax-scroll-view.tsx  # Scroll view with parallax header image
-│   ├── themed-text.tsx     # Text component with theme-aware colors
-│   ├── themed-view.tsx     # View component with theme-aware colors
-│   └── ui/                 # Lower-level UI primitives
-│       ├── collapsible.tsx # Expandable/collapsible section
-│       └── icon-symbol.tsx # Cross-platform icon component (SF Symbols on iOS, MaterialIcons elsewhere)
+│   └── index.tsx           # Entry route — renders <App />
+├── src/                    # Application source code
+│   ├── components/
+│   │   ├── App.tsx         # Root component mounted by app/index.tsx
+│   │   └── atoms/
+│   │       └── icons.tsx   # Shared SVG icon components
+│   ├── navigation/
+│   │   └── RootNavigator.tsx  # Top-level React Navigation stack
+│   ├── screens/
+│   │   ├── HomeScreen.tsx  # Landing page with animated Berlin city map
+│   │   ├── LoginScreen.tsx # 3-step phone number login (phone → channel → OTP)
+│   │   ├── EventScreen.tsx # Event detail page (hero, RSVP, info, line-up, host)
+│   │   └── TestScreen.tsx
+│   └── utils/
+│       └── useAppNavigation.ts  # Typed navigation hook
 ├── constants/
-│   └── theme.ts            # Color palette for light and dark themes
+│   ├── berlin-map-paths.ts # SVG path data for the Berlin city map
+│   └── colors.ts           # Material Design 3 color tokens (light + dark)
 ├── hooks/
-│   ├── use-color-scheme.ts # Returns the device color scheme (native)
-│   ├── use-color-scheme.web.ts  # Web-specific color scheme hook
-│   └── use-theme-color.ts  # Resolves a theme color by name for the current scheme
+│   └── use-theme.ts        # useTheme() — returns { colors, isDark }
 ├── assets/
 │   └── images/             # App icons, splash screen, and static images
-├── scripts/
-│   └── reset-project.js    # Utility to reset the project to a blank state
 ├── documentation/          # Project documentation (you are here)
 ├── app.json                # Expo app configuration
 ├── tsconfig.json           # TypeScript configuration
