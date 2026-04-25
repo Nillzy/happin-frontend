@@ -28,6 +28,7 @@ import Svg, {
 import { MAP_PATHS_PRIMARY, MAP_PATHS_SECONDARY, MAP_PATHS_MINOR } from '@/constants/berlin-map-paths';
 import { useTheme } from '@/hooks/use-theme';
 import { useAppNavigation } from '../utils/useAppNavigation';
+import DarkLightToggle from '../components/atoms/DarkLightToggle';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -428,13 +429,16 @@ export default function HomeScreen() {
             {/* ── Nav ── */}
             <View style={[styles.nav, { borderBottomColor: 'rgba(255,255,255,0.06)' }]}>
                 <Text style={[styles.navLogo, { color: colors.primary }]}>happin</Text>
-                <TouchableOpacity
-                    style={[styles.navCta, { borderColor: colors.primary }]}
-                >
-                    <Text style={[styles.navCtaText, { color: colors.primary }]}>
-                        App laden
-                    </Text>
-                </TouchableOpacity>
+                <View style={styles.navRight}>
+                    <DarkLightToggle />
+                    <TouchableOpacity
+                        style={[styles.navCta, { borderColor: colors.primary }]}
+                    >
+                        <Text style={[styles.navCtaText, { color: colors.primary }]}>
+                            App laden
+                        </Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* ── Hero: City Map ── */}
@@ -616,6 +620,11 @@ const styles = StyleSheet.create({
         fontSize: 22,
         fontWeight: '800',
         letterSpacing: -0.5,
+    },
+    navRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     navCta: {
         paddingHorizontal: 14,
