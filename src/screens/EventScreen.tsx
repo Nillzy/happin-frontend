@@ -19,7 +19,8 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
-import { useAppNavigation } from '../utils/useAppNavigation';
+import Navbar from '../components/atoms/Navbar';
+import Footer from '../components/atoms/Footer';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -305,7 +306,6 @@ function InfoRow({
 
 export default function EventScreen() {
     const { colors } = useTheme();
-    const navigation = useAppNavigation();
     const [expanded, setExpanded] = useState(false);
 
     const descriptionLines = EVENT.description.split('\n\n');
@@ -314,6 +314,7 @@ export default function EventScreen() {
     return (
         <View style={[s.root, { backgroundColor: colors.background }]}>
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+            <Navbar showBack />
 
             <ScrollView
                 style={s.scroll}
@@ -329,23 +330,6 @@ export default function EventScreen() {
                     />
                     <View style={s.heroOverlayTop} />
                     <View style={s.heroOverlayBottom} pointerEvents="none" />
-
-                    {/* Nav buttons */}
-                    <View style={s.heroNav}>
-                        <TouchableOpacity
-                            style={[s.navBtn, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
-                            onPress={() => navigation.goBack()}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={s.navBtnText}>←</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[s.navBtn, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={s.navBtnText}>↑</Text>
-                        </TouchableOpacity>
-                    </View>
 
                     {/* Hero title overlay */}
                     <View style={s.heroTitleBlock}>
@@ -479,6 +463,7 @@ export default function EventScreen() {
                         </View>
                     </View>
 
+                    <Footer />
                     <View style={s.bottomSpacer} />
                 </View>
             </ScrollView>
@@ -489,7 +474,6 @@ export default function EventScreen() {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const HERO_HEIGHT = 380;
-const NAV_TOP = Platform.OS === 'ios' ? 56 : 40;
 
 const s = StyleSheet.create({
     root: { flex: 1 },
@@ -518,20 +502,6 @@ const s = StyleSheet.create({
         height: 200,
         backgroundColor: 'rgba(13,14,21,0.85)',
     },
-    heroNav: {
-        position: 'absolute',
-        top: NAV_TOP, left: 0, right: 0,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-    },
-    navBtn: {
-        width: 40, height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    navBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
     heroTitleBlock: {
         position: 'absolute',
         bottom: 28, left: 22, right: 22,

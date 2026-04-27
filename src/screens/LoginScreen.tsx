@@ -23,6 +23,8 @@ import Animated, {
 import { useTheme } from '@/hooks/use-theme';
 import { useAppNavigation } from '../utils/useAppNavigation';
 import { SmsIcon, WhatsAppIcon } from '../components/atoms/icons';
+import Navbar from '../components/atoms/Navbar';
+import Footer from '../components/atoms/Footer';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -357,7 +359,7 @@ function ChannelButton({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function LoginScreen() {
-    const { colors, isDark } = useTheme();
+    const { colors } = useTheme();
     const navigation = useAppNavigation();
 
     const [step, setStep] = useState<Step>('phone');
@@ -468,25 +470,12 @@ export default function LoginScreen() {
             style={[s.root, { backgroundColor: colors.background }]}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+            <Navbar showBack />
             <ScrollView
                 contentContainerStyle={s.scrollContent}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
             >
-                {/* Back button */}
-                <TouchableOpacity
-                    style={s.backBtn}
-                    onPress={() => {
-                        if (step === 'phone') navigation.goBack();
-                        else if (step === 'channel') setStep('phone');
-                        else if (step === 'otp') setStep('channel');
-                    }}
-                >
-                    <Text style={[s.backBtnText, { color: colors.onSurfaceVariant }]}>← Zurück</Text>
-                </TouchableOpacity>
-
-                {/* Logo */}
-                <Text style={[s.logo, { color: colors.primary }]}>happin</Text>
 
                 {/* ── Step: Phone ── */}
                 {step === 'phone' && (
@@ -683,6 +672,7 @@ export default function LoginScreen() {
                         </View>
                     </StepView>
                 )}
+                <Footer />
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -697,23 +687,8 @@ const s = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: 24,
-        paddingTop: 60,
+        paddingTop: 32,
         paddingBottom: 48,
-    },
-    backBtn: {
-        alignSelf: 'flex-start',
-        marginBottom: 32,
-        paddingVertical: 4,
-    },
-    backBtnText: {
-        fontSize: 15,
-        fontWeight: '500',
-    },
-    logo: {
-        fontSize: 28,
-        fontWeight: '800',
-        letterSpacing: -0.8,
-        marginBottom: 36,
     },
     heading: {
         fontSize: 36,
