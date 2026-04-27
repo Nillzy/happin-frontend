@@ -1,5 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { NavigationIndependentTree } from '@react-navigation/core';
+import { ThemeProvider } from '@/context/ThemeContext';
 import RootNavigator from '../navigation/RootNavigator';
 
 export default function App() {
@@ -17,9 +18,11 @@ export default function App() {
 
   return (
     <NavigationIndependentTree>
-      <NavigationContainer linking={linking}>
-        <RootNavigator />
-      </NavigationContainer>
+      <ThemeProvider>
+        <NavigationContainer linking={linking}>
+          <RootNavigator />
+        </NavigationContainer>
+      </ThemeProvider>
     </NavigationIndependentTree>
   );
 }

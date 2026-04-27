@@ -28,6 +28,8 @@ import Svg, {
 import { MAP_PATHS_PRIMARY, MAP_PATHS_SECONDARY, MAP_PATHS_MINOR } from '@/constants/berlin-map-paths';
 import { useTheme } from '@/hooks/use-theme';
 import { useAppNavigation } from '../utils/useAppNavigation';
+import Navbar from '../components/atoms/Navbar';
+import Footer from '../components/atoms/Footer';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -426,16 +428,7 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
         >
             {/* ── Nav ── */}
-            <View style={[styles.nav, { borderBottomColor: 'rgba(255,255,255,0.06)' }]}>
-                <Text style={[styles.navLogo, { color: colors.primary }]}>happin</Text>
-                <TouchableOpacity
-                    style={[styles.navCta, { borderColor: colors.primary }]}
-                >
-                    <Text style={[styles.navCtaText, { color: colors.primary }]}>
-                        App laden
-                    </Text>
-                </TouchableOpacity>
-            </View>
+            <Navbar showCta />
 
             {/* ── Hero: City Map ── */}
             <View
@@ -582,17 +575,7 @@ export default function HomeScreen() {
             </View>
 
             {/* ── Footer ── */}
-            <View
-                style={[
-                    styles.footer,
-                    { borderTopColor: 'rgba(255,255,255,0.06)' },
-                ]}
-            >
-                <Text style={[styles.footerLogo, { color: colors.primary }]}>happin</Text>
-                <Text style={[styles.footerCopy, { color: colors.onSurfaceVariant }]}>
-                    © 2025 Happin. Alle Rechte vorbehalten.
-                </Text>
-            </View>
+            <Footer />
         </ScrollView>
     );
 }
@@ -602,31 +585,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
     scroll: { flex: 1 },
     container: { flexGrow: 1 },
-
-    // Nav
-    nav: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 24,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-    },
-    navLogo: {
-        fontSize: 22,
-        fontWeight: '800',
-        letterSpacing: -0.5,
-    },
-    navCta: {
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderRadius: 8,
-        borderWidth: 1,
-    },
-    navCtaText: {
-        fontSize: 13,
-        fontWeight: '600',
-    },
 
     // Hero Map
     heroMap: {
@@ -934,20 +892,4 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    // Footer
-    footer: {
-        paddingHorizontal: 24,
-        paddingVertical: 28,
-        alignItems: 'center',
-        borderTopWidth: 1,
-        gap: 6,
-    },
-    footerLogo: {
-        fontSize: 17,
-        fontWeight: '800',
-        letterSpacing: -0.3,
-    },
-    footerCopy: {
-        fontSize: 12,
-    },
 });
