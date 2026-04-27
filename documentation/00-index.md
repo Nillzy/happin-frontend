@@ -8,3 +8,4 @@ This is the central index for all project documentation in the `documentation/` 
 | [01-project-overview.md](./01-project-overview.md) | High-level overview of the Happin frontend: goals, tech stack, project structure, and how it connects to the backend. |
 | [DESIGN.md](./DESIGN.md) | Complete design system: color palettes, typography, spacing, elevation, shapes, and component specs for both light and dark themes. |
 | [02-dark-light-mode.md](./02-dark-light-mode.md) | Dark/Light Mode Toggle: Architektur (ThemeContext), DarkLightToggle-Komponente, Integration und betroffene Dateien. |
+| [03-navbar-footer.md](./03-navbar-footer.md) | Navbar, Footer und HappinLogo-Komponenten: Aufbau, Props, Integration in alle Screens. |

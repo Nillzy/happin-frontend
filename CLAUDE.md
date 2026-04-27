@@ -85,7 +85,7 @@ The `documentation/` folder is the source of truth for project context and desig
 **Always read the relevant docs before starting a task.** When making changes, document them in the appropriate file in `documentation/`. New topics that don't fit an existing file get their own file, registered in `00-index.md`.
 
 **All documentation must live in `documentation/` — never create doc files outside this folder.**
-Every major Change should be well documented.
+Every major Change should be well documented (eventually in an own file).
 
 `DESIGN.md` in particular must be consulted before touching any UI. It defines:
 - Full MD3 color token sets for both `light` ("Happin Light") and `dark` ("Neon Horizon") themes
