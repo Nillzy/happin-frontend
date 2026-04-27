@@ -1,5 +1,5 @@
 stages:
-  # - test  # TODO: Uncomment when tests are implemented
+  - test
   - build
   - deploy
 
@@ -7,18 +7,17 @@ variables:
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: "/certs"
 
-# TODO: Uncomment test stage when implementing tests
-# test:
-#   stage: test
-#   image: node:20-alpine
-#   before_script:
-#     - npm ci
-#   script:
-#     - npm run lint || echo "Add lint script to package.json"
-#     - npm test || echo "Add test script to package.json"
-#   only:
-#     - main
-#     - merge_requests
+test:
+  stage: test
+  image: node:20-alpine
+  before_script:
+    - npm ci
+  script:
+    - npm run lint
+    - npm run build
+  only:
+    - main
+    - merge_requests
 
 # Build Docker image and push to GitLab Container Registry
 build:
