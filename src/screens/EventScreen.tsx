@@ -20,9 +20,11 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
+import { useAppNavigation } from '../utils/useAppNavigation';
 import { useRoute } from '@react-navigation/native';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
+import { authorize } from '../services/supabase';
 import { api } from '../services/api';
 import type { EventDetailResponse } from '../types/events';
 
@@ -371,12 +373,19 @@ function InfoRow({
 
 export default function EventScreen() {
     const { colors } = useTheme();
+    const navigation = useAppNavigation();
     const route = useRoute<any>();
     const eventId = route.params?.eventId as number | undefined;
 
     const [event, setEvent] = useState<EventData>(MOCK_EVENT);
     const [loading, setLoading] = useState(!!eventId);
     const [expanded, setExpanded] = useState(false);
+
+    useEffect(() => {
+        authorize().then((isAuthorized) => {
+            if (!isAuthorized) navigation.navigate('Login');
+        });
+    }, []);
 
     useEffect(() => {
         if (!eventId) return;

@@ -11,3 +11,4 @@ This is the central index for all project documentation in the `documentation/` 
 | [03-navbar-footer.md](./03-navbar-footer.md) | Navbar, Footer und HappinLogo-Komponenten: Aufbau, Props, Integration in alle Screens. |
 | [04-time-based-slogan.md](./04-time-based-slogan.md) | Zeitabhängiger Slogan auf der Startseite: Logik, Zeitbereiche und Integration. |
 | [05-event-list-screen.md](./05-event-list-screen.md) | Event-Übersichtsseite: API-Client, Screen-Aufbau, Navigation, Daten-Mapping. |
+| [06-authentication.md](06-authentication.md) | Passwordless Authentication via E-Mail OTP: Supabase-Setup, Auth-Flow, Token-Speicherung (Web/iOS/Android), betroffene Dateien und Sicherheitshinweise. |
