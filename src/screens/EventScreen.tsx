@@ -400,7 +400,7 @@ export default function EventScreen() {
         return () => { cancelled = true; };
     }, [eventId]);
 
-    const descriptionLines = EVENT.description.split('\n\n');
+    const descriptionLines = event.description.split('\n\n');
     const shortDesc = descriptionLines[0];
 
     if (loading) {
