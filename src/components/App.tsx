@@ -11,7 +11,8 @@ export default function App() {
             screens: {
                 Home: '/',
                 Login: '/login',
-                Event: '/event',
+                EventList: '/events',
+                Event: '/event/:eventId',
             },
         }
     }
