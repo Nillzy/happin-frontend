@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -19,8 +19,10 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
+import { useAppNavigation } from '../utils/useAppNavigation';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
+import { authorize } from '../services/supabase';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -306,7 +308,14 @@ function InfoRow({
 
 export default function EventScreen() {
     const { colors } = useTheme();
+    const navigation = useAppNavigation();
     const [expanded, setExpanded] = useState(false);
+
+    useEffect(() => {
+        authorize().then((isAuthorized) => {
+            if (!isAuthorized) navigation.navigate('Login');
+        });
+    }, []);
 
     const descriptionLines = EVENT.description.split('\n\n');
     const shortDesc = descriptionLines[0];
