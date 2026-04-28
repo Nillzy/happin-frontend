@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -10,6 +10,7 @@ import {
     Platform,
     Modal,
     Pressable,
+    ActivityIndicator,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -19,8 +20,11 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
+import { useRoute } from '@react-navigation/native';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
+import { api } from '../services/api';
+import type { EventDetailResponse } from '../types/events';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -37,9 +41,26 @@ const RSVP_OPTIONS: {
     { status: 'not_going', icon: '✕', label: 'Absagen',  sublabel: 'Ich kann leider nicht'     },
 ];
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+// ── Mock data (fallback when no eventId is provided) ─────────────────────────
 
-const EVENT = {
+interface EventData {
+    title: string;
+    subtitle: string;
+    heroImage: string;
+    date: string;
+    time: string;
+    location: string;
+    locationDetail: string;
+    categories: string[];
+    price: string;
+    capacity: string;
+    attending: number;
+    description: string;
+    host: { name: string; role: string; avatar: string; events: number };
+    lineup: string[];
+}
+
+const MOCK_EVENT: EventData = {
     title: 'Neon Horizon',
     subtitle: 'Electronic Music Festival',
     heroImage: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&q=80',
@@ -61,6 +82,50 @@ const EVENT = {
     },
     lineup: ['Paula Temple', 'Surgeon', 'Blawan', 'Phase Fatale'],
 };
+
+function mapApiToEventData(raw: EventDetailResponse): EventData {
+    const d = new Date(raw.date);
+    const dateStr = new Intl.DateTimeFormat('de-DE', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    }).format(d);
+    const timeStr = new Intl.DateTimeFormat('de-DE', {
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(d) + ' Uhr';
+
+    const loc = raw.location;
+    const locationName = loc ? `${loc.city}` : '';
+    const locationDetail = loc
+        ? [loc.street, loc.house_number, loc.postal_code, loc.city].filter(Boolean).join(', ')
+        : '';
+
+    const categories = raw.category ? raw.category.split(',').map((c) => c.trim()) : [];
+
+    return {
+        title: raw.title,
+        subtitle: raw.description?.slice(0, 50) ?? '',
+        heroImage: raw.image_url ?? '',
+        date: dateStr,
+        time: timeStr,
+        location: locationName,
+        locationDetail,
+        categories,
+        price: 'Preis auf Anfrage',
+        capacity: raw.max_capacity ? `${raw.max_capacity} Plätze` : 'Unbegrenzt',
+        attending: raw.participant_count,
+        description: raw.description ?? '',
+        host: {
+            name: raw.host_name ?? 'Veranstalter',
+            role: 'Veranstalter',
+            avatar: '',
+            events: 0,
+        },
+        lineup: [],
+    };
+}
 
 // ── RSVP Menu ─────────────────────────────────────────────────────────────────
 
@@ -306,10 +371,39 @@ function InfoRow({
 
 export default function EventScreen() {
     const { colors } = useTheme();
+    const route = useRoute<any>();
+    const eventId = route.params?.eventId as number | undefined;
+
+    const [event, setEvent] = useState<EventData>(MOCK_EVENT);
+    const [loading, setLoading] = useState(!!eventId);
     const [expanded, setExpanded] = useState(false);
 
-    const descriptionLines = EVENT.description.split('\n\n');
+    useEffect(() => {
+        if (!eventId) return;
+        let cancelled = false;
+        setLoading(true);
+        api.getEventById(eventId)
+            .then((data) => {
+                if (!cancelled) setEvent(mapApiToEventData(data));
+            })
+            .catch(() => {})
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [eventId]);
+
+    const descriptionLines = event.description.split('\n\n');
     const shortDesc = descriptionLines[0];
+
+    if (loading) {
+        return (
+            <View style={[s.root, { backgroundColor: colors.background }]}>
+                <Navbar showBack />
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                </View>
+            </View>
+        );
+    }
 
     return (
         <View style={[s.root, { backgroundColor: colors.background }]}>
@@ -324,7 +418,7 @@ export default function EventScreen() {
                 {/* ── Hero ── */}
                 <View style={s.heroContainer}>
                     <Image
-                        source={{ uri: EVENT.heroImage }}
+                        source={{ uri: event.heroImage }}
                         style={s.heroImage}
                         resizeMode="cover"
                     />
@@ -334,14 +428,14 @@ export default function EventScreen() {
                     {/* Hero title overlay */}
                     <View style={s.heroTitleBlock}>
                         <View style={s.heroChips}>
-                            {EVENT.categories.slice(0, 2).map((cat) => (
+                            {event.categories.slice(0, 2).map((cat) => (
                                 <View key={cat} style={s.heroBadge}>
                                     <Text style={s.heroBadgeText}>{cat}</Text>
                                 </View>
                             ))}
                         </View>
-                        <Text style={s.heroTitle}>{EVENT.title}</Text>
-                        <Text style={s.heroSubtitle}>{EVENT.subtitle}</Text>
+                        <Text style={s.heroTitle}>{event.title}</Text>
+                        <Text style={s.heroSubtitle}>{event.subtitle}</Text>
                     </View>
                 </View>
 
@@ -352,12 +446,12 @@ export default function EventScreen() {
                     <View style={s.topActionRow}>
                         <View style={s.statsGroup}>
                             <View>
-                                <Text style={[s.statValue, { color: colors.onSurface }]}>{EVENT.price}</Text>
+                                <Text style={[s.statValue, { color: colors.onSurface }]}>{event.price}</Text>
                                 <Text style={[s.statLabel, { color: colors.onSurfaceVariant }]}>Eintritt</Text>
                             </View>
                             <View style={[s.statDivider, { backgroundColor: colors.outlineVariant }]} />
                             <View>
-                                <Text style={[s.statValue, { color: colors.onSurface }]}>{EVENT.attending}</Text>
+                                <Text style={[s.statValue, { color: colors.onSurface }]}>{event.attending}</Text>
                                 <Text style={[s.statLabel, { color: colors.onSurfaceVariant }]}>Teilnehmer</Text>
                             </View>
                         </View>
@@ -368,9 +462,9 @@ export default function EventScreen() {
 
                     {/* Date / Time / Location */}
                     <View style={s.infoBlock}>
-                        <InfoRow icon="📅" primary={EVENT.date} secondary={EVENT.time} colors={colors} />
-                        <InfoRow icon="📍" primary={EVENT.location} secondary={EVENT.locationDetail} colors={colors} />
-                        <InfoRow icon="🎟" primary={EVENT.price} secondary={`Kapazität: ${EVENT.capacity}`} colors={colors} />
+                        <InfoRow icon="📅" primary={event.date} secondary={event.time} colors={colors} />
+                        <InfoRow icon="📍" primary={event.location} secondary={event.locationDetail} colors={colors} />
+                        <InfoRow icon="🎟" primary={event.price} secondary={`Kapazität: ${event.capacity}`} colors={colors} />
                     </View>
 
                     <View style={[s.divider, { backgroundColor: colors.outlineVariant }]} />
@@ -379,7 +473,7 @@ export default function EventScreen() {
                     <View style={s.section}>
                         <Text style={[s.sectionTitle, { color: colors.onSurface }]}>Kategorien</Text>
                         <View style={s.chipRow}>
-                            {EVENT.categories.map((cat) => (
+                            {event.categories.map((cat) => (
                                 <Chip key={cat} label={cat} colors={colors} />
                             ))}
                         </View>
@@ -391,7 +485,7 @@ export default function EventScreen() {
                     <View style={s.section}>
                         <Text style={[s.sectionTitle, { color: colors.onSurface }]}>Über dieses Event</Text>
                         <Text style={[s.description, { color: colors.onSurfaceVariant }]}>
-                            {expanded ? EVENT.description : shortDesc}
+                            {expanded ? event.description : shortDesc}
                         </Text>
                         <TouchableOpacity onPress={() => setExpanded((v) => !v)} activeOpacity={0.7}>
                             <Text style={[s.readMore, { color: colors.primary }]}>
@@ -406,7 +500,7 @@ export default function EventScreen() {
                     <View style={s.section}>
                         <Text style={[s.sectionTitle, { color: colors.onSurface }]}>Line-up</Text>
                         <View style={s.lineupGrid}>
-                            {EVENT.lineup.map((artist) => (
+                            {event.lineup.map((artist) => (
                                 <View
                                     key={artist}
                                     style={[
@@ -439,13 +533,13 @@ export default function EventScreen() {
                             ]}
                         >
                             <Image
-                                source={{ uri: EVENT.host.avatar }}
+                                source={{ uri: event.host.avatar }}
                                 style={[s.hostAvatar, { borderColor: colors.primary }]}
                             />
                             <View style={s.hostInfo}>
-                                <Text style={[s.hostName, { color: colors.onSurface }]}>{EVENT.host.name}</Text>
+                                <Text style={[s.hostName, { color: colors.onSurface }]}>{event.host.name}</Text>
                                 <Text style={[s.hostRole, { color: colors.onSurfaceVariant }]}>
-                                    {EVENT.host.role} · {EVENT.host.events} Events
+                                    {event.host.role} · {event.host.events} Events
                                 </Text>
                             </View>
                             <TouchableOpacity

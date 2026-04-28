@@ -474,6 +474,7 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.btnSecondary, { borderColor: 'rgba(255,255,255,0.2)' }]}
+                        onPress={() => navigation.navigate('EventList')}
                     >
                         <Text style={[styles.btnSecondaryText, { color: colors.onSurface }]}>
                             Mehr erfahren
