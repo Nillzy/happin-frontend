@@ -28,6 +28,7 @@ import Svg, {
 import { MAP_PATHS_PRIMARY, MAP_PATHS_SECONDARY, MAP_PATHS_MINOR } from '@/constants/berlin-map-paths';
 import { useTheme } from '@/hooks/use-theme';
 import { useAppNavigation } from '../utils/useAppNavigation';
+import { getTimeBasedSlogan } from '../utils/getTimeBasedSlogan';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 
@@ -420,6 +421,7 @@ export default function HomeScreen() {
     const { colors } = useTheme();
     const [mapWidth, setMapWidth] = useState(SCREEN_WIDTH);
     const navigation = useAppNavigation();
+    const slogan = getTimeBasedSlogan();
 
     return (
         <ScrollView
@@ -454,8 +456,8 @@ export default function HomeScreen() {
             {/* ── Headline Block ── */}
             <View style={styles.headline}>
                 <Text style={[styles.headlineH1, { color: colors.onBackground }]}>
-                    Dein Abend.{'\n'}
-                    <Text style={{ color: colors.primary }}>Dein Vibe.</Text>
+                    {slogan.firstLine}{'\n'}
+                    <Text style={{ color: colors.primary }}>{slogan.secondLine}</Text>
                 </Text>
                 <Text style={[styles.headlineSub, { color: colors.onSurfaceVariant }]}>
                     Happin bringt dir die besten Events deiner Stadt –{'\n'}
