@@ -27,7 +27,7 @@ import Svg, {
 } from 'react-native-svg';
 import { MAP_PATHS_PRIMARY, MAP_PATHS_SECONDARY, MAP_PATHS_MINOR } from '@/constants/berlin-map-paths';
 import { useTheme } from '@/hooks/use-theme';
-import { useAppNavigation } from '../utils/useAppNavigation';
+import { useRouter } from 'expo-router';
 import { getTimeBasedSlogan } from '../utils/getTimeBasedSlogan';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
@@ -420,7 +420,7 @@ function CityMap({ mapWidth }: { mapWidth: number }) {
 export default function HomeScreen() {
     const { colors } = useTheme();
     const [mapWidth, setMapWidth] = useState(SCREEN_WIDTH);
-    const navigation = useAppNavigation();
+    const router = useRouter();
     const slogan = getTimeBasedSlogan();
 
     return (
@@ -466,7 +466,7 @@ export default function HomeScreen() {
                 <View style={styles.headlineCtas}>
                     <TouchableOpacity
                         style={[styles.btnPrimary, { backgroundColor: colors.primary }]}
-                        onPress={() => navigation.navigate('Login')}
+                        onPress={() => router.push('/login')}
                     >
                         <Text style={[styles.btnPrimaryText, { color: colors.onPrimary }]}>
                             Kostenlos starten
@@ -474,8 +474,7 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.btnSecondary, { borderColor: 'rgba(255,255,255,0.2)' }]}
-                        onPress={() => navigation.navigate('EventList')}
-                    >
+                        onPress={() => router.push('/login')}>
                         <Text style={[styles.btnSecondaryText, { color: colors.onSurface }]}>
                             Mehr erfahren
                         </Text>

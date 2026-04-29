@@ -1,30 +1,28 @@
-import { createClient } from "@supabase/supabase-js";
-import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseSbPublishable = process.env.EXPO_PUBLIC_SUPABASE_SB_PUBLISHABLE;
+let _supabase: SupabaseClient | null = null;
 
-if (!supabaseUrl || !supabaseSbPublishable) throw new Error('Missing Supabase environment variables');
-
-const supabase = createClient(supabaseUrl, supabaseSbPublishable);
-
-async function getStoredToken(): Promise<string | null> {
-    if (Platform.OS === 'web') {
-        return localStorage.getItem('access_token');
+function getSupabase(): SupabaseClient {
+    if (!_supabase) {
+        const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+        const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+        if (!url || !key) {
+            throw new Error('Missing Supabase environment variables');
+        }
+        _supabase = createClient(url, key);
     }
-    return SecureStore.getItemAsync('access_token');
+    return _supabase;
 }
 
 export async function sendOtp(email: string): Promise<void> {
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    const { error } = await getSupabase().auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
     if (error) {
         throw new Error(error.message)
     }
 }
 
 export async function verifyOtp(email: string, token: string): Promise<string> {
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { data, error } = await getSupabase().auth.verifyOtp({
         email,
         token,
         type: 'email',
@@ -41,10 +39,15 @@ export async function verifyOtp(email: string, token: string): Promise<string> {
     return data.session.access_token;
 }
 
+export async function getSession(): Promise<string | null> {
+    const { data } = await getSupabase().auth.getSession();
+    return data.session?.access_token ?? null;
+}
+
 export async function authorize(): Promise<boolean> {
-    const token = await getStoredToken();
+    const token = await getSession();
     if (!token) return false;
 
-    const { data, error } = await supabase.auth.getUser(token);
+    const { data, error } = await getSupabase().auth.getUser(token);
     return !error && !!data.user;
 }

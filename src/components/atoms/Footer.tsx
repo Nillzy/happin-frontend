@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import HappinLogo from './HappinLogo';
-import { useAppNavigation } from '@/src/utils/useAppNavigation';
+import { useRouter } from 'expo-router';
 
 const LINKS = [
     { label: 'Datenschutz', key: 'privacy' },
@@ -12,13 +12,13 @@ const LINKS = [
 
 export default function Footer() {
     const { colors, isDark } = useTheme();
-    const navigation = useAppNavigation();
+    const router = useRouter();
 
     const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
 
     return (
         <View style={[styles.footer, { borderTopColor: borderColor, backgroundColor: colors.background }]}>
-            <TouchableOpacity onPress={() => navigation.navigate('Home')} activeOpacity={0.85}>
+            <TouchableOpacity onPress={() => router.push('/')} activeOpacity={0.85}>
                 <HappinLogo size="sm" />
             </TouchableOpacity>
 

@@ -20,8 +20,7 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
-import { useAppNavigation } from '../utils/useAppNavigation';
-import { useRoute } from '@react-navigation/native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import { authorize } from '../services/supabase';
@@ -86,7 +85,7 @@ const MOCK_EVENT: EventData = {
 };
 
 function mapApiToEventData(raw: EventDetailResponse): EventData {
-    const d = new Date(raw.date);
+    const d = new Date(raw.starts_at);
     const dateStr = new Intl.DateTimeFormat('de-DE', {
         weekday: 'long',
         day: 'numeric',
@@ -373,9 +372,9 @@ function InfoRow({
 
 export default function EventScreen() {
     const { colors } = useTheme();
-    const navigation = useAppNavigation();
-    const route = useRoute<any>();
-    const eventId = route.params?.eventId as number | undefined;
+    const router = useRouter();
+    const { eventId: eventIdParam } = useLocalSearchParams<{ eventId: string }>();
+    const eventId = eventIdParam ? Number(eventIdParam) : undefined;
 
     const [event, setEvent] = useState<EventData>(MOCK_EVENT);
     const [loading, setLoading] = useState(!!eventId);
@@ -383,7 +382,7 @@ export default function EventScreen() {
 
     useEffect(() => {
         authorize().then((isAuthorized) => {
-            if (!isAuthorized) navigation.navigate('Login');
+            if (!isAuthorized) router.replace('/login');
         });
     }, []);
 

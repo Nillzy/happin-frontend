@@ -11,7 +11,8 @@ export interface EventLocation {
 export interface EventListItem {
     event_id: number;
     title: string;
-    date: string;
+    starts_at: string;
+    ends_at?: string;
     description?: string;
     category?: string;
     max_capacity?: number;
@@ -32,4 +33,25 @@ export interface EventDetailResponse extends EventListItem {
     updated_at?: string;
     host_name?: string;
     media_urls: string[];
+}
+
+export interface LocationCreate {
+    city: string;
+    street?: string;
+    house_number?: string;
+    postal_code?: string;
+    country?: string;
+    type?: string;
+    description?: string;
+}
+
+export interface EventCreateRequest {
+    title: string;
+    starts_at: string;
+    ends_at?: string;
+    description?: string;
+    category?: string;
+    max_capacity?: number;
+    is_public: boolean;
+    location: LocationCreate;
 }

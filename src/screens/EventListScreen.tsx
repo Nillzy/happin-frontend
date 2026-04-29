@@ -12,10 +12,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
-import { useAppNavigation } from '../utils/useAppNavigation';
+import { useRouter } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import { api } from '../services/api';
+import { authorize } from '../services/supabase';
 import type { EventListItem } from '../types/events';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -43,7 +44,7 @@ function formatDateGerman(isoDate: string): string {
 
 export default function EventListScreen() {
     const { colors } = useTheme();
-    const navigation = useAppNavigation();
+    const router = useRouter();
     const [events, setEvents] = useState<EventListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -59,6 +60,12 @@ export default function EventListScreen() {
         } finally {
             setLoading(false);
         }
+    }, []);
+
+    useEffect(() => {
+        authorize().then((isAuthorized) => {
+            if (!isAuthorized) router.replace('/login');
+        });
     }, []);
 
     useEffect(() => {
@@ -78,7 +85,7 @@ export default function EventListScreen() {
                         borderColor: colors.outlineVariant,
                     },
                 ]}
-                onPress={() => navigation.navigate('Event', { eventId: item.event_id })}
+                onPress={() => router.push(`/event/${item.event_id}`)}
             >
                 {item.image_url ? (
                     <Image
@@ -102,7 +109,7 @@ export default function EventListScreen() {
 
                     <View style={styles.cardMeta}>
                         <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
-                            {formatDateGerman(item.date)}
+                            {formatDateGerman(item.starts_at)}
                         </Text>
                         {item.location?.city && (
                             <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
@@ -183,6 +190,14 @@ export default function EventListScreen() {
                     showsVerticalScrollIndicator={false}
                 />
             )}
+
+            <TouchableOpacity
+                activeOpacity={0.85}
+                style={[styles.fab, { backgroundColor: colors.primary }]}
+                onPress={() => router.push('/events/create')}
+            >
+                <Text style={[styles.fabIcon, { color: colors.onPrimary }]}>+</Text>
+            </TouchableOpacity>
         </View>
     );
 }
@@ -294,5 +309,25 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 16,
+    },
+    fab: {
+        position: 'absolute',
+        bottom: 24,
+        right: 24,
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+    },
+    fabIcon: {
+        fontSize: 28,
+        fontWeight: '400',
+        lineHeight: 30,
     },
 });

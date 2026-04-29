@@ -1,1 +1,1 @@
-export { default } from '../src/components/App';
+export { default } from '@/src/screens/HomeScreen';

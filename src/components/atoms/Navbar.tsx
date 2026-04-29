@@ -3,7 +3,7 @@ import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native
 import { useTheme } from '@/hooks/use-theme';
 import HappinLogo from './HappinLogo';
 import DarkLightToggle from './DarkLightToggle';
-import { useAppNavigation } from '@/src/utils/useAppNavigation';
+import { useRouter } from 'expo-router';
 
 interface NavbarProps {
     /** Show the "App laden" CTA button (default: true) */
@@ -14,7 +14,7 @@ interface NavbarProps {
 
 export default function Navbar({ showCta = true, showBack = false }: NavbarProps) {
     const { colors, isDark } = useTheme();
-    const navigation = useAppNavigation();
+    const router = useRouter();
 
     const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
 
@@ -22,14 +22,14 @@ export default function Navbar({ showCta = true, showBack = false }: NavbarProps
         <View style={[styles.nav, { borderBottomColor: borderColor, backgroundColor: colors.background }]}>
             {showBack ? (
                 <TouchableOpacity
-                    onPress={() => navigation.goBack()}
+                    onPress={() => router.back()}
                     style={styles.backBtn}
                     activeOpacity={0.7}
                 >
                     <Text style={[styles.backText, { color: colors.onSurfaceVariant }]}>← Zurück</Text>
                 </TouchableOpacity>
             ) : (
-                <TouchableOpacity onPress={() => navigation.navigate('Home')} activeOpacity={0.85}>
+                <TouchableOpacity onPress={() => router.push('/')} activeOpacity={0.85}>
                     <HappinLogo size="md" />
                 </TouchableOpacity>
             )}
