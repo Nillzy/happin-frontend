@@ -5,7 +5,7 @@ let _supabase: SupabaseClient | null = null;
 function getSupabase(): SupabaseClient {
     if (!_supabase) {
         const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-        const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+        const key = process.env.EXPO_PUBLIC_SUPABASE_SB_PUBLISHABLE;
         if (!url || !key) {
             throw new Error('Missing Supabase environment variables');
         }
