@@ -15,11 +15,16 @@ Happin verwendet **Passwordless Authentication** via **E-Mail OTP** (One-Time Pa
   3. Nutzer gibt 6-stelligen Code ein
   4. verifyOtp(email, token)  →  Supabase gibt Session zurück
   5. access_token wird lokal gespeichert
-  6. Navigation → EventScreen
+  6. Navigation → EventListScreen
+
+[EventCreateScreen]
+  1. handleSubmit: getSession() → Token aus Supabase-Session
+  2. Kein Token → Weiterleitung zu LoginScreen
+  3. Token vorhanden → API-Call mit Bearer Token
 
 [EventScreen]
   1. useEffect on mount: authorize()
-  2. Liest access_token aus lokalem Speicher
+  2. getSession() liest Token aus Supabase-Session
   3. Supabase prüft Token via getUser()
   4. Ungültig → Weiterleitung zu LoginScreen
 ```
@@ -46,9 +51,10 @@ Happin verwendet **Passwordless Authentication** via **E-Mail OTP** (One-Time Pa
 
 | Datei | Rolle |
 |---|---|
-| `src/services/supabase.ts` | Supabase-Client, alle Auth-Funktionen |
-| `src/screens/LoginScreen.tsx` | OTP-Flow UI, Token-Speicherung nach Verifikation |
+| `src/services/supabase.ts` | Supabase-Client, alle Auth-Funktionen (sendOtp, verifyOtp, getSession, authorize) |
+| `src/screens/LoginScreen.tsx` | OTP-Flow UI, Token-Speicherung nach Verifikation, Navigation → EventList |
 | `src/screens/EventScreen.tsx` | Auth-Guard via `authorize()` im `useEffect` |
+| `src/screens/EventCreateScreen.tsx` | Token-Abruf via `getSession()` beim Absenden, Redirect zu Login falls nicht eingeloggt |
 | `.env` | Supabase-Zugangsdaten |
 
 ---
@@ -61,8 +67,11 @@ Löst den OTP-Versand aus. Wirft einen Fehler, wenn Supabase die Anfrage ablehnt
 ### `verifyOtp(email: string, token: string): Promise<string>`
 Verifiziert den vom Nutzer eingegebenen 6-stelligen Code. Gibt bei Erfolg den `access_token` der neuen Session zurück. Wirft einen Fehler bei falschem Code oder abgelaufener Session.
 
+### `getSession(): Promise<string | null>`
+Liest den `access_token` aus der aktuellen Supabase-Session. Nutzt `supabase.auth.getSession()` — funktioniert auf Web (Cookies) und Native (SecureStore) gleichermaßen. Gibt `null` zurück wenn keine Session aktiv ist. **Das ist die bevorzugte Methode um den Token abzurufen** — nicht manuell aus localStorage/SecureStore lesen.
+
 ### `authorize(): Promise<boolean>`
-Liest den gespeicherten `access_token` aus dem lokalen Speicher und prüft ihn über `supabase.auth.getUser(token)`. Gibt `true` zurück, wenn der Token gültig ist und Supabase einen User zurückliefert, sonst `false`.
+Prüft ob der aktuelle Nutzer eingeloggt ist. Ruft intern `getSession()` auf und validiert den Token über `supabase.auth.getUser()`. Gibt `true` zurück bei gültigem Token, sonst `false`.
 
 ---
 
@@ -88,9 +97,10 @@ Die plattformabhängige Abstraktion ist in `LoginScreen.tsx` (`storeToken`) und 
 
 ---
 
-## Auth-Guard (EventScreen)
+## Auth-Guards
 
-`EventScreen` ist die einzige Route, die einen Login erfordert. Der Guard läuft im `useEffect` beim ersten Mount:
+### EventScreen
+`EventScreen` prüft beim Mount ob der Nutzer eingeloggt ist:
 
 ```typescript
 useEffect(() => {
@@ -100,7 +110,19 @@ useEffect(() => {
 }, []);
 ```
 
-Solange die Prüfung läuft, bleibt der Screen kurz sichtbar. Da der Check schnell abläuft (lokaler Lese-Zugriff + ein Supabase-API-Call), ist kein separater Loading-State nötig.
+### EventCreateScreen
+`EventCreateScreen` prüft beim Absenden des Formulars ob eine gültige Session existiert:
+
+```typescript
+const token = await getSession();
+if (!token) {
+    navigation.navigate('Login');
+    return;
+}
+const result = await api.createEvent(payload, token);
+```
+
+Falls kein Token vorhanden ist, wird der Nutzer zum Login weitergeleitet. Nach erfolgreichem Login kann er das Formular erneut absenden.
 
 ---
 

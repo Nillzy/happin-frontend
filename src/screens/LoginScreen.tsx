@@ -17,7 +17,7 @@ import Animated, {
     Easing,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
-import { useAppNavigation } from '../utils/useAppNavigation';
+import { useRouter } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import * as SecureStore from 'expo-secure-store';
@@ -141,7 +141,7 @@ function isValidEmail(value: string): boolean {
 
 export default function LoginScreen() {
     const { colors } = useTheme();
-    const navigation = useAppNavigation();
+    const router = useRouter();
 
     const [step, setStep] = useState<Step>('email');
     const [email, setEmail] = useState('');
@@ -224,7 +224,7 @@ export default function LoginScreen() {
         try {
             const accessToken = await verifyOtp(email, otp);
             await storeToken('access_token', accessToken);
-            navigation.navigate('Event');
+            router.replace('/events');
         } catch (e) {
             console.error('OTP verification failed:', e);
             setOtpError(true);
