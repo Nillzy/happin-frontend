@@ -48,10 +48,10 @@ React Native / Expo Frontend der **Happin Event-Discovery Plattform** — läuft
 │               Happin Frontend               │
 │           (Expo / React Native)             │
 │                                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │   Web    │  │   iOS    │  │ Android  │  │
-│  │(Browser) │  │Simulator │  │ Emulator │  │
-│  └──────────┘  └──────────┘  └──────────┘  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │   Web    │  │   iOS    │  │ Android  │   │
+│  │(Browser) │  │Simulator │  │ Emulator │   │
+│  └──────────┘  └──────────┘  └──────────┘   │
 │                                             │
 │  ┌─────────────────────────────────────┐    │
 │  │  Expo Router (file-based Routing)   │    │
