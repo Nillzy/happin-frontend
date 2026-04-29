@@ -6,6 +6,66 @@ interface IconProps {
     color?: string;
 }
 
+export function CalendarIcon({ size = 24, color = 'currentColor' }: IconProps) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <Path
+                d="M8 2v3M16 2v3M3.5 9.09h17M21 8.5V17c0 3-1.5 5-5 5H8c-3.5 0-5-2-5-5V8.5c0-3 1.5-5 5-5h8c3.5 0 5 2 5 5Z"
+                stroke={color}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <Path
+                d="M15.695 13.7h.009M15.695 16.7h.009M11.995 13.7h.01M11.995 16.7h.01M8.295 13.7h.009M8.295 16.7h.009"
+                stroke={color}
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </Svg>
+    );
+}
+
+export function LocationIcon({ size = 24, color = 'currentColor' }: IconProps) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <Path
+                d="M12 13.43a3.12 3.12 0 1 0 0-6.24 3.12 3.12 0 0 0 0 6.24Z"
+                stroke={color}
+                strokeWidth={2}
+            />
+            <Path
+                d="M3.62 8.49c1.97-8.66 14.8-8.65 16.76.01 1.15 5.08-2.01 9.38-4.78 12.04a5.193 5.193 0 0 1-7.21 0c-2.76-2.66-5.92-6.97-4.77-12.05Z"
+                stroke={color}
+                strokeWidth={2}
+            />
+        </Svg>
+    );
+}
+
+export function TicketIcon({ size = 24, color = 'currentColor' }: IconProps) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <Path
+                d="M19.5 12.5c0-1.64 1.36-3 3-3V8c0-4-1-5-5-5H6.5c-4 0-5 1-5 5v1c1.64 0 3 1.36 3 3s-1.36 3-3 3v1c0 4 1 5 5 5h11c4 0 5-1 5-5a3.01 3.01 0 0 1-3-3Z"
+                stroke={color}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <Path
+                d="M10 3v18"
+                stroke={color}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray="5 5"
+            />
+        </Svg>
+    );
+}
+
 export function SmsIcon({ size = 24, color = 'currentColor' }: IconProps) {
     const scale = size / 16;
     return (
