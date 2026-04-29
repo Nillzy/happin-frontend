@@ -282,6 +282,6 @@ Die GitLab CI/CD Pipeline (`.gitlab-ci.yml`) läuft bei jedem Push auf `main` au
 
 Detaillierte technische Dokumentation liegt im Ordner [`documentation/`](documentation/).
 
----
+**Neue Themen, die in keine bestehende Datei passen, erhalten eine eigene Datei und einen Eintrag in `00-index.md`.**
 
 *DHBW Karlsruhe — Software Engineering TINF24B2 — Happin*
