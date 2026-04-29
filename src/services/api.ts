@@ -1,4 +1,4 @@
-import type { EventListResponse, EventDetailResponse, EventCreateRequest } from '@/src/types/events';
+import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption } from '@/src/types/events';
 
 const BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? 'http://localhost:8001';
 
@@ -22,13 +22,29 @@ export const api = {
     getPublicEvents: (limit = 50, offset = 0) =>
         request<EventListResponse>(`/api/v1/events/?limit=${limit}&offset=${offset}`),
 
-    getEventById: (eventId: number) =>
-        request<EventDetailResponse>(`/api/v1/events/${eventId}`),
+    getEventById: (eventId: string, token?: string) =>
+        request<EventDetailResponse>(`/api/v1/events/${eventId}`, token ? {
+            headers: { Authorization: `Bearer ${token}` },
+        } : undefined),
 
     createEvent: (data: EventCreateRequest, token: string) =>
         request<EventDetailResponse>('/api/v1/events/', {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify(data),
+        }),
+
+    updateEvent: (eventId: string, data: EventUpdateRequest, token: string) =>
+        request<EventDetailResponse>(`/api/v1/events/${eventId}`, {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify(data),
+        }),
+
+    syncTicketOptions: (eventId: string, options: TicketOption[], token: string) =>
+        request<TicketOption[]>(`/api/v1/events/${eventId}/ticket-options`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ ticket_options: options }),
         }),
 };

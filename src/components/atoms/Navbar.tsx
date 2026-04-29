@@ -10,9 +10,11 @@ interface NavbarProps {
     showCta?: boolean;
     /** Show the back-navigation arrow instead of CTA (default: false) */
     showBack?: boolean;
+    /** Custom back handler (default: router.back()) */
+    onBackPress?: () => void;
 }
 
-export default function Navbar({ showCta = true, showBack = false }: NavbarProps) {
+export default function Navbar({ showCta = true, showBack = false, onBackPress }: NavbarProps) {
     const { colors, isDark } = useTheme();
     const router = useRouter();
 
@@ -22,7 +24,7 @@ export default function Navbar({ showCta = true, showBack = false }: NavbarProps
         <View style={[styles.nav, { borderBottomColor: borderColor, backgroundColor: colors.background }]}>
             {showBack ? (
                 <TouchableOpacity
-                    onPress={() => router.back()}
+                    onPress={onBackPress ?? (() => router.back())}
                     style={styles.backBtn}
                     activeOpacity={0.7}
                 >
