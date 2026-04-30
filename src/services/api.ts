@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption } from '@/src/types/events';
+import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse } from '@/src/types/events';
 import type { ParticipantListResponse, RemoveParticipantsResponse } from '@/src/types/host';
 
 /**
@@ -71,6 +71,13 @@ export const api = {
             method: 'PUT',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ ticket_options: options }),
+        }),
+
+    rsvpEvent: (eventId: string, status: RsvpStatus, token: string) =>
+        request<RsvpResponse>(`/api/v1/events/${eventId}/rsvp`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ status }),
         }),
 
     getEventParticipants: (eventId: string, token: string) =>

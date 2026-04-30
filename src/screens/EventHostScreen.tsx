@@ -62,7 +62,7 @@ export default function EventHostScreen() {
             }
 
             const [eventData, participantData] = await Promise.all([
-                api.getEventById(eventId),
+                api.getEventById(eventId, token),
                 api.getEventParticipants(eventId, token),
             ]);
 

@@ -46,6 +46,16 @@ export interface EventDetailResponse extends EventListItem {
     host_name?: string;
     media_urls: string[];
     ticket_options: TicketOption[];
+    my_rsvp_status?: RsvpStatus | null;
+}
+
+export type RsvpStatus = 'Accepted' | 'Declined' | 'Pending';
+
+export interface RsvpResponse {
+    event_participation_id: string;
+    event_id: string;
+    person_id: string;
+    status: RsvpStatus;
 }
 
 export interface LocationCreate {

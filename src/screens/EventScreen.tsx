@@ -13,6 +13,7 @@ import {
     Pressable,
     ActivityIndicator,
     Switch,
+    Alert,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -42,7 +43,7 @@ import type { EventDetailResponse, EventUpdateRequest, TicketOption } from '../t
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type RsvpStatus = 'going' | 'not_going' | 'maybe' | null;
+type RsvpStatus = 'Accepted' | 'Declined' | 'Pending' | null;
 
 const RSVP_OPTIONS: {
     status: Exclude<RsvpStatus, null>;
@@ -50,10 +51,16 @@ const RSVP_OPTIONS: {
     label: string;
     sublabel: string;
 }[] = [
-    { status: 'going',     icon: '✓', label: 'Zusagen',  sublabel: 'Ich bin dabei'             },
-    { status: 'maybe',     icon: '~', label: 'Unsicher', sublabel: 'Vielleicht bin ich dabei'  },
-    { status: 'not_going', icon: '✕', label: 'Absagen',  sublabel: 'Ich kann leider nicht'     },
+    { status: 'Accepted', icon: '✓', label: 'Zusagen',  sublabel: 'Ich bin dabei'            },
+    { status: 'Pending',  icon: '~', label: 'Unsicher', sublabel: 'Vielleicht bin ich dabei' },
+    { status: 'Declined', icon: '✕', label: 'Absagen',  sublabel: 'Ich kann leider nicht'    },
 ];
+
+const RSVP_STATUS_LABELS: Record<NonNullable<RsvpStatus>, string> = {
+    Accepted: '✓  Zugesagt',
+    Declined: '✕  Abgesagt',
+    Pending:  '~  Unsicher',
+};
 
 type EditSection = 'title' | 'description' | 'datetime' | 'location' | 'category' | 'capacity' | 'tickets' | null;
 
@@ -274,69 +281,111 @@ function RsvpOptionRow({
 
 function RsvpButton({
     colors,
+    eventId,
+    isPublic,
+    initialStatus,
+    token,
+    onParticipantCountChange,
+    onStatusChange,
 }: {
     colors: ReturnType<typeof useTheme>['colors'];
+    eventId: string;
+    isPublic: boolean;
+    initialStatus: RsvpStatus;
+    token: string | null;
+    onParticipantCountChange: (delta: number) => void;
+    onStatusChange: (status: RsvpStatus) => void;
 }) {
-    const [status, setStatus] = useState<RsvpStatus>(null);
+    const router = useRouter();
+    const [status, setStatus] = useState<RsvpStatus>(initialStatus);
     const [menuVisible, setMenuVisible] = useState(false);
+    const [loading, setLoading] = useState(false);
     const scale = useSharedValue(1);
 
     const animStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
     }));
 
+    const callRsvp = async (newStatus: Exclude<RsvpStatus, null>) => {
+        if (!token) return;
+        setLoading(true);
+        try {
+            await api.rsvpEvent(eventId, newStatus, token);
+            if (newStatus === 'Accepted' && status !== 'Accepted') onParticipantCountChange(1);
+            if (newStatus !== 'Accepted' && status === 'Accepted') onParticipantCountChange(-1);
+            setStatus(newStatus);
+            onStatusChange(newStatus);
+        } catch (err: unknown) {
+            let msg = 'RSVP konnte nicht gespeichert werden.';
+            if (err instanceof Error) {
+                const match = err.message.match(/\{.*\}/);
+                if (match) {
+                    try { msg = JSON.parse(match[0]).detail ?? msg; } catch {}
+                }
+            }
+            Alert.alert('Fehler', msg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handlePress = () => {
         scale.value = withSequence(
             withTiming(0.94, { duration: 80 }),
             withSpring(1, { damping: 10, stiffness: 280 }),
         );
-        setMenuVisible(true);
+        if (!token) {
+            router.navigate('/login');
+            return;
+        }
+        if (isPublic) {
+            callRsvp(status === 'Accepted' ? 'Declined' : 'Accepted');
+        } else {
+            setMenuVisible(true);
+        }
     };
 
-    const activeOpt = RSVP_OPTIONS.find((o) => o.status === status);
+    const isAccepted = status === 'Accepted';
+    const btnLabel = loading ? '...' : isPublic ? (isAccepted ? 'Absagen' : 'Zusagen') : 'RSVP';
 
-    const btnBg =
-        status === 'going'
-            ? colors.primary
-            : status === null
-            ? colors.primary
-            : colors.surfaceContainerHigh;
+    let btnBg: string;
+    let btnBorder: string;
+    let btnTextColor: string;
 
-    const btnBorder =
-        status === 'maybe'
-            ? `${colors.primary}60`
-            : status === 'not_going'
-            ? colors.outlineVariant
-            : 'transparent';
-
-    const btnTextColor =
-        status === 'going' || status === null ? colors.onPrimary : colors.onSurfaceVariant;
-
-    const btnLabel = activeOpt ? `${activeOpt.icon}  ${activeOpt.label}` : 'RSVP';
+    if (isPublic) {
+        btnBg = isAccepted ? 'transparent' : colors.primary;
+        btnBorder = isAccepted ? colors.outline : 'transparent';
+        btnTextColor = isAccepted ? colors.onSurface : colors.onPrimary;
+    } else {
+        btnBg = colors.primary;
+        btnBorder = 'transparent';
+        btnTextColor = colors.onPrimary;
+    }
 
     return (
-        <>
+        <View>
             <Animated.View style={animStyle}>
                 <TouchableOpacity
                     onPress={handlePress}
                     activeOpacity={0.9}
+                    disabled={loading}
                     style={[
                         s.rsvpBtn,
                         { backgroundColor: btnBg, borderColor: btnBorder },
                     ]}
                 >
-                    <Text style={[s.rsvpBtnText, { color: btnTextColor }]}>{btnLabel}</Text>
-                </TouchableOpacity>
-            </Animated.View>
+                        <Text style={[s.rsvpBtnText, { color: btnTextColor }]}>{btnLabel}</Text>
+                    </TouchableOpacity>
+                </Animated.View>
 
             <RsvpMenu
                 visible={menuVisible}
                 current={status}
-                onSelect={setStatus}
+                onSelect={(s) => { callRsvp(s); }}
                 onClose={() => setMenuVisible(false)}
                 colors={colors}
             />
-        </>
+        </View>
     );
 }
 
@@ -412,6 +461,7 @@ export default function EventScreen() {
     const [tempData, setTempData] = useState<Record<string, string | boolean>>({});
     const [publishing, setPublishing] = useState(false);
     const [ticketOptions, setTicketOptions] = useState<TicketOption[]>([]);
+    const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus>(null);
 
     // Auth guard: Wait for auth to load, then redirect if not authenticated
     useEffect(() => {
@@ -432,6 +482,7 @@ export default function EventScreen() {
             const data = await api.getEventById(eventId, token ?? undefined);
             setRawEvent(data);
             setEvent(mapApiToEventData(data));
+            setRsvpStatus((data.my_rsvp_status as RsvpStatus) ?? null);
         } catch {
             setRawEvent(null);
             setEvent(null);
@@ -640,18 +691,56 @@ export default function EventScreen() {
 
                     {/* Price + Attending + RSVP/Publish row */}
                     <View style={s.topActionRow}>
-                        <View style={s.statsGroup}>
-                            <View>
-                                <Text style={[s.statValue, { color: colors.onSurface }]}>{event.price}</Text>
-                                <Text style={[s.statLabel, { color: colors.onSurfaceVariant }]}>Eintritt</Text>
+                        <View style={s.statsAndStatus}>
+                            <View style={s.statsGroup}>
+                                <View>
+                                    <Text style={[s.statValue, { color: colors.onSurface }]}>{event.price}</Text>
+                                    <Text style={[s.statLabel, { color: colors.onSurfaceVariant }]}>Eintritt</Text>
+                                </View>
+                                <View style={[s.statDivider, { backgroundColor: colors.outlineVariant }]} />
+                                <View>
+                                    <Text style={[s.statValue, { color: colors.onSurface }]}>{event.attending}</Text>
+                                    <Text style={[s.statLabel, { color: colors.onSurfaceVariant }]}>Teilnehmer</Text>
+                                </View>
                             </View>
-                            <View style={[s.statDivider, { backgroundColor: colors.outlineVariant }]} />
-                            <View>
-                                <Text style={[s.statValue, { color: colors.onSurface }]}>{event.attending}</Text>
-                                <Text style={[s.statLabel, { color: colors.onSurfaceVariant }]}>Teilnehmer</Text>
-                            </View>
+                            {!isDraft && !rawEvent.is_host && rsvpStatus && (() => {
+                                const pillColors = {
+                                    Accepted: colors.tertiary,
+                                    Declined: colors.error,
+                                    Pending: colors.onSurfaceVariant,
+                                };
+                                const c = pillColors[rsvpStatus];
+                                return (
+                                    <View style={[s.statusPill, { backgroundColor: `${c}20` }]}>
+                                        <Text style={[s.statusPillText, { color: c }]}>
+                                            {RSVP_STATUS_LABELS[rsvpStatus]}
+                                        </Text>
+                                    </View>
+                                );
+                            })()}
                         </View>
-                        {!isDraft && <RsvpButton colors={colors} />}
+                        {!isDraft && rawEvent.is_host ? (
+                            <TouchableOpacity
+                                onPress={() => router.push(`/event/${rawEvent.event_id}/manage`)}
+                                style={[s.rsvpBtn, { backgroundColor: colors.secondaryContainer }]}
+                            >
+                                <Text style={[s.rsvpBtnText, { color: colors.onSecondaryContainer }]}>Verwalten</Text>
+                            </TouchableOpacity>
+                        ) : !isDraft && (
+                            <RsvpButton
+                                colors={colors}
+                                eventId={rawEvent.event_id}
+                                isPublic={rawEvent.is_public}
+                                initialStatus={rawEvent.my_rsvp_status ?? null}
+                                token={session?.access_token ?? null}
+                                onParticipantCountChange={(delta) => {
+                                    const updated = { ...rawEvent, participant_count: rawEvent.participant_count + delta };
+                                    setRawEvent(updated);
+                                    setEvent(mapApiToEventData(updated));
+                                }}
+                                onStatusChange={setRsvpStatus}
+                            />
+                        )}
                     </View>
 
                     <View style={[s.divider, { backgroundColor: colors.outlineVariant }]} />
@@ -1158,11 +1247,20 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 24,
     },
+    statsAndStatus: { gap: 10 },
     statsGroup: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     statValue: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
     statLabel: { fontSize: 11, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 1 },
     statDivider: { width: 1, height: 32, opacity: 0.4 },
 
+    rsvpWrapper: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    statusPill: {
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 99,
+        alignItems: 'center',
+    },
+    statusPillText: { fontSize: 13, fontWeight: '700', letterSpacing: 0.2 },
     rsvpBtn: {
         paddingHorizontal: 22,
         paddingVertical: 13,
