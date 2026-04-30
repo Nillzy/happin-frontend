@@ -98,3 +98,4 @@ Strict mode is enabled. Path alias `@/*` maps to the repo root (e.g. `@/src/scre
 ## Git
 
 If you make commits, they should always be in german.
+Never push to the main branch. If you start a new topic open a new one.

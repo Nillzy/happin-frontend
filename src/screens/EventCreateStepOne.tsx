@@ -13,6 +13,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
+import Footer from '../components/atoms/Footer';
 import DatePicker from '../components/atoms/DatePicker';
 import TimePicker from '../components/atoms/TimePicker';
 import { api } from '../services/api';
@@ -175,6 +176,8 @@ export default function EventCreateStepOne() {
                             </Text>
                         )}
                     </TouchableOpacity>
+
+                    <Footer />
                 </ScrollView>
             </KeyboardAvoidingView>
         </View>
