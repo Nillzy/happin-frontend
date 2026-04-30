@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption } from '@/src/types/events';
+import type { ParticipantListResponse, RemoveParticipantsResponse } from '@/src/types/host';
 
 /**
  * Get the appropriate backend URL based on platform and environment.
@@ -41,8 +42,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-    getPublicEvents: (limit = 50, offset = 0) =>
-        request<EventListResponse>(`/api/v1/events/?limit=${limit}&offset=${offset}`),
+    getPublicEvents: (limit = 50, offset = 0, token?: string) =>
+        request<EventListResponse>(`/api/v1/events/?limit=${limit}&offset=${offset}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }),
 
     getEventById: (eventId: string, token?: string) =>
         request<EventDetailResponse>(`/api/v1/events/${eventId}`, token ? {
@@ -68,5 +71,17 @@ export const api = {
             method: 'PUT',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ ticket_options: options }),
+        }),
+
+    getEventParticipants: (eventId: string, token: string) =>
+        request<ParticipantListResponse>(`/api/v1/events/${eventId}/participants`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
+    removeParticipants: (eventId: string, participationIds: string[], token: string) =>
+        request<RemoveParticipantsResponse>(`/api/v1/events/${eventId}/participants`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ participation_ids: participationIds }),
         }),
 };

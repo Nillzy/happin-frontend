@@ -1,0 +1,32 @@
+export interface PersonInfo {
+    person_id: string;
+    first_name: string;
+    last_name?: string;
+    phone_number?: string;
+}
+
+export interface Participant {
+    participation_id: string;
+    person: PersonInfo;
+    status: 'Accepted' | 'Declined' | 'Pending';
+    created_at?: string;
+}
+
+export interface ParticipantCounts {
+    accepted: number;
+    declined: number;
+    pending: number;
+}
+
+export interface ParticipantListResponse {
+    participants: Participant[];
+    counts: ParticipantCounts;
+}
+
+export interface RemoveParticipantsRequest {
+    participation_ids: string[];
+}
+
+export interface RemoveParticipantsResponse {
+    removed_count: number;
+}
