@@ -20,16 +20,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { useRouter } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
-import * as SecureStore from 'expo-secure-store';
 import { sendOtp, verifyOtp } from '../services/supabase';
-
-async function storeToken(key: string, value: string): Promise<void> {
-    if (Platform.OS === 'web') {
-        localStorage.setItem(key, value);
-    } else {
-        await SecureStore.setItemAsync(key, value);
-    }
-}
+import { clearAllAuthData } from '../utils/clearAuthData';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -149,6 +141,7 @@ export default function LoginScreen() {
     const [otpError, setOtpError] = useState(false);
     const [resendSeconds, setResendSeconds] = useState(RESEND_COUNTDOWN);
     const [isSending, setIsSending] = useState(false);
+    const [isClearing, setIsClearing] = useState(false);
     const resendRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const shakeX = useSharedValue(0);
@@ -222,13 +215,28 @@ export default function LoginScreen() {
     const handleVerify = async () => {
         if (otp.length !== OTP_LENGTH) return;
         try {
-            const accessToken = await verifyOtp(email, otp);
-            await storeToken('access_token', accessToken);
+            // Supabase client will automatically store the session in encrypted storage
+            // No need to manually store tokens anymore
+            await verifyOtp(email, otp);
+
+            // Session is now persisted and will be available via AuthContext
             router.replace('/events');
         } catch (e) {
             console.error('OTP verification failed:', e);
             setOtpError(true);
             triggerShake();
+        }
+    };
+
+    const handleClearStorage = async () => {
+        setIsClearing(true);
+        try {
+            await clearAllAuthData();
+            alert('✅ Storage cleared! Try OTP flow again.');
+        } catch (e) {
+            alert('❌ Failed to clear storage: ' + (e instanceof Error ? e.message : 'Unknown error'));
+        } finally {
+            setIsClearing(false);
         }
     };
 
@@ -323,6 +331,17 @@ export default function LoginScreen() {
                             Mit der Anmeldung stimmst du unseren{' '}
                             <Text style={{ color: colors.primary }}>Nutzungsbedingungen</Text> zu.
                         </Text>
+
+                        {/* Debug: Clear Storage Button */}
+                        <TouchableOpacity
+                            onPress={handleClearStorage}
+                            disabled={isClearing}
+                            style={{ marginTop: 20, padding: 8 }}
+                        >
+                            <Text style={[s.legalText, { color: colors.error, textDecorationLine: 'underline' }]}>
+                                {isClearing ? 'Clearing...' : '🔧 Debug: Clear Auth Storage'}
+                            </Text>
+                        </TouchableOpacity>
                     </StepView>
                 )}
 

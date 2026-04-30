@@ -23,6 +23,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { AuthGate } from '@/src/components/auth/AuthGate';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import EventHero from '../components/event/EventHero';
@@ -34,7 +36,7 @@ import EditModal from '../components/atoms/EditModal';
 import { CalendarIcon, LocationIcon, TicketIcon } from '../components/atoms/icons';
 import DatePicker from '../components/atoms/DatePicker';
 import TimePicker from '../components/atoms/TimePicker';
-import { authorize, getSession } from '../services/supabase';
+import { getSession } from '../services/supabase';
 import { api } from '../services/api';
 import type { EventDetailResponse, EventUpdateRequest, TicketOption } from '../types/events';
 
@@ -396,6 +398,7 @@ export default function EventScreen() {
     const { colors } = useTheme();
     const router = useRouter();
     const { eventId } = useLocalSearchParams<{ eventId: string }>();
+    const { session, loading: authLoading } = useAuth();
 
     const [rawEvent, setRawEvent] = useState<EventDetailResponse | null>(null);
     const [event, setEvent] = useState<EventData | null>(null);
@@ -410,11 +413,13 @@ export default function EventScreen() {
     const [publishing, setPublishing] = useState(false);
     const [ticketOptions, setTicketOptions] = useState<TicketOption[]>([]);
 
+    // Auth guard: Wait for auth to load, then redirect if not authenticated
     useEffect(() => {
-        authorize().then((isAuthorized) => {
-            if (!isAuthorized) router.replace('/login');
-        });
-    }, []);
+        if (!authLoading && !session) {
+            // Use setTimeout to avoid "navigate before mounting" error
+            setTimeout(() => router.replace('/login'), 0);
+        }
+    }, [authLoading, session, router]);
 
     const fetchEvent = async () => {
         if (!eventId) {
@@ -443,12 +448,12 @@ export default function EventScreen() {
         }
     }, [rawEvent]);
 
-    if (loading || !event || !rawEvent) {
+    if (authLoading || loading || !event || !rawEvent) {
         return (
             <View style={[s.root, { backgroundColor: colors.background }]}>
                 <Navbar showBack />
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                    {loading ? (
+                    {(authLoading || loading) ? (
                         <ActivityIndicator size="large" color={colors.primary} />
                     ) : (
                         <Text style={{ color: colors.onSurfaceVariant, fontSize: 15 }}>

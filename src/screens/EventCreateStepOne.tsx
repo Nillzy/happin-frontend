@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/src/contexts/AuthContext';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import DatePicker from '../components/atoms/DatePicker';
@@ -22,6 +23,7 @@ import { getSession } from '../services/supabase';
 export default function EventCreateStepOne() {
     const { colors } = useTheme();
     const router = useRouter();
+    const { session } = useAuth();
     const [title, setTitle] = useState('');
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
@@ -52,6 +54,7 @@ export default function EventCreateStepOne() {
         try {
             const token = await getSession();
             if (!token) {
+                // Should not happen if session is valid, but redirect just in case
                 router.replace('/login');
                 return;
             }
