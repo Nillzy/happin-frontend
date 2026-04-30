@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import { api } from '../services/api';
-import { authorize } from '../services/supabase';
+import { authorize, getSession } from '../services/supabase';
 import type { EventListItem } from '../types/events';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -53,7 +53,8 @@ export default function EventListScreen() {
         setLoading(true);
         setError(null);
         try {
-            const data = await api.getPublicEvents();
+            const token = await getSession();
+            const data = await api.getPublicEvents(50, 0, token || undefined);
             setEvents(data.events);
         } catch (e) {
             setError('Fehler beim Laden der Events');
@@ -72,6 +73,14 @@ export default function EventListScreen() {
         fetchEvents();
     }, [fetchEvents]);
 
+    const handleEventPress = (event: EventListItem) => {
+        if (event.is_host) {
+            router.push(`/event/${event.event_id}/manage`);
+        } else {
+            router.push(`/event/${event.event_id}`);
+        }
+    };
+
     const renderCard = ({ item, index }: { item: EventListItem; index: number }) => {
         const gradient = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
 
@@ -84,23 +93,32 @@ export default function EventListScreen() {
                         backgroundColor: colors.surfaceContainer,
                         borderColor: colors.outlineVariant,
                     },
+                    item.is_host && { borderColor: `${colors.primary}30`, borderWidth: 1 },
                 ]}
-                onPress={() => router.push(`/event/${item.event_id}`)}
+                onPress={() => handleEventPress(item)}
             >
-                {item.image_url ? (
-                    <Image
-                        source={{ uri: item.image_url }}
-                        style={styles.cardImage}
-                        resizeMode="cover"
-                    />
-                ) : (
-                    <LinearGradient
-                        colors={gradient as [string, string]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.cardImage}
-                    />
-                )}
+                <View style={styles.imageContainer}>
+                    {item.image_url ? (
+                        <Image
+                            source={{ uri: item.image_url }}
+                            style={styles.cardImage}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <LinearGradient
+                            colors={gradient as [string, string]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.cardImage}
+                        />
+                    )}
+                    {item.is_host && (
+                        <View style={[styles.hostBadge, { backgroundColor: `${colors.primary}E6` }]}>
+                            <Text style={styles.hostBadgeIcon}>👑</Text>
+                            <Text style={[styles.hostBadgeText, { color: colors.onPrimary }]}>Dein Event</Text>
+                        </View>
+                    )}
+                </View>
 
                 <View style={styles.cardBody}>
                     <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2}>
@@ -269,6 +287,29 @@ const styles = StyleSheet.create({
         height: 180,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
+    },
+    imageContainer: {
+        position: 'relative',
+    },
+    hostBadge: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        gap: 6,
+    },
+    hostBadgeIcon: {
+        fontSize: 12,
+    },
+    hostBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
     },
     cardBody: {
         padding: 16,

@@ -9,7 +9,7 @@ export interface TicketOption {
 
 export interface EventLocation {
     location_id: string;
-    city: string;
+    city?: string | null;
     street?: string;
     house_number?: string;
     postal_code?: string;
@@ -31,6 +31,7 @@ export interface EventListItem {
     image_url?: string;
     location?: EventLocation;
     participant_count: number;
+    is_host?: boolean;
 }
 
 export interface EventListResponse {
