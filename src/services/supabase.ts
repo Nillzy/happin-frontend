@@ -101,18 +101,49 @@ export async function authorize(): Promise<boolean> {
     return !error && !!data.user;
 }
 
-/**
- * Get the Supabase client instance.
- * Use this to access the client directly for advanced operations or to set up auth state listeners.
- *
- * Example:
- * ```typescript
- * const supabase = getSupabaseClient();
- * supabase.auth.onAuthStateChange((event, session) => {
- *   console.log('Auth event:', event, session);
- * });
- * ```
- */
+export interface UserProfile {
+    id: string;
+    email: string;
+    /** Display name set by the user (user_metadata.display_name) */
+    displayName: string | null;
+    /** Full name from registration (user_metadata.full_name) */
+    fullName: string | null;
+    /** Avatar URL — null until backend provides one */
+    avatarUrl: string | null;
+}
+
+export async function getUserProfile(): Promise<UserProfile | null> {
+    const { data, error } = await getSupabase().auth.getUser();
+    if (error || !data.user) return null;
+    const u = data.user;
+    return {
+        id: u.id,
+        email: u.email ?? '',
+        displayName: u.user_metadata?.display_name ?? null,
+        fullName: u.user_metadata?.full_name ?? null,
+        avatarUrl: u.user_metadata?.avatar_url ?? null,
+    };
+}
+
+export async function updateDisplayName(displayName: string): Promise<void> {
+    const { error } = await getSupabase().auth.updateUser({
+        data: { display_name: displayName },
+    });
+    if (error) throw new Error(error.message);
+}
+
+export async function signOut(): Promise<void> {
+    const { error } = await getSupabase().auth.signOut();
+    if (error) throw new Error(error.message);
+}
+
+export async function deleteAccount(): Promise<void> {
+    // Placeholder — the actual deletion requires a backend endpoint.
+    // Once the backend provides DELETE /api/v1/users/me, call it here with the
+    // current session token before signing out.
+    await signOut();
+}
+
 export function getSupabaseClient(): SupabaseClient {
     return getSupabase();
 }

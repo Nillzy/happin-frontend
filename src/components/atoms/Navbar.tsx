@@ -3,6 +3,7 @@ import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native
 import { useTheme } from '@/hooks/use-theme';
 import HappinLogo from './HappinLogo';
 import DarkLightToggle from './DarkLightToggle';
+import AccountButton from './AccountButton';
 import { useRouter } from 'expo-router';
 
 interface NavbarProps {
@@ -46,6 +47,7 @@ export default function Navbar({ showCta = true, showBack = false, onBackPress }
                         <Text style={[styles.ctaText, { color: colors.primary }]}>App laden</Text>
                     </TouchableOpacity>
                 )}
+                <AccountButton />
             </View>
         </View>
     );
