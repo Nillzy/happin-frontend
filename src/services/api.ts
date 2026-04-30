@@ -11,25 +11,15 @@ import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventU
 function getBackendUrl(): string {
     const envUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
 
-    // If explicitly set to ngrok URL, always use it (for physical devices)
     if (envUrl && envUrl.includes('ngrok')) {
         return envUrl;
     }
 
-    // Web platform can use localhost
     if (Platform.OS === 'web') {
-        return envUrl || 'http://localhost:8001';
+        return envUrl ?? '';
     }
 
-    // Native platforms (iOS/Android):
-    // - If ngrok URL is set, use it
-    // - Otherwise try to detect local IP from Expo debugger
-    if (envUrl) {
-        return envUrl;
-    }
-
-    // Fallback for simulators/emulators (can reach localhost)
-    return 'http://localhost:8001';
+    return envUrl ?? '';
 }
 
 const BASE_URL = getBackendUrl();
