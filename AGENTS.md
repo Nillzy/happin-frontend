@@ -7,6 +7,9 @@ npm run web        # Start in browser at http://localhost:8081
 npm run ios        # Start on iOS simulator
 npm run android    # Start on Android emulator
 
+# Physical Device Development (iOS/Android)
+npm start          # Start Expo, then scan QR code with Expo Go app
+
 # Quality
 npm run lint       # Run ESLint
 
@@ -15,6 +18,67 @@ npm run build      # Export web build to dist/ (Expo export --platform web)
 ```
 
 No test framework is configured yet.
+
+## Local Development on Physical Devices
+
+### Problem: macOS Firewall blocks LAN connections
+
+When developing on a physical device (iPhone/Android), the device cannot reach `http://localhost:8001` on your Mac. The standard solution (using your Mac's local IP like `http://192.168.x.x:8001`) fails if macOS Firewall is enabled, which blocks incoming connections from other devices.
+
+### Solution: ngrok tunnel for backend
+
+Use **ngrok** to create a public tunnel to your local backend that bypasses the firewall:
+
+#### 1. Start Backend (on 0.0.0.0 to accept external connections)
+```bash
+cd /Users/I749987/Documents/vs-code/happin/happin-backend
+source venv/bin/activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+```
+
+#### 2. Start ngrok tunnel (in separate terminal)
+```bash
+ngrok http 8001
+```
+
+This outputs a public URL like:
+```
+https://abc-xyz-123.ngrok-free.dev
+```
+
+#### 3. Update Frontend .env.local
+```bash
+# .env.local
+EXPO_PUBLIC_BACKEND_URL=https://abc-xyz-123.ngrok-free.dev
+EXPO_PUBLIC_SUPABASE_URL=https://hylnqapjtkgqyxvmfqgy.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_EE_Ih9vyxOh7cKAPySDLqg_a3ZdrnzA
+```
+
+#### 4. Start Expo
+```bash
+cd /Users/I749987/Documents/vs-code/happin/happin-frontend
+npm start
+```
+
+#### 5. Open on Device
+- Scan the QR code with **Expo Go** app (iOS App Store / Google Play)
+- Ensure your Mac and phone are on the **same Wi-Fi** (for Expo Metro bundler)
+- The app will connect to the backend via the ngrok tunnel
+
+### Important Notes
+
+- **ngrok URL changes** on every restart unless you use a paid ngrok account with a fixed domain
+- After restarting ngrok, update `EXPO_PUBLIC_BACKEND_URL` in `.env.local` and restart Expo
+- **Supabase auth works directly** from the phone because it uses the public Supabase URL (no tunnel needed)
+- **Performance**: ngrok adds latency (~100-300ms) but is acceptable for development
+
+### Alternative: Disable macOS Firewall (less secure)
+
+If you don't want to use ngrok:
+1. Go to **System Settings → Network → Firewall**
+2. Add **Python** to allowed apps
+3. Use your Mac's local IP in `.env.local`: `http://192.168.x.x:8001`
+4. Find your IP: `ifconfig | grep "inet " | grep -v 127.0.0.1`
 
 ## Environment
 
