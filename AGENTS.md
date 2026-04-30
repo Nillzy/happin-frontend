@@ -94,3 +94,7 @@ Every major Change should be well documented (eventually in an own file).
 ## TypeScript
 
 Strict mode is enabled. Path alias `@/*` maps to the repo root (e.g. `@/src/screens/HomeScreen`).
+
+## Git
+
+If you make commits, they should always be in german.

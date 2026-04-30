@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
@@ -17,10 +17,15 @@ const SIZE_MAP = {
 
 /** Happin brand mark: a stylized location-pin with a heart cutout */
 function HappinMark({ size, color }: { size: number; color: string }) {
+    // Each instance gets a unique gradient ID so multiple logos on screen
+    // (e.g. during navigation transitions) don't clobber each other's <defs>.
+    const uid = useId().replace(/:/g, '');
+    const gradId = `pinGrad_${uid}`;
+
     return (
         <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
             <Defs>
-                <LinearGradient id="pinGrad" x1="0" y1="0" x2="1" y2="1">
+                <LinearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
                     <Stop offset="0" stopColor={color} stopOpacity="1" />
                     <Stop offset="1" stopColor={color} stopOpacity="0.7" />
                 </LinearGradient>
@@ -28,7 +33,7 @@ function HappinMark({ size, color }: { size: number; color: string }) {
             {/* Pin body */}
             <Path
                 d="M16 2C10.477 2 6 6.477 6 12c0 7 10 18 10 18s10-11 10-18c0-5.523-4.477-10-10-10z"
-                fill="url(#pinGrad)"
+                fill={`url(#${gradId})`}
             />
             {/* Heart cutout (white) */}
             <Path
