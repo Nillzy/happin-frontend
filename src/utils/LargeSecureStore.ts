@@ -61,12 +61,20 @@ export class LargeSecureStore {
 
     // Native: Use SecureStore (iOS Keychain / Android Keystore)
     const SecureStore = await import('expo-secure-store');
+    const FALLBACK_KEY_NAME = `__fallback_${ENCRYPTION_KEY_NAME}`;
 
     if (forceReset) {
-      await SecureStore.deleteItemAsync(ENCRYPTION_KEY_NAME);
+      try { await SecureStore.deleteItemAsync(ENCRYPTION_KEY_NAME); } catch (_) {}
+      await AsyncStorage.removeItem(FALLBACK_KEY_NAME);
     }
 
-    let keyString = await SecureStore.getItemAsync(ENCRYPTION_KEY_NAME);
+    let keyString: string | null = null;
+    try {
+      keyString = await SecureStore.getItemAsync(ENCRYPTION_KEY_NAME);
+    } catch (e) {
+      console.warn('[LargeSecureStore] SecureStore.getItemAsync failed, using AsyncStorage fallback', e);
+      keyString = await AsyncStorage.getItem(FALLBACK_KEY_NAME);
+    }
 
     if (!keyString) {
       console.log('[LargeSecureStore] Generating new encryption key');
@@ -76,8 +84,13 @@ export class LargeSecureStore {
       keyString = Array.from(key)
         .map((byte) => byte.toString(16).padStart(2, '0'))
         .join('');
-      await SecureStore.setItemAsync(ENCRYPTION_KEY_NAME, keyString);
-      console.log('[LargeSecureStore] New encryption key stored in SecureStore');
+      try {
+        await SecureStore.setItemAsync(ENCRYPTION_KEY_NAME, keyString);
+        console.log('[LargeSecureStore] New encryption key stored in SecureStore');
+      } catch (e) {
+        console.warn('[LargeSecureStore] SecureStore.setItemAsync failed, using AsyncStorage fallback', e);
+        await AsyncStorage.setItem(FALLBACK_KEY_NAME, keyString);
+      }
     }
 
     const key = new Uint8Array(
