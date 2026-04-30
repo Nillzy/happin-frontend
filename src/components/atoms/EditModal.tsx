@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,8 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    PanResponder,
+    Animated,
 } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -20,19 +22,92 @@ interface EditModalProps {
     children: React.ReactNode;
 }
 
+const isWeb = Platform.OS === 'web';
+const DISMISS_THRESHOLD = 80;
+
 export default function EditModal({ visible, onClose, title, onSave, children }: EditModalProps) {
     const { colors } = useTheme();
+    const translateY = useRef(new Animated.Value(0)).current;
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onMoveShouldSetPanResponder: (_, gestureState) =>
+                !isWeb && gestureState.dy > 5,
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dy > 0) {
+                    translateY.setValue(gestureState.dy);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                if (gestureState.dy > DISMISS_THRESHOLD) {
+                    Animated.timing(translateY, {
+                        toValue: 600,
+                        duration: 200,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        translateY.setValue(0);
+                        onClose();
+                    });
+                } else {
+                    Animated.spring(translateY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
+    const handleClose = () => {
+        translateY.setValue(0);
+        onClose();
+    };
 
     return (
-        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-            <Pressable style={styles.backdrop} onPress={onClose} />
+        <Modal
+            visible={visible}
+            // "none" so the backdrop appears instantly without animating alongside the sheet
+            animationType="none"
+            transparent
+            onRequestClose={handleClose}
+        >
+            {/* Backdrop fills screen immediately — no animation */}
+            <Pressable style={styles.backdrop} onPress={handleClose} />
+
             <KeyboardAvoidingView
                 style={styles.sheetWrapper}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                pointerEvents="box-none"
             >
-                <View style={[styles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
-                    <View style={[styles.handle, { backgroundColor: colors.outlineVariant }]} />
-                    <Text style={[styles.title, { color: colors.onSurface }]}>{title}</Text>
+                <Animated.View
+                    style={[
+                        styles.sheet,
+                        { backgroundColor: colors.surfaceContainerLow },
+                        { transform: [{ translateY }] },
+                    ]}
+                >
+                    {/* Drag handle — mobile only, used to pull down and dismiss */}
+                    {!isWeb && (
+                        <View {...panResponder.panHandlers} style={styles.handleArea}>
+                            <View style={[styles.handle, { backgroundColor: colors.outlineVariant }]} />
+                        </View>
+                    )}
+
+                    {/* Header: title + close button on web */}
+                    <View style={styles.headerRow}>
+                        <Text style={[styles.title, { color: colors.onSurface }]}>{title}</Text>
+                        {isWeb && (
+                            <TouchableOpacity
+                                onPress={handleClose}
+                                hitSlop={8}
+                                activeOpacity={0.7}
+                                style={styles.closeBtn}
+                            >
+                                <Text style={[styles.closeBtnText, { color: colors.onSurfaceVariant }]}>✕</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
 
                     <ScrollView
                         style={styles.content}
@@ -53,7 +128,7 @@ export default function EditModal({ visible, onClose, title, onSave, children }:
                             </Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </Animated.View>
             </KeyboardAvoidingView>
         </Modal>
     );
@@ -61,10 +136,11 @@ export default function EditModal({ visible, onClose, title, onSave, children }:
 
 const styles = StyleSheet.create({
     backdrop: {
-        flex: 1,
+        ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.4)',
     },
     sheetWrapper: {
+        flex: 1,
         justifyContent: 'flex-end',
     },
     sheet: {
@@ -75,17 +151,34 @@ const styles = StyleSheet.create({
         paddingBottom: Platform.OS === 'ios' ? 34 : 24,
         maxHeight: '80%',
     },
+    handleArea: {
+        alignItems: 'center',
+        paddingBottom: 12,
+        marginTop: -4,
+    },
     handle: {
         width: 36,
         height: 4,
         borderRadius: 2,
-        alignSelf: 'center',
+    },
+    headerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         marginBottom: 16,
     },
     title: {
         fontSize: 17,
         fontWeight: '700',
-        marginBottom: 16,
+        flex: 1,
+    },
+    closeBtn: {
+        marginLeft: 12,
+        padding: 4,
+    },
+    closeBtnText: {
+        fontSize: 18,
+        fontWeight: '400',
     },
     content: {
         marginBottom: 16,
