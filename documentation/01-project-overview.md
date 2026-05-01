@@ -21,35 +21,86 @@ Happin is a mobile application built with React Native and Expo. This repository
 
 ```
 happin-frontend/
-├── app/                    # Expo Router entry points (minimal — delegates to src/)
-│   ├── _layout.tsx         # Root layout (stack navigator, fonts, splash screen)
-│   └── index.tsx           # Entry route — renders <App />
-├── src/                    # Application source code
+├── app/                          # Expo Router — file-based routing
+│   ├── _layout.tsx               # Root layout (ThemeProvider + AuthProvider + Stack)
+│   ├── index.tsx                 # Route / → HomeScreen
+│   ├── login.tsx                 # Route /login → LoginScreen
+│   ├── account.tsx               # Route /account → AccountScreen
+│   ├── +not-found.tsx            # 404 Fallback
+│   ├── event/
+│   │   ├── [eventId].tsx         # Route /event/:id → EventScreen
+│   │   └── [eventId]/
+│   │       └── host.tsx          # Route /event/:id/host → EventHostScreen
+│   └── events/
+│       ├── index.tsx             # Route /events → EventListScreen
+│       └── create.tsx            # Route /events/create → EventCreateScreen
+│
+├── src/                          # Application source code
 │   ├── components/
-│   │   ├── App.tsx         # Root component mounted by app/index.tsx
-│   │   └── atoms/
-│   │       └── icons.tsx   # Shared SVG icon components
-│   ├── navigation/
-│   │   └── RootNavigator.tsx  # Top-level React Navigation stack
+│   │   ├── atoms/
+│   │   │   ├── DarkLightToggle.tsx  # Theme toggle button
+│   │   │   ├── Footer.tsx           # App footer
+│   │   │   ├── HappinLogo.tsx       # Logo component (Pin + Heart cutout)
+│   │   │   ├── Navbar.tsx           # Navigation bar
+│   │   │   ├── AccountButton.tsx    # Account button in navbar
+│   │   │   ├── EditButton.tsx       # Edit button component
+│   │   │   ├── DatePicker.tsx       # Date picker component
+│   │   │   ├── TimePicker.tsx       # Time picker component
+│   │   │   └── icons.tsx            # Shared SVG icon components
+│   │   ├── auth/
+│   │   │   └── AuthGate.tsx         # Auth guard component (redirects to /login)
+│   │   └── event/
+│   │       ├── EventHero.tsx        # Event hero section with image/gradient
+│   │       ├── EventDescription.tsx # Event description block
+│   │       ├── EventInfoBlock.tsx   # Event info cards (date, location, etc.)
+│   │       └── EventCategories.tsx  # Event category chips
+│   ├── contexts/
+│   │   └── AuthContext.tsx       # Global auth state (session, user, loading, signOut)
 │   ├── screens/
-│   │   ├── HomeScreen.tsx  # Landing page with animated Berlin city map
-│   │   ├── LoginScreen.tsx # 3-step phone number login (phone → channel → OTP)
-│   │   ├── EventScreen.tsx # Event detail page (hero, RSVP, info, line-up, host)
-│   │   └── TestScreen.tsx
+│   │   ├── HomeScreen.tsx        # Landing page with animated Berlin city map
+│   │   ├── LoginScreen.tsx       # Passwordless E-Mail OTP login (3 steps)
+│   │   ├── AccountScreen.tsx     # User account page
+│   │   ├── EventListScreen.tsx   # Public events list
+│   │   ├── EventScreen.tsx       # Event detail page (hero, RSVP, info)
+│   │   ├── EventHostScreen.tsx   # Host view for event management
+│   │   ├── EventCreateScreen.tsx # Event creation wizard (multi-step)
+│   │   ├── EventCreateStepOne.tsx   # Step 1: Basic info
+│   │   ├── EventCreatePreview.tsx   # Final preview before publish
+│   │   └── TestScreen.tsx        # Development test screen
+│   ├── services/
+│   │   ├── supabase.ts           # Supabase client + auth functions
+│   │   └── api.ts                # Backend REST API client
+│   ├── types/
+│   │   ├── events.ts             # Event type definitions
+│   │   └── host.ts               # Host type definitions
 │   └── utils/
-│       └── useAppNavigation.ts  # Typed navigation hook
+│       ├── LargeSecureStore.ts   # Custom storage adapter (AES-256 encrypted)
+│       ├── clearAuthData.ts      # Helper to clear auth data (debug)
+│       └── getTimeBasedSlogan.ts # Time-based greeting text
+│
+├── context/
+│   └── ThemeContext.tsx          # Manual theme override context
+│
 ├── constants/
-│   ├── berlin-map-paths.ts # SVG path data for the Berlin city map
-│   └── colors.ts           # Material Design 3 color tokens (light + dark)
+│   ├── berlin-map-paths.ts       # SVG path data for Berlin city map
+│   └── colors.ts                 # Material Design 3 color tokens (light + dark)
+│
 ├── hooks/
-│   └── use-theme.ts        # useTheme() — returns { colors, isDark }
+│   └── use-theme.ts              # useTheme() hook → { colors, isDark }
+│
 ├── assets/
-│   └── images/             # App icons, splash screen, and static images
-├── documentation/          # Project documentation (you are here)
-├── app.json                # Expo app configuration
-├── tsconfig.json           # TypeScript configuration
-├── eslint.config.js        # ESLint configuration
-└── package.json            # Dependencies and scripts
+│   └── images/                   # App icons, splash screen, static images
+│
+├── documentation/                # Technical documentation (you are here)
+│
+├── Dockerfile                    # Multi-stage build (Node build + Nginx serve)
+├── nginx.conf                    # Nginx config for web export
+├── .gitlab-ci.yml                # CI/CD pipeline definition
+├── app.json                      # Expo app configuration
+├── tsconfig.json                 # TypeScript strict config (path alias @/*)
+├── eslint.config.js              # ESLint configuration
+├── .env.example                  # Environment variables template
+└── package.json                  # Dependencies and scripts
 ```
 
 ## Available Scripts
