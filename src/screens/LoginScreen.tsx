@@ -90,6 +90,8 @@ function OtpInput({
                 onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, OTP_LENGTH))}
                 keyboardType="number-pad"
                 maxLength={OTP_LENGTH}
+                autoComplete="one-time-code"
+                textContentType="oneTimeCode"
                 style={s.otpHiddenInput}
                 autoFocus
                 caretHidden
@@ -291,6 +293,9 @@ export default function LoginScreen() {
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                     autoCorrect={false}
+                                    autoComplete="email"
+                                    textContentType="emailAddress"
+                                    importantForAutofill="yes"
                                     value={email}
                                     onChangeText={setEmail}
                                     autoFocus
