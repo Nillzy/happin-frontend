@@ -3,6 +3,7 @@ import {
     View,
     Text,
     FlatList,
+    ScrollView,
     TouchableOpacity,
     StyleSheet,
     Dimensions,
@@ -19,10 +20,46 @@ import { api } from '../services/api';
 import { authorize, getSession } from '../services/supabase';
 import type { EventListItem } from '../types/events';
 
+/**
+ * EventListScreen - Responsive Event Overview
+ *
+ * Displays all public events in a platform-adaptive layout:
+ * - Web: Flexbox grid with 1-5 columns based on viewport width
+ * - Mobile/Tablet: FlatList with virtualization for performance
+ *
+ * Breakpoints (Web):
+ * - < 768px: 1 column
+ * - 768-1199px: 2 columns
+ * - 1200-1919px: 3 columns
+ * - 1920-2559px: 4 columns (2K/QHD)
+ * - ≥ 2560px: 5 columns (Ultrawide 21:9, 4K)
+ *
+ * Design compliance: DESIGN.md spacing tokens (grid_margin: 24px, grid_gutter: 16px)
+ */
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
 const CARD_MARGIN_H = 24;
 const CARD_WIDTH = isWeb ? Math.min(SCREEN_WIDTH - CARD_MARGIN_H * 2, 600) : SCREEN_WIDTH - CARD_MARGIN_H * 2;
+
+// Grid layout configuration for Web (from DESIGN.md)
+const CONTAINER_MAX_WIDTH = 2560;  // Support up to 4K/Ultrawide
+const GRID_PADDING = 24;  // grid_margin
+const GRID_GAP_H = 20;    // gutter horizontal
+const GRID_GAP_V = 16;    // grid_gutter vertical
+
+/**
+ * Returns number of columns based on viewport width
+ * Used for responsive grid layout on Web
+ * Supports up to 5 columns for Ultrawide (21:9) and 4K displays
+ */
+function getNumColumns(width: number): number {
+    if (width >= 2560) return 5; // 4K / Ultrawide 21:9 (3440x1440)
+    if (width >= 1920) return 4; // 2K / QHD
+    if (width >= 1200) return 3; // Desktop
+    if (width >= 768) return 2;  // Tablet Landscape
+    return 1;                     // Mobile / Tablet Portrait
+}
 
 const GRADIENT_PAIRS = [
     ['#b32053', '#6645c7'],
@@ -42,26 +79,64 @@ function formatDateGerman(isoDate: string): string {
     }).format(d);
 }
 
+// Pagination configuration
+const EVENTS_PER_PAGE = 30; // 5 columns × 6 rows on Ultrawide, 3 columns × 10 rows on desktop
+
 export default function EventListScreen() {
     const { colors } = useTheme();
     const router = useRouter();
     const [events, setEvents] = useState<EventListItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
 
-    const fetchEvents = useCallback(async () => {
-        setLoading(true);
+    const loadMoreEvents = useCallback(async (isInitial = false) => {
+        if (!isInitial && (loadingMore || !hasMore)) return;
+
+        if (isInitial) {
+            setLoading(true);
+            setPage(0);
+            setHasMore(true);
+        } else {
+            setLoadingMore(true);
+        }
+
         setError(null);
+
         try {
             const token = await getSession();
-            const data = await api.getPublicEvents(50, 0, token || undefined);
-            setEvents(data.events);
+            const currentPage = isInitial ? 0 : page;
+            const data = await api.getPublicEvents(
+                EVENTS_PER_PAGE,
+                currentPage * EVENTS_PER_PAGE,
+                token || undefined
+            );
+
+            // Check if we received fewer events than requested (last page)
+            if (data.events.length < EVENTS_PER_PAGE) {
+                setHasMore(false);
+            }
+
+            if (isInitial) {
+                setEvents(data.events);
+                setPage(1);
+            } else {
+                setEvents(prev => [...prev, ...data.events]);
+                setPage(prev => prev + 1);
+            }
         } catch (e) {
             setError('Fehler beim Laden der Events');
         } finally {
-            setLoading(false);
+            if (isInitial) {
+                setLoading(false);
+            } else {
+                setLoadingMore(false);
+            }
         }
-    }, []);
+    }, [page, loadingMore, hasMore]);
 
     useEffect(() => {
         authorize().then((isAuthorized) => {
@@ -70,8 +145,19 @@ export default function EventListScreen() {
     }, []);
 
     useEffect(() => {
-        fetchEvents();
-    }, [fetchEvents]);
+        loadMoreEvents(true); // Initial load
+    }, []);
+
+    // Listen to window resize for responsive grid on Web
+    useEffect(() => {
+        if (!isWeb) return;
+
+        const subscription = Dimensions.addEventListener('change', ({ window }) => {
+            setDimensions(window);
+        });
+
+        return () => subscription?.remove();
+    }, []);
 
     const handleEventPress = (event: EventListItem) => {
         if (event.is_host) {
@@ -88,7 +174,7 @@ export default function EventListScreen() {
             <TouchableOpacity
                 activeOpacity={0.85}
                 style={[
-                    styles.card,
+                    isWeb ? styles.cardWeb : styles.card,
                     {
                         backgroundColor: colors.surfaceContainer,
                         borderColor: colors.outlineVariant,
@@ -176,6 +262,99 @@ export default function EventListScreen() {
         );
     };
 
+    const numColumns = getNumColumns(dimensions.width);
+
+    // Calculate grid container width
+    const containerWidth = Math.min(dimensions.width, CONTAINER_MAX_WIDTH);
+    const availableWidth = containerWidth - GRID_PADDING * 2;
+    const cardWidth = (availableWidth - GRID_GAP_H * (numColumns - 1)) / numColumns;
+
+    // Scroll handler for infinite scroll
+    const handleScroll = useCallback((event: any) => {
+        if (!isWeb) return;
+
+        const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+        const paddingToBottom = 500; // Start loading 500px before reaching bottom
+
+        const isCloseToBottom =
+            layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+
+        if (isCloseToBottom && hasMore && !loadingMore) {
+            loadMoreEvents(false);
+        }
+    }, [hasMore, loadingMore, loadMoreEvents]);
+
+    const renderLoadingFooter = () => {
+        if (!loadingMore) return null;
+
+        return (
+            <View style={styles.loadingFooter}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.loadingFooterText, { color: colors.onSurfaceVariant }]}>
+                    Lade weitere Events...
+                </Text>
+            </View>
+        );
+    };
+
+    const renderWebGrid = () => (
+        <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            onScroll={handleScroll}
+            scrollEventThrottle={400}
+        >
+            {renderHeader()}
+
+            {events.length === 0 ? (
+                renderEmpty()
+            ) : (
+                <>
+                    <View style={[styles.gridContainer, { maxWidth: CONTAINER_MAX_WIDTH, alignSelf: 'center', width: '100%' }]}>
+                        {events.map((item, index) => (
+                            <View
+                                key={String(item.event_id)}
+                                style={[
+                                    styles.gridItem,
+                                    {
+                                        width: cardWidth,
+                                        marginRight: (index + 1) % numColumns === 0 ? 0 : GRID_GAP_H,
+                                        marginBottom: GRID_GAP_V,
+                                    }
+                                ]}
+                            >
+                                {renderCard({ item, index })}
+                            </View>
+                        ))}
+                    </View>
+                    {renderLoadingFooter()}
+                </>
+            )}
+
+            <Footer />
+        </ScrollView>
+    );
+
+    const renderMobileList = () => (
+        <FlatList
+            data={events}
+            keyExtractor={(item) => String(item.event_id)}
+            renderItem={renderCard}
+            ListHeaderComponent={renderHeader}
+            ListEmptyComponent={renderEmpty}
+            ListFooterComponent={
+                <>
+                    {renderLoadingFooter()}
+                    <Footer />
+                </>
+            }
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            onEndReached={() => loadMoreEvents(false)}
+            onEndReachedThreshold={0.5}
+        />
+    );
+
     return (
         <View style={[styles.root, { backgroundColor: colors.background }]}>
             <Navbar showCta={false} showBack />
@@ -189,7 +368,7 @@ export default function EventListScreen() {
                     <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
                     <TouchableOpacity
                         style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                        onPress={fetchEvents}
+                        onPress={() => loadMoreEvents(true)}
                     >
                         <Text style={[styles.retryText, { color: colors.onPrimary }]}>
                             Erneut versuchen
@@ -197,16 +376,7 @@ export default function EventListScreen() {
                     </TouchableOpacity>
                 </View>
             ) : (
-                <FlatList
-                    data={events}
-                    keyExtractor={(item) => String(item.event_id)}
-                    renderItem={renderCard}
-                    ListHeaderComponent={renderHeader}
-                    ListEmptyComponent={renderEmpty}
-                    ListFooterComponent={<Footer />}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                />
+                isWeb ? renderWebGrid() : renderMobileList()
             )}
 
             <TouchableOpacity
@@ -249,6 +419,17 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
+    scrollContent: {
+        paddingBottom: 0,
+    },
+    gridContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingHorizontal: GRID_PADDING,
+    },
+    gridItem: {
+        // Width and margins are set dynamically
+    },
     listContent: {
         paddingBottom: 0,
     },
@@ -281,6 +462,12 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         alignSelf: 'center',
         width: CARD_WIDTH,
+    },
+    cardWeb: {
+        borderRadius: 20,
+        borderWidth: 1,
+        overflow: 'hidden',
+        width: '100%',
     },
     cardImage: {
         width: '100%',
@@ -350,6 +537,15 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 16,
+    },
+    loadingFooter: {
+        paddingVertical: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+    },
+    loadingFooterText: {
+        fontSize: 14,
     },
     fab: {
         position: 'absolute',
