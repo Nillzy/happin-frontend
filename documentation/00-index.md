@@ -10,7 +10,7 @@ This is the central index for all project documentation in the `documentation/` 
 | [02-dark-light-mode.md](./02-dark-light-mode.md) | Dark/Light Mode Toggle: Architektur (ThemeContext), DarkLightToggle-Komponente, Integration und betroffene Dateien. |
 | [03-navbar-footer.md](./03-navbar-footer.md) | Navbar, Footer und HappinLogo-Komponenten: Aufbau, Props, Integration in alle Screens. |
 | [04-time-based-slogan.md](./04-time-based-slogan.md) | Zeitabhängiger Slogan auf der Startseite: Logik, Zeitbereiche und Integration. |
-| [05-event-list-screen.md](./05-event-list-screen.md) | Event-Übersichtsseite: API-Client, Screen-Aufbau, Navigation, Daten-Mapping. |
+| [05-event-list-screen.md](./05-event-list-screen.md) | Event-Übersichtsseite: API-Client, Responsive Grid-Layout (Web: 1-5 Spalten für Mobile bis Ultrawide 21:9/4K, Mobile: FlatList), Infinite Scroll Pagination (30 Events/Page), Breakpoints, Screen-Aufbau, Navigation, Daten-Mapping. |
 | [06-authentication.md](./06-authentication.md) | Passwordless Authentication via E-Mail OTP: Supabase-Setup, Auth-Flow, Token-Speicherung (Web/iOS/Android), betroffene Dateien und Sicherheitshinweise. |
 | [07-event-create-screen.md](./07-event-create-screen.md) | Event-Erstellungs-Screen: Formular, Validierung, Auth-Token-Handling, Navigation. |
 | [08-routing.md](./08-routing.md) | Routing: Expo Router file-based Routing, Dateistruktur, Navigation-Patterns, Web-Reload. |

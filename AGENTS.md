@@ -114,6 +114,38 @@ Always destructure `colors` from `useTheme()` at the top of a component — do n
 
 Use React Native's `StyleSheet.create`. Styles that depend on the theme must be computed inside the component (not at module level) so they can reference `colors`. Responsive behaviour uses `Dimensions.get('window')` and `Platform.OS` checks.
 
+**Responsive Layout Patterns:**
+
+1. **Platform-specific rendering:**
+   ```typescript
+   const isWeb = Platform.OS === 'web';
+   
+   return isWeb ? <WebLayout /> : <MobileLayout />;
+   ```
+
+2. **Dynamic dimensions:**
+   ```typescript
+   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+   
+   useEffect(() => {
+       const subscription = Dimensions.addEventListener('change', ({ window }) => {
+           setDimensions(window);
+       });
+       return () => subscription?.remove();
+   }, []);
+   ```
+
+3. **Breakpoints for Web:**
+   ```typescript
+   function getNumColumns(width: number): number {
+       if (width >= 1200) return 3;
+       if (width >= 768) return 2;
+       return 1;
+   }
+   ```
+
+**EventListScreen** uses this pattern: `FlatList` (virtualized) for Mobile, Flexbox Grid for Web with responsive columns.
+
 ### Component Structure
 
 ```
