@@ -50,12 +50,12 @@ export async function clearAllAuthData(): Promise<void> {
         console.log('[ClearAuth] No old access_token in SecureStore');
       }
     } else {
-      // Web: Clear sessionStorage encryption key
+      // Web: Clear localStorage encryption key
       try {
-        sessionStorage.removeItem('supabase-session-encryption-key-web');
-        console.log('[ClearAuth] Cleared encryption key from sessionStorage');
+        localStorage.removeItem('supabase-session-encryption-key-web');
+        console.log('[ClearAuth] Cleared encryption key from localStorage');
       } catch (e) {
-        console.log('[ClearAuth] No encryption key found in sessionStorage');
+        console.log('[ClearAuth] No encryption key found in localStorage');
       }
     }
 
