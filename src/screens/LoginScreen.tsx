@@ -22,6 +22,7 @@ import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import { sendOtp, verifyOtp } from '../services/supabase';
 import { clearAllAuthData } from '../utils/clearAuthData';
+import { useAuth } from '../contexts/AuthContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,13 @@ function isValidEmail(value: string): boolean {
 export default function LoginScreen() {
     const { colors } = useTheme();
     const router = useRouter();
+    const { session, loading } = useAuth();
+
+    useEffect(() => {
+        if (!loading && session) {
+            router.replace('/events');
+        }
+    }, [loading, session]);
 
     const [step, setStep] = useState<Step>('email');
     const [email, setEmail] = useState('');
