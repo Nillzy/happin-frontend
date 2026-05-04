@@ -80,7 +80,7 @@ function formatDateGerman(isoDate: string): string {
 }
 
 // Pagination configuration
-const EVENTS_PER_PAGE = 5;
+const EVENTS_PER_PAGE = 12;
 
 export default function EventListScreen() {
     const { colors } = useTheme();
