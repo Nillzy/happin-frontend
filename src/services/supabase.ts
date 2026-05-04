@@ -133,8 +133,17 @@ export async function updateDisplayName(displayName: string): Promise<void> {
 }
 
 export async function updateName(firstName: string, lastName: string): Promise<void> {
-    // Schreibt direkt in Supabase user_metadata.
-    // Backend-Sync via PATCH /api/v1/users/me/name folgt sobald der Endpoint implementiert ist.
+    const token = await getSession();
+    if (!token) throw new Error('Not authenticated');
+
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+    const res = await fetch(`${backendUrl}/api/v1/users/me/name`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ first_name: firstName, last_name: lastName }),
+    });
+    if (!res.ok) throw new Error(`Update failed: ${res.status}`);
+
     const { error } = await getSupabase().auth.updateUser({
         data: { first_name: firstName, last_name: lastName },
     });

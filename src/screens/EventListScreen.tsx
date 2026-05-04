@@ -13,12 +13,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import { api } from '../services/api';
 import { authorize, getSession } from '../services/supabase';
-import type { EventListItem } from '../types/events';
+import type { EventListItem, EventListResponse } from '../types/events';
 
 /**
  * EventListScreen - Responsive Event Overview
@@ -85,6 +85,10 @@ const EVENTS_PER_PAGE = 30; // 5 columns × 6 rows on Ultrawide, 3 columns × 10
 export default function EventListScreen() {
     const { colors } = useTheme();
     const router = useRouter();
+    const { period, role } = useLocalSearchParams<{ period?: string; role?: string }>();
+    const isOrganizerView = role === 'organizer';
+    const eventPeriod = (period === 'past' ? 'past' : 'upcoming') as 'upcoming' | 'past';
+
     const [events, setEvents] = useState<EventListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -109,13 +113,16 @@ export default function EventListScreen() {
         try {
             const token = await getSession();
             const currentPage = isInitial ? 0 : page;
-            const data = await api.getPublicEvents(
-                EVENTS_PER_PAGE,
-                currentPage * EVENTS_PER_PAGE,
-                token || undefined
-            );
+            const offset = currentPage * EVENTS_PER_PAGE;
+            let data: EventListResponse;
 
-            // Check if we received fewer events than requested (last page)
+            if (isOrganizerView) {
+                if (!token) { router.replace('/login'); return; }
+                data = await api.getUserEvents(token, eventPeriod, EVENTS_PER_PAGE, offset);
+            } else {
+                data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token || undefined);
+            }
+
             if (data.events.length < EVENTS_PER_PAGE) {
                 setHasMore(false);
             }
@@ -136,7 +143,7 @@ export default function EventListScreen() {
                 setLoadingMore(false);
             }
         }
-    }, [page, loadingMore, hasMore]);
+    }, [page, loadingMore, hasMore, isOrganizerView, eventPeriod]);
 
     useEffect(() => {
         authorize().then((isAuthorized) => {

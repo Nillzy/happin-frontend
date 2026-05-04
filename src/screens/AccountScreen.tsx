@@ -431,13 +431,13 @@ export default function AccountScreen() {
                         <ActionRow
                             icon={<CalendarIcon size={20} color={colors.primary} />}
                             label="Aktuelle & geplante Events"
-                            onPress={() => router.push('/events?period=upcoming')}
+                            onPress={() => router.push('/events?period=upcoming&role=organizer')}
                             colors={colors}
                         />
                         <ActionRow
                             icon={<CalendarIcon size={20} color={colors.onSurfaceVariant} />}
                             label="Vergangene Events"
-                            onPress={() => router.push('/events?period=past')}
+                            onPress={() => router.push('/events?period=past&role=organizer')}
                             colors={colors}
                         />
                     </View>
