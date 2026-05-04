@@ -97,8 +97,13 @@ interface EventData {
     lineup: string[];
 }
 
+function parseLocalDate(isoDate: string): Date {
+    const bare = isoDate.replace(/([+-]\d{2}:\d{2}|Z)$/, '').replace('T', ' ');
+    return new Date(bare);
+}
+
 function mapApiToEventData(raw: EventDetailResponse): EventData {
-    const d = new Date(raw.starts_at);
+    const d = parseLocalDate(raw.starts_at);
     const dateStr = new Intl.DateTimeFormat('de-DE', {
         weekday: 'long',
         day: 'numeric',
@@ -113,7 +118,7 @@ function mapApiToEventData(raw: EventDetailResponse): EventData {
     let endDateStr = '';
     let endTimeStr = '';
     if (raw.ends_at) {
-        const ed = new Date(raw.ends_at);
+        const ed = parseLocalDate(raw.ends_at);
         endDateStr = new Intl.DateTimeFormat('de-DE', {
             weekday: 'long',
             day: 'numeric',

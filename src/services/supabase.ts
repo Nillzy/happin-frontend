@@ -104,10 +104,9 @@ export async function authorize(): Promise<boolean> {
 export interface UserProfile {
     id: string;
     email: string;
-    /** Display name set by the user (user_metadata.display_name) */
     displayName: string | null;
-    /** Full name from registration (user_metadata.full_name) */
-    fullName: string | null;
+    firstName: string | null;
+    lastName: string | null;
     /** Avatar URL — null until backend provides one */
     avatarUrl: string | null;
 }
@@ -120,7 +119,8 @@ export async function getUserProfile(): Promise<UserProfile | null> {
         id: u.id,
         email: u.email ?? '',
         displayName: u.user_metadata?.display_name ?? null,
-        fullName: u.user_metadata?.full_name ?? null,
+        firstName: u.user_metadata?.first_name ?? null,
+        lastName: u.user_metadata?.last_name ?? null,
         avatarUrl: u.user_metadata?.avatar_url ?? null,
     };
 }
@@ -132,16 +132,47 @@ export async function updateDisplayName(displayName: string): Promise<void> {
     if (error) throw new Error(error.message);
 }
 
+export async function updateName(firstName: string, lastName: string): Promise<void> {
+    // Schreibt direkt in Supabase user_metadata.
+    // Backend-Sync via PATCH /api/v1/users/me/name folgt sobald der Endpoint implementiert ist.
+    const { error } = await getSupabase().auth.updateUser({
+        data: { first_name: firstName, last_name: lastName },
+    });
+    if (error) throw new Error(error.message);
+}
+
 export async function signOut(): Promise<void> {
     const { error } = await getSupabase().auth.signOut();
     if (error) throw new Error(error.message);
 }
 
 export async function deleteAccount(): Promise<void> {
-    // Placeholder — the actual deletion requires a backend endpoint.
-    // Once the backend provides DELETE /api/v1/users/me, call it here with the
-    // current session token before signing out.
+    const token = await getSession();
+    if (!token) throw new Error('Not authenticated');
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+    const res = await fetch(`${backendUrl}/api/v1/users/me`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
     await signOut();
+}
+
+export async function updateEmail(newEmail: string): Promise<void> {
+    const token = await getSession();
+    if (!token) throw new Error('Not authenticated');
+
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+    const checkRes = await fetch(`${backendUrl}/api/v1/users/check-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: newEmail }),
+    });
+    if (checkRes.status === 409) throw new Error('email_already_in_use');
+    if (!checkRes.ok) throw new Error('Fehler bei der Überprüfung der E-Mail-Adresse.');
+
+    const { error } = await getSupabase().auth.updateUser({ email: newEmail });
+    if (error) throw new Error(error.message);
 }
 
 export function getSupabaseClient(): SupabaseClient {

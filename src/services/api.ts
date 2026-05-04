@@ -91,4 +91,21 @@ export const api = {
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ participation_ids: participationIds }),
         }),
+
+    getUserEvents: (token: string, period: 'upcoming' | 'past' = 'upcoming', limit = 50, offset = 0) =>
+        request<EventListResponse>(`/api/v1/users/me/events?period=${period}&limit=${limit}&offset=${offset}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
+    getUserTickets: (token: string) =>
+        request<{ tickets: { ticket_id: string; event_title: string; ticket_option_name: string; status: string }[]; total: number }>(
+            '/api/v1/users/me/tickets',
+            { headers: { Authorization: `Bearer ${token}` } }
+        ),
+
+    getUserStats: (token: string) =>
+        request<{ events_attended: number; events_created: number; tickets_total: number; participants_total: number }>(
+            '/api/v1/users/me/stats',
+            { headers: { Authorization: `Bearer ${token}` } }
+        ),
 };
