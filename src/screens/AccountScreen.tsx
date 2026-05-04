@@ -19,10 +19,13 @@ import { PersonIcon, EditIcon, LogoutIcon, TrashIcon, CalendarIcon, TicketIcon, 
 import {
     getUserProfile,
     updateDisplayName,
+    updateName,
     signOut,
     deleteAccount,
+    getSession,
     UserProfile,
 } from '../services/supabase';
+import { api } from '../services/api';
 
 // ── Profilbild-Platzhalter ────────────────────────────────────────────────────
 
@@ -180,9 +183,16 @@ export default function AccountScreen() {
 
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState<{ events_attended: number; events_created: number; tickets_total: number; participants_total: number } | null>(null);
+
     const [editingName, setEditingName] = useState(false);
     const [nameInput, setNameInput] = useState('');
     const [savingName, setSavingName] = useState(false);
+
+    const [editingRealName, setEditingRealName] = useState(false);
+    const [firstNameInput, setFirstNameInput] = useState('');
+    const [lastNameInput, setLastNameInput] = useState('');
+    const [savingRealName, setSavingRealName] = useState(false);
 
     const loadProfile = useCallback(async () => {
         setLoading(true);
@@ -193,7 +203,13 @@ export default function AccountScreen() {
         }
         setProfile(p);
         setNameInput(p.displayName ?? '');
+        setFirstNameInput(p.firstName ?? '');
+        setLastNameInput(p.lastName ?? '');
         setLoading(false);
+        const token = await getSession();
+        if (token) {
+            api.getUserStats(token).then(setStats).catch(() => {});
+        }
     }, []);
 
     useEffect(() => {
@@ -214,44 +230,56 @@ export default function AccountScreen() {
         }
     };
 
-    const handleLogout = () => {
-        Alert.alert(
-            'Abmelden',
-            'Möchtest du dich wirklich abmelden?',
-            [
-                { text: 'Abbrechen', style: 'cancel' },
-                {
-                    text: 'Abmelden',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await signOut();
-                        router.replace('/login');
-                    },
-                },
-            ],
-        );
+    const handleSaveRealName = async () => {
+        setSavingRealName(true);
+        try {
+            await updateName(firstNameInput.trim(), lastNameInput.trim());
+            setProfile(prev => prev ? {
+                ...prev,
+                firstName: firstNameInput.trim() || null,
+                lastName: lastNameInput.trim() || null,
+            } : prev);
+            setEditingRealName(false);
+        } catch {
+            Alert.alert('Fehler', 'Name konnte nicht gespeichert werden.');
+        } finally {
+            setSavingRealName(false);
+        }
     };
 
-    const handleDeleteAccount = () => {
-        Alert.alert(
-            'Konto löschen',
-            'Diese Aktion kann nicht rückgängig gemacht werden. Dein Konto und alle Daten werden dauerhaft gelöscht.',
-            [
-                { text: 'Abbrechen', style: 'cancel' },
-                {
-                    text: 'Konto löschen',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await deleteAccount();
-                            router.replace('/login');
-                        } catch {
-                            Alert.alert('Fehler', 'Konto konnte nicht gelöscht werden. Bitte versuche es später erneut.');
-                        }
-                    },
-                },
-            ],
-        );
+    const handleLogout = async () => {
+        const confirmed = Platform.OS === 'web'
+            ? window.confirm('Möchtest du dich wirklich abmelden?')
+            : await new Promise<boolean>(resolve =>
+                Alert.alert('Abmelden', 'Möchtest du dich wirklich abmelden?', [
+                    { text: 'Abbrechen', style: 'cancel', onPress: () => resolve(false) },
+                    { text: 'Abmelden', style: 'destructive', onPress: () => resolve(true) },
+                ])
+            );
+        if (!confirmed) return;
+        try { await signOut(); } finally { router.replace('/login'); }
+    };
+
+    const handleDeleteAccount = async () => {
+        const confirmed = Platform.OS === 'web'
+            ? window.confirm('Konto löschen? Diese Aktion kann nicht rückgängig gemacht werden.')
+            : await new Promise<boolean>(resolve =>
+                Alert.alert(
+                    'Konto löschen',
+                    'Diese Aktion kann nicht rückgängig gemacht werden. Dein Konto und alle Daten werden dauerhaft gelöscht.',
+                    [
+                        { text: 'Abbrechen', style: 'cancel', onPress: () => resolve(false) },
+                        { text: 'Konto löschen', style: 'destructive', onPress: () => resolve(true) },
+                    ]
+                )
+            );
+        if (!confirmed) return;
+        try {
+            await deleteAccount();
+            router.replace('/login');
+        } catch {
+            Alert.alert('Fehler', 'Konto konnte nicht gelöscht werden. Bitte versuche es später erneut.');
+        }
     };
 
     if (loading) {
@@ -275,10 +303,9 @@ export default function AccountScreen() {
                 {/* ── Profilkopf ── */}
                 <View style={[s.profileCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
                     <AvatarPlaceholder
-                        displayName={profile?.displayName ?? profile?.fullName ?? null}
+                        displayName={(profile?.displayName ?? `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim()) || null}
                         colors={colors}
                         onPress={() => {
-                            // Platzhalter — Bildauswahl/-upload wird implementiert sobald Backend-Endpoint bereit ist
                             Alert.alert('Profilbild', 'Profilbild-Upload wird in einer späteren Version verfügbar sein.');
                         }}
                     />
@@ -316,7 +343,7 @@ export default function AccountScreen() {
                             ) : (
                                 <>
                                     <Text style={[s.displayName, { color: colors.onSurface }]} numberOfLines={1}>
-                                        {profile?.displayName ?? profile?.fullName ?? 'Kein Name gesetzt'}
+                                        {(profile?.displayName ?? `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim()) || 'Kein Name gesetzt'}
                                     </Text>
                                     <TouchableOpacity onPress={() => setEditingName(true)} activeOpacity={0.7} style={s.editBtn}>
                                         <EditIcon size={16} color={colors.onSurfaceVariant} />
@@ -325,16 +352,59 @@ export default function AccountScreen() {
                             )}
                         </View>
 
-                        {/* E-Mail */}
+                        {/* E-Mail (nur Anzeige) */}
                         <Text style={[s.infoLabel, { color: colors.onSurfaceVariant }]}>E-Mail</Text>
                         <Text style={[s.infoValue, { color: colors.onSurface }]}>{profile?.email}</Text>
 
-                        {/* Registrierter Name */}
-                        {profile?.fullName && (
-                            <>
-                                <Text style={[s.infoLabel, { color: colors.onSurfaceVariant }]}>Registrierter Name</Text>
-                                <Text style={[s.infoValue, { color: colors.onSurface }]}>{profile.fullName}</Text>
-                            </>
+                        {/* Vor- und Nachname */}
+                        <Text style={[s.infoLabel, { color: colors.onSurfaceVariant }]}>Vor- & Nachname</Text>
+                        {editingRealName ? (
+                            <View style={{ gap: 6, marginBottom: 10 }}>
+                                <View style={s.nameEditRow}>
+                                    <TextInput
+                                        style={[s.nameInput, { flex: 1, color: colors.onSurface, borderColor: colors.primary, backgroundColor: colors.surfaceContainerLow }]}
+                                        value={firstNameInput}
+                                        onChangeText={setFirstNameInput}
+                                        autoFocus
+                                        placeholder="Vorname"
+                                        placeholderTextColor={colors.outline}
+                                        returnKeyType="next"
+                                    />
+                                    <TextInput
+                                        style={[s.nameInput, { flex: 1, color: colors.onSurface, borderColor: colors.primary, backgroundColor: colors.surfaceContainerLow }]}
+                                        value={lastNameInput}
+                                        onChangeText={setLastNameInput}
+                                        placeholder="Nachname"
+                                        placeholderTextColor={colors.outline}
+                                        returnKeyType="done"
+                                        onSubmitEditing={handleSaveRealName}
+                                    />
+                                </View>
+                                <View style={s.nameEditRow}>
+                                    <TouchableOpacity
+                                        style={[s.saveBtn, { backgroundColor: savingRealName ? colors.surfaceContainerHigh : colors.primary }]}
+                                        onPress={handleSaveRealName}
+                                        disabled={savingRealName}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={[s.saveBtnText, { color: savingRealName ? colors.onSurfaceVariant : colors.onPrimary }]}>
+                                            {savingRealName ? '…' : 'Speichern'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => setEditingRealName(false)} style={s.editBtn}>
+                                        <Text style={{ color: colors.onSurfaceVariant, fontSize: 13 }}>Abbrechen</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ) : (
+                            <View style={[s.nameRow, { marginBottom: 10 }]}>
+                                <Text style={[s.infoValue, { color: colors.onSurface, marginBottom: 0, flex: 1 }]}>
+                                    {[profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || 'Nicht angegeben'}
+                                </Text>
+                                <TouchableOpacity onPress={() => setEditingRealName(true)} activeOpacity={0.7} style={s.editBtn}>
+                                    <EditIcon size={16} color={colors.onSurfaceVariant} />
+                                </TouchableOpacity>
+                            </View>
                         )}
                     </View>
                 </View>
@@ -342,16 +412,15 @@ export default function AccountScreen() {
                 {/* ── Statistiken ── */}
                 <View style={s.section}>
                     <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Übersicht</Text>
-                    {/* Platzhalter-Werte — werden später vom Backend befüllt */}
                     <View style={s.statRow}>
-                        <StatTile label="Events besucht" value="—" colors={colors} />
+                        <StatTile label="Events besucht" value={stats?.events_attended ?? '—'} colors={colors} />
                         <View style={s.statGap} />
-                        <StatTile label="Events erstellt" value="—" colors={colors} />
+                        <StatTile label="Events erstellt" value={stats?.events_created ?? '—'} colors={colors} />
                     </View>
                     <View style={[s.statRow, { marginTop: 8 }]}>
-                        <StatTile label="Tickets" value="—" colors={colors} />
+                        <StatTile label="Tickets" value={stats?.tickets_total ?? '—'} colors={colors} />
                         <View style={s.statGap} />
-                        <StatTile label="Teilnehmer" value="—" colors={colors} />
+                        <StatTile label="Teilnehmer" value={stats?.participants_total ?? '—'} colors={colors} />
                     </View>
                 </View>
 
@@ -362,13 +431,13 @@ export default function AccountScreen() {
                         <ActionRow
                             icon={<CalendarIcon size={20} color={colors.primary} />}
                             label="Aktuelle & geplante Events"
-                            onPress={() => router.push('/events')}
+                            onPress={() => router.push('/events?period=upcoming')}
                             colors={colors}
                         />
                         <ActionRow
                             icon={<CalendarIcon size={20} color={colors.onSurfaceVariant} />}
                             label="Vergangene Events"
-                            onPress={() => router.push('/events')}
+                            onPress={() => router.push('/events?period=past')}
                             colors={colors}
                         />
                     </View>
@@ -381,8 +450,22 @@ export default function AccountScreen() {
                         <ActionRow
                             icon={<TicketIcon size={20} color={colors.secondary} />}
                             label="Alle Tickets anzeigen"
-                            onPress={() => {
-                                // Platzhalter — Ticket-Screen wird später implementiert
+                            onPress={async () => {
+                                try {
+                                    const token = await getSession();
+                                    if (!token) { router.replace('/login'); return; }
+                                    const { tickets, total } = await api.getUserTickets(token);
+                                    if (total === 0) {
+                                        Alert.alert('Meine Tickets', 'Du hast noch keine Tickets.');
+                                        return;
+                                    }
+                                    const list = tickets.map(t =>
+                                        `• ${t.event_title} — ${t.ticket_option_name} (${t.status})`
+                                    ).join('\n');
+                                    Alert.alert(`Meine Tickets (${total})`, list);
+                                } catch {
+                                    Alert.alert('Fehler', 'Tickets konnten nicht geladen werden.');
+                                }
                             }}
                             colors={colors}
                         />
@@ -393,15 +476,14 @@ export default function AccountScreen() {
                 <View style={s.section}>
                     <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Konto</Text>
                     <View style={[s.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-                        <ActionRow
-                            icon={<MailIcon size={20} color={colors.onSurface} />}
-                            label="E-Mail-Adresse ändern"
-                            onPress={() => {
-                                // Platzhalter — erfordert Backend-Endpoint und erneute OTP-Verifizierung
-                                Alert.alert('E-Mail ändern', 'Diese Funktion wird in einer späteren Version verfügbar sein.');
-                            }}
-                            colors={colors}
-                        />
+                        {/* E-Mail ändern — demnächst verfügbar */}
+                        <View style={[actionStyles.row, { borderBottomColor: colors.outlineVariant, opacity: 0.45 }]}>
+                            <View style={actionStyles.left}>
+                                <MailIcon size={20} color={colors.onSurface} />
+                                <Text style={[actionStyles.label, { color: colors.onSurface }]}>E-Mail-Adresse ändern</Text>
+                            </View>
+                            <Text style={{ fontSize: 12, color: colors.onSurfaceVariant, fontStyle: 'italic' }}>Demnächst</Text>
+                        </View>
                         <ActionRow
                             icon={<LogoutIcon size={20} color={colors.onSurface} />}
                             label="Abmelden"

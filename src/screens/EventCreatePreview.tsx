@@ -79,6 +79,15 @@ export default function EventCreatePreview({ data, onChange, onBack }: EventCrea
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [editedSections, setEditedSections] = useState<Set<EditSection>>(new Set());
 
+    // Builds an ISO string with the device's local UTC offset so Supabase stores the correct UTC time.
+    const localIso = (date: string, time: string): string => {
+        const d = new Date(`${date}T${time}:00`);
+        const tzOffset = -d.getTimezoneOffset();
+        const sign = tzOffset >= 0 ? '+' : '-';
+        const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
+        return `${date}T${time}:00${sign}${pad(Math.floor(Math.abs(tzOffset) / 60))}:${pad(Math.abs(tzOffset) % 60)}`;
+    };
+
     // Temp state for modal edits (so cancel doesn't persist)
     const [tempData, setTempData] = useState<Partial<PreviewFormData>>({});
 
@@ -125,9 +134,9 @@ export default function EventCreatePreview({ data, onChange, onBack }: EventCrea
 
         const payload: EventCreateRequest = {
             title: data.title.trim(),
-            starts_at: `${data.date.trim()}T${data.time.trim()}:00`,
+            starts_at: localIso(data.date.trim(), data.time.trim()),
             ends_at: data.endDate.trim() && data.endTime.trim()
-                ? `${data.endDate.trim()}T${data.endTime.trim()}:00`
+                ? localIso(data.endDate.trim(), data.endTime.trim())
                 : undefined,
             description: data.description.trim() || undefined,
             category: data.category.trim() || undefined,
