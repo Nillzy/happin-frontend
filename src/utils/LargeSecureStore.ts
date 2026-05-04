@@ -16,15 +16,14 @@ import { Platform } from 'react-native';
  *
  * Security:
  * - iOS/Android: Encryption key stored in SecureStore (iOS Keychain / Android Keystore)
- * - Web: Encryption key stored in sessionStorage (cleared on browser close, never persisted to disk)
+ * - Web: Encryption key stored in localStorage (persists across tabs and browser restarts)
  * - Session data in AsyncStorage is ALWAYS encrypted and unreadable without the key
- * - Each app/browser session gets a unique encryption key
  *
  * Web Security Trade-offs:
- * - sessionStorage key is vulnerable to XSS attacks (same as localStorage tokens)
+ * - localStorage key is vulnerable to XSS attacks (same as any client-side token storage)
  * - But MUCH better than unencrypted storage
- * - Key is cleared on browser close (no persistent storage)
- * - Recommendation: Use short session timeouts on web (e.g., 1 hour instead of 30 days)
+ * - Session persists across browser restarts (user stays logged in)
+ * - Supabase handles token expiry and refresh automatically
  */
 export class LargeSecureStore {
   private isWeb = Platform.OS === 'web';
@@ -34,23 +33,23 @@ export class LargeSecureStore {
     const ENCRYPTION_KEY_NAME = 'supabase-session-encryption-key';
 
     if (this.isWeb) {
-      // Web: Use sessionStorage for encryption key (cleared on browser close)
+      // Web: Use localStorage for encryption key (persists across browser restarts)
       if (forceReset) {
-        sessionStorage.removeItem(this.WEB_KEY_STORAGE_NAME);
+        localStorage.removeItem(this.WEB_KEY_STORAGE_NAME);
       }
 
-      let keyString = sessionStorage.getItem(this.WEB_KEY_STORAGE_NAME);
+      let keyString = localStorage.getItem(this.WEB_KEY_STORAGE_NAME);
 
       if (!keyString) {
-        console.log('[LargeSecureStore] Generating new web encryption key (session-only)');
+        console.log('[LargeSecureStore] Generating new web encryption key');
         const randomBytes = await Crypto.getRandomBytesAsync(32);
         const key = new Uint8Array(randomBytes);
 
         keyString = Array.from(key)
           .map((byte) => byte.toString(16).padStart(2, '0'))
           .join('');
-        sessionStorage.setItem(this.WEB_KEY_STORAGE_NAME, keyString);
-        console.log('[LargeSecureStore] Web encryption key stored in sessionStorage (cleared on close)');
+        localStorage.setItem(this.WEB_KEY_STORAGE_NAME, keyString);
+        console.log('[LargeSecureStore] Web encryption key stored in localStorage');
       }
 
       const key = new Uint8Array(
