@@ -98,8 +98,26 @@ interface EventData {
 }
 
 function parseLocalDate(isoDate: string): Date {
-    const bare = isoDate.replace(/([+-]\d{2}:\d{2}|Z)$/, '').replace('T', ' ');
-    return new Date(bare);
+    return new Date(isoDate);
+}
+
+function toLocalDateString(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function toLocalTimeString(d: Date): string {
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function toLocalIso(date: string, time: string): string {
+    const d = new Date(`${date}T${time}:00`);
+    const tzOffset = -d.getTimezoneOffset();
+    const sign = tzOffset >= 0 ? '+' : '-';
+    const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
+    return `${date}T${time}:00${sign}${pad(Math.floor(Math.abs(tzOffset) / 60))}:${pad(Math.abs(tzOffset) % 60)}`;
 }
 
 function mapApiToEventData(raw: EventDetailResponse): EventData {
@@ -543,11 +561,12 @@ export default function EventScreen() {
         } else if (editing === 'description' && tempData.description !== undefined) {
             patch.description = (tempData.description as string) || null;
         } else if (editing === 'datetime') {
-            const date = (tempData.date as string) || rawEvent.starts_at.slice(0, 10);
-            const time = (tempData.time as string) || rawEvent.starts_at.slice(11, 16);
-            patch.starts_at = `${date}T${time}:00`;
+            const localD = new Date(rawEvent.starts_at);
+            const date = (tempData.date as string) || toLocalDateString(localD);
+            const time = (tempData.time as string) || toLocalTimeString(localD);
+            patch.starts_at = toLocalIso(date, time);
             if (tempData.endDate && tempData.endTime) {
-                patch.ends_at = `${tempData.endDate}T${tempData.endTime}:00`;
+                patch.ends_at = toLocalIso(tempData.endDate as string, tempData.endTime as string);
             }
         } else if (editing === 'location') {
             patch.location = {};
@@ -981,14 +1000,14 @@ export default function EventScreen() {
                             <View style={[es.modalRow, { zIndex: 60 }]}>
                                 <View style={es.modalHalf}>
                                     <DatePicker
-                                        value={getVal('date', rawEvent.starts_at.slice(0, 10))}
+                                        value={getVal('date', toLocalDateString(new Date(rawEvent.starts_at)))}
                                         onChange={(v) => setTempData((p) => ({ ...p, date: v }))}
                                         minDate={new Date()}
                                     />
                                 </View>
                                 <View style={es.modalHalf}>
                                     <TimePicker
-                                        value={getVal('time', rawEvent.starts_at.slice(11, 16))}
+                                        value={getVal('time', toLocalTimeString(new Date(rawEvent.starts_at)))}
                                         onChange={(v) => setTempData((p) => ({ ...p, time: v }))}
                                     />
                                 </View>
@@ -999,14 +1018,14 @@ export default function EventScreen() {
                             <View style={[es.modalRow, { zIndex: 50 }]}>
                                 <View style={es.modalHalf}>
                                     <DatePicker
-                                        value={getVal('endDate', rawEvent.ends_at?.slice(0, 10) ?? '')}
+                                        value={getVal('endDate', rawEvent.ends_at ? toLocalDateString(new Date(rawEvent.ends_at)) : '')}
                                         onChange={(v) => setTempData((p) => ({ ...p, endDate: v }))}
                                         minDate={new Date()}
                                     />
                                 </View>
                                 <View style={es.modalHalf}>
                                     <TimePicker
-                                        value={getVal('endTime', rawEvent.ends_at?.slice(11, 16) ?? '')}
+                                        value={getVal('endTime', rawEvent.ends_at ? toLocalTimeString(new Date(rawEvent.ends_at)) : '')}
                                         onChange={(v) => setTempData((p) => ({ ...p, endTime: v }))}
                                     />
                                 </View>

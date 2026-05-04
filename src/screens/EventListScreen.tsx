@@ -80,7 +80,7 @@ function formatDateGerman(isoDate: string): string {
 }
 
 // Pagination configuration
-const EVENTS_PER_PAGE = 30; // 5 columns × 6 rows on Ultrawide, 3 columns × 10 rows on desktop
+const EVENTS_PER_PAGE = 12;
 
 export default function EventListScreen() {
     const { colors } = useTheme();
@@ -91,29 +91,20 @@ export default function EventListScreen() {
 
     const [events, setEvents] = useState<EventListItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [dimensions, setDimensions] = useState(Dimensions.get('window'));
-    const [page, setPage] = useState(0);
-    const [hasMore, setHasMore] = useState(true);
+    const [currentPage, setCurrentPage] = useState(0);
+    const [totalCount, setTotalCount] = useState(0);
 
-    const loadMoreEvents = useCallback(async (isInitial = false) => {
-        if (!isInitial && (loadingMore || !hasMore)) return;
+    const totalPages = Math.max(1, Math.ceil(totalCount / EVENTS_PER_PAGE));
 
-        if (isInitial) {
-            setLoading(true);
-            setPage(0);
-            setHasMore(true);
-        } else {
-            setLoadingMore(true);
-        }
-
+    const loadPage = useCallback(async (page: number) => {
+        setLoading(true);
         setError(null);
 
         try {
             const token = await getSession();
-            const currentPage = isInitial ? 0 : page;
-            const offset = currentPage * EVENTS_PER_PAGE;
+            const offset = page * EVENTS_PER_PAGE;
             let data: EventListResponse;
 
             if (isOrganizerView) {
@@ -123,27 +114,15 @@ export default function EventListScreen() {
                 data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token || undefined);
             }
 
-            if (data.events.length < EVENTS_PER_PAGE) {
-                setHasMore(false);
-            }
-
-            if (isInitial) {
-                setEvents(data.events);
-                setPage(1);
-            } else {
-                setEvents(prev => [...prev, ...data.events]);
-                setPage(prev => prev + 1);
-            }
+            setEvents(data.events);
+            setTotalCount(data.count);
+            setCurrentPage(page);
         } catch (e) {
             setError('Fehler beim Laden der Events');
         } finally {
-            if (isInitial) {
-                setLoading(false);
-            } else {
-                setLoadingMore(false);
-            }
+            setLoading(false);
         }
-    }, [page, loadingMore, hasMore, isOrganizerView, eventPeriod]);
+    }, [isOrganizerView, eventPeriod]);
 
     useEffect(() => {
         authorize().then((isAuthorized) => {
@@ -152,7 +131,7 @@ export default function EventListScreen() {
     }, []);
 
     useEffect(() => {
-        loadMoreEvents(true); // Initial load
+        void loadPage(0);
     }, []);
 
     // Listen to window resize for responsive grid on Web
@@ -172,6 +151,10 @@ export default function EventListScreen() {
         } else {
             router.push(`/event/${event.event_id}`);
         }
+    };
+
+    const handlePageChange = (page: number) => {
+        void loadPage(page);
     };
 
     const renderCard = ({ item, index }: { item: EventListItem; index: number }) => {
@@ -276,30 +259,80 @@ export default function EventListScreen() {
     const availableWidth = containerWidth - GRID_PADDING * 2;
     const cardWidth = (availableWidth - GRID_GAP_H * (numColumns - 1)) / numColumns;
 
-    // Scroll handler for infinite scroll
-    const handleScroll = useCallback((event: any) => {
-        if (!isWeb) return;
+    const renderPagination = () => {
+        if (events.length === 0) return null;
 
-        const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-        const paddingToBottom = 500; // Start loading 500px before reaching bottom
-
-        const isCloseToBottom =
-            layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
-
-        if (isCloseToBottom && hasMore && !loadingMore) {
-            loadMoreEvents(false);
+        const maxVisible = 5;
+        const half = Math.floor(maxVisible / 2);
+        let startPage = Math.max(0, currentPage - half);
+        const endPage = Math.min(totalPages - 1, startPage + maxVisible - 1);
+        if (endPage - startPage < maxVisible - 1) {
+            startPage = Math.max(0, endPage - maxVisible + 1);
         }
-    }, [hasMore, loadingMore, loadMoreEvents]);
-
-    const renderLoadingFooter = () => {
-        if (!loadingMore) return null;
+        const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
 
         return (
-            <View style={styles.loadingFooter}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={[styles.loadingFooterText, { color: colors.onSurfaceVariant }]}>
-                    Lade weitere Events...
-                </Text>
+            <View style={styles.pagination}>
+                <TouchableOpacity
+                    style={[styles.pageBtn, currentPage === 0 && styles.pageBtnDisabled, { borderColor: colors.outlineVariant }]}
+                    onPress={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 0}
+                >
+                    <Text style={[styles.pageBtnText, { color: currentPage === 0 ? colors.onSurfaceVariant : colors.onSurface }]}>‹</Text>
+                </TouchableOpacity>
+
+                {startPage > 0 && (
+                    <>
+                        <TouchableOpacity
+                            style={[styles.pageBtn, { borderColor: colors.outlineVariant }]}
+                            onPress={() => handlePageChange(0)}
+                        >
+                            <Text style={[styles.pageBtnText, { color: colors.onSurface }]}>1</Text>
+                        </TouchableOpacity>
+                        {startPage > 1 && (
+                            <Text style={[styles.pageEllipsis, { color: colors.onSurfaceVariant }]}>…</Text>
+                        )}
+                    </>
+                )}
+
+                {pageNumbers.map(p => (
+                    <TouchableOpacity
+                        key={p}
+                        style={[
+                            styles.pageBtn,
+                            { borderColor: colors.outlineVariant },
+                            p === currentPage && { backgroundColor: colors.primary, borderColor: colors.primary },
+                        ]}
+                        onPress={() => handlePageChange(p)}
+                        disabled={p === currentPage}
+                    >
+                        <Text style={[styles.pageBtnText, { color: p === currentPage ? colors.onPrimary : colors.onSurface }]}>
+                            {p + 1}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+
+                {endPage < totalPages - 1 && (
+                    <>
+                        {endPage < totalPages - 2 && (
+                            <Text style={[styles.pageEllipsis, { color: colors.onSurfaceVariant }]}>…</Text>
+                        )}
+                        <TouchableOpacity
+                            style={[styles.pageBtn, { borderColor: colors.outlineVariant }]}
+                            onPress={() => handlePageChange(totalPages - 1)}
+                        >
+                            <Text style={[styles.pageBtnText, { color: colors.onSurface }]}>{totalPages}</Text>
+                        </TouchableOpacity>
+                    </>
+                )}
+
+                <TouchableOpacity
+                    style={[styles.pageBtn, currentPage === totalPages - 1 && styles.pageBtnDisabled, { borderColor: colors.outlineVariant }]}
+                    onPress={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages - 1}
+                >
+                    <Text style={[styles.pageBtnText, { color: currentPage === totalPages - 1 ? colors.onSurfaceVariant : colors.onSurface }]}>›</Text>
+                </TouchableOpacity>
             </View>
         );
     };
@@ -308,36 +341,32 @@ export default function EventListScreen() {
         <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
-            onScroll={handleScroll}
-            scrollEventThrottle={400}
         >
             {renderHeader()}
 
             {events.length === 0 ? (
                 renderEmpty()
             ) : (
-                <>
-                    <View style={[styles.gridContainer, { maxWidth: CONTAINER_MAX_WIDTH, alignSelf: 'center', width: '100%' }]}>
-                        {events.map((item, index) => (
-                            <View
-                                key={String(item.event_id)}
-                                style={[
-                                    styles.gridItem,
-                                    {
-                                        width: cardWidth,
-                                        marginRight: (index + 1) % numColumns === 0 ? 0 : GRID_GAP_H,
-                                        marginBottom: GRID_GAP_V,
-                                    }
-                                ]}
-                            >
-                                {renderCard({ item, index })}
-                            </View>
-                        ))}
-                    </View>
-                    {renderLoadingFooter()}
-                </>
+                <View style={[styles.gridContainer, { maxWidth: CONTAINER_MAX_WIDTH, alignSelf: 'center', width: '100%' }]}>
+                    {events.map((item, index) => (
+                        <View
+                            key={String(item.event_id)}
+                            style={[
+                                styles.gridItem,
+                                {
+                                    width: cardWidth,
+                                    marginRight: (index + 1) % numColumns === 0 ? 0 : GRID_GAP_H,
+                                    marginBottom: GRID_GAP_V,
+                                }
+                            ]}
+                        >
+                            {renderCard({ item, index })}
+                        </View>
+                    ))}
+                </View>
             )}
 
+            {renderPagination()}
             <Footer />
         </ScrollView>
     );
@@ -351,14 +380,12 @@ export default function EventListScreen() {
             ListEmptyComponent={renderEmpty}
             ListFooterComponent={
                 <>
-                    {renderLoadingFooter()}
+                    {renderPagination()}
                     <Footer />
                 </>
             }
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
-            onEndReached={() => loadMoreEvents(false)}
-            onEndReachedThreshold={0.5}
         />
     );
 
@@ -375,7 +402,7 @@ export default function EventListScreen() {
                     <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
                     <TouchableOpacity
                         style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                        onPress={() => loadMoreEvents(true)}
+                        onPress={() => void loadPage(currentPage)}
                     >
                         <Text style={[styles.retryText, { color: colors.onPrimary }]}>
                             Erneut versuchen
@@ -545,15 +572,6 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 16,
     },
-    loadingFooter: {
-        paddingVertical: 32,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-    },
-    loadingFooterText: {
-        fontSize: 14,
-    },
     fab: {
         position: 'absolute',
         bottom: 24,
@@ -573,5 +591,34 @@ const styles = StyleSheet.create({
         fontSize: 28,
         fontWeight: '400',
         lineHeight: 30,
+    },
+    pagination: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 24,
+        paddingHorizontal: 16,
+        gap: 6,
+        flexWrap: 'wrap',
+    },
+    pageBtn: {
+        minWidth: 40,
+        height: 40,
+        borderRadius: 10,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 8,
+    },
+    pageBtnDisabled: {
+        opacity: 0.35,
+    },
+    pageBtnText: {
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    pageEllipsis: {
+        fontSize: 15,
+        paddingHorizontal: 4,
     },
 });

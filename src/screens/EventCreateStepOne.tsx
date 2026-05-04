@@ -59,7 +59,7 @@ export default function EventCreateStepOne() {
                 return;
             }
 
-            const startsAt = `${date}T${time}:00`;
+            const startsAt = new Date(`${date}T${time}:00`).toISOString();
             const result = await api.createEvent({
                 title: title.trim(),
                 starts_at: startsAt,
