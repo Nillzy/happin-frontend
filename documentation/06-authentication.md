@@ -181,15 +181,16 @@ supabase.auth.onAuthStateChange((event, session) => {
 - **Encryption:** Alle Session-Daten sind verschlüsselt
 - **Key Storage:**
   - **iOS/Android:** SecureStore (iOS Keychain / Android Keystore) - Hardware-backed, persistent
-  - **Web:** sessionStorage (cleared on browser close) - Vulnerable to XSS but still encrypted
+  - **Web:** localStorage - Persistent across reloads, vulnerable to XSS but encrypted
 - **Data Storage:** AsyncStorage (encrypted payload)
 
 **Web Security Trade-offs:**
 - ✅ IMMER verschlüsselt (nie plain-text)
-- ✅ Encryption Key in sessionStorage (kein localStorage)
-- ✅ Key wird bei Browser-Close gelöscht (kein persistent storage)
-- ⚠️ Vulnerable to XSS attacks (gleich wie localStorage tokens)
-- ⚠️ Empfehlung: Kürzere Session Timeouts im Web (1h statt 30d)
+- ✅ Encryption Key in localStorage (persistent für "Stay logged in" UX)
+- ✅ Session überlebt Browser-Reloads und Tab-Wechsel
+- ⚠️ Vulnerable to XSS attacks (gleich wie unencrypted localStorage tokens)
+- ⚠️ Key wird bei Logout oder explizitem clearAuthData() gelöscht
+- 💡 Empfehlung: Supabase auto-refresh tokens mit vernünftigen Timeouts (Standard: 1h Access Token, 30d Refresh Token)
 
 **Native Security:**
 - ✅ Hardware-backed encryption key storage
@@ -200,10 +201,11 @@ supabase.auth.onAuthStateChange((event, session) => {
 **Ablauf:**
 1. Login → Supabase gibt Session zurück
 2. LargeSecureStore verschlüsselt Session-JSON mit AES-256
-3. Encrypted Payload → AsyncStorage
-4. Encryption Key → SecureStore (Native) / sessionStorage (Web)
-5. App-Restart → LargeSecureStore lädt Encrypted Payload
-6. Decrypt mit Key aus SecureStore/sessionStorage → Session verfügbar
+3. Encrypted Payload → AsyncStorage (localStorage im Web)
+4. Encryption Key → SecureStore (Native) / localStorage (Web)
+5. App-Restart / Browser-Reload → LargeSecureStore lädt Encrypted Payload
+6. Decrypt mit Key aus SecureStore/localStorage → Session verfügbar
+7. Bei mehreren offenen Tabs: Nur ein Tab sollte verwendet werden (Tabs können sich gegenseitig Session kaputt machen)
 
 **Kein manuelles Token-Handling mehr:**
 - ❌ ~~`localStorage.setItem('access_token', token)`~~

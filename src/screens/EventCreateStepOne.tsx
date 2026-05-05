@@ -12,23 +12,19 @@ import {
 } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/src/contexts/AuthContext';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
+import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import DatePicker from '../components/atoms/DatePicker';
 import TimePicker from '../components/atoms/TimePicker';
-import { api } from '../services/api';
-import { getSession } from '../services/supabase';
 
 export default function EventCreateStepOne() {
     const { colors } = useTheme();
     const router = useRouter();
-    const { session } = useAuth();
     const [title, setTitle] = useState('');
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
     const [errors, setErrors] = useState<{ title?: string; date?: string; time?: string }>({});
-    const [submitting, setSubmitting] = useState(false);
 
     const validate = (): boolean => {
         const e: typeof errors = {};
@@ -49,37 +45,22 @@ export default function EventCreateStepOne() {
 
     const handleNext = async () => {
         if (!validate()) return;
-        setSubmitting(true);
 
-        try {
-            const token = await getSession();
-            if (!token) {
-                // Should not happen if session is valid, but redirect just in case
-                router.replace('/login');
-                return;
-            }
-
-            const startsAt = new Date(`${date}T${time}:00`).toISOString();
-            const result = await api.createEvent({
+        // Navigate to Step 2 (Preview) with form data as URL params
+        router.push({
+            pathname: '/events/create/preview',
+            params: {
                 title: title.trim(),
-                starts_at: startsAt,
-                is_public: true,
-                status: 'draft',
-                location: {},
-            }, token);
-
-            router.replace(`/event/${result.event_id}`);
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Unbekannter Fehler';
-            setErrors({ title: `Fehler: ${msg}` });
-        } finally {
-            setSubmitting(false);
-        }
+                date: date.trim(),
+                time: time.trim(),
+            },
+        });
     };
 
     return (
-        <View style={[styles.root, { backgroundColor: colors.background }]}>
-            <Navbar showCta={false} showBack />
+        <ScreenWithNav>
+            <View style={[styles.root, { backgroundColor: colors.background }]}>
+                <Navbar showCta={false} showBack />
 
             <KeyboardAvoidingView
                 style={styles.flex}
@@ -169,21 +150,17 @@ export default function EventCreateStepOne() {
                         activeOpacity={0.85}
                         style={[styles.nextButton, { backgroundColor: colors.primary }]}
                         onPress={handleNext}
-                        disabled={submitting}
                     >
-                        {submitting ? (
-                            <ActivityIndicator color={colors.onPrimary} />
-                        ) : (
-                            <Text style={[styles.nextButtonText, { color: colors.onPrimary }]}>
-                                Weiter
-                            </Text>
-                        )}
+                        <Text style={[styles.nextButtonText, { color: colors.onPrimary }]}>
+                            Weiter
+                        </Text>
                     </TouchableOpacity>
 
                     <Footer />
                 </ScrollView>
             </KeyboardAvoidingView>
         </View>
+        </ScreenWithNav>
     );
 }
 

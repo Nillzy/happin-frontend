@@ -16,6 +16,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
+import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { api } from '../services/api';
 import { authorize, getSession } from '../services/supabase';
 import type { EventListItem, EventListResponse } from '../types/events';
@@ -390,37 +391,31 @@ export default function EventListScreen() {
     );
 
     return (
-        <View style={[styles.root, { backgroundColor: colors.background }]}>
-            <Navbar showCta={false} showBack />
+        <ScreenWithNav>
+            <View style={[styles.root, { backgroundColor: colors.background }]}>
+                <Navbar showCta={false} showBack />
 
-            {loading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={colors.primary} />
-                </View>
-            ) : error ? (
-                <View style={styles.errorContainer}>
-                    <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
-                    <TouchableOpacity
-                        style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                        onPress={() => void loadPage(currentPage)}
-                    >
-                        <Text style={[styles.retryText, { color: colors.onPrimary }]}>
-                            Erneut versuchen
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                isWeb ? renderWebGrid() : renderMobileList()
-            )}
-
-            <TouchableOpacity
-                activeOpacity={0.85}
-                style={[styles.fab, { backgroundColor: colors.primary }]}
-                onPress={() => router.push('/events/create')}
-            >
-                <Text style={[styles.fabIcon, { color: colors.onPrimary }]}>+</Text>
-            </TouchableOpacity>
-        </View>
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                    </View>
+                ) : error ? (
+                    <View style={styles.errorContainer}>
+                        <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+                        <TouchableOpacity
+                            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                            onPress={() => void loadPage(currentPage)}
+                        >
+                            <Text style={[styles.retryText, { color: colors.onPrimary }]}>
+                                Erneut versuchen
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    isWeb ? renderWebGrid() : renderMobileList()
+                )}
+            </View>
+        </ScreenWithNav>
     );
 }
 
@@ -571,26 +566,6 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         fontSize: 16,
-    },
-    fab: {
-        position: 'absolute',
-        bottom: 24,
-        right: 24,
-        width: 56,
-        height: 56,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        elevation: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-    },
-    fabIcon: {
-        fontSize: 28,
-        fontWeight: '400',
-        lineHeight: 30,
     },
     pagination: {
         flexDirection: 'row',
