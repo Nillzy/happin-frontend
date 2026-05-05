@@ -11,7 +11,7 @@ Drei neue Atom-Komponenten in `src/components/atoms/`:
 | Datei | Beschreibung |
 |-------|-------------|
 | `HappinLogo.tsx` | Brand-Logo: SVG-Pin-Icon + „happin"-Wordmark |
-| `Navbar.tsx` | Obere Navigation: Logo (navigiert zu Home) + DarkLightToggle + optionaler CTA |
+| `Navbar.tsx` | Obere Navigation: Logo (links) + Account-Button (rechts) + optionaler CTA |
 | `Footer.tsx` | Untere Leiste: Logo + Datenschutz/Impressum/Kontakt-Links + Copyright |
 
 ---
@@ -37,21 +37,24 @@ import HappinLogo from '@/src/components/atoms/HappinLogo';
 ```tsx
 import Navbar from '@/src/components/atoms/Navbar';
 
-<Navbar showCta />          // Standard: Logo + Toggle + "App laden"-Button
-<Navbar showBack />         // Back-Variante: "← Zurück" + Toggle (für Login/Detail-Screens)
-<Navbar />                  // Logo + Toggle, kein CTA
+<Navbar showCta />          // Standard: Logo (links) + Account-Button (rechts) + "App laden"-Button
+<Navbar showBack />         // Back-Variante: "← Zurück" + Account-Button
+<Navbar />                  // Logo + Account-Button, kein CTA
 ```
 
 **Props:**
 
 | Prop | Default | Beschreibung |
 |------|---------|-------------|
-| `showCta` | `false` | Zeigt „App laden"-Button rechts neben Toggle |
+| `showCta` | `false` | Zeigt „App laden"-Button rechts neben Account-Button |
 | `showBack` | `false` | Ersetzt Logo durch „← Zurück"-Button |
 
 - Hintergrund: `colors.background`
 - Bottom-Border: `rgba(255,255,255,0.06)` (dark) / `rgba(0,0,0,0.06)` (light)
 - iOS: `paddingTop: 54` für Safe-Area-Ausgleich
+- **Links**: Logo oder Back-Button
+- **Rechts**: Account-Button (immer sichtbar)
+- **DarkLightToggle entfernt**: Jetzt im Account-Screen (siehe 14-account-screen.md)
 
 ---
 

@@ -1,103 +1,347 @@
-# Event-Übersichtsseite (EventListScreen)
+# Event-Übersichtsseite (EventListScreen) - Explore
 
-Dieses Dokument beschreibt den EventListScreen, den API-Client und die zugehörigen Architektur-Entscheidungen, einschließlich des responsiven Grid-Layouts für Web und Infinite Scroll Pagination.
+Dieses Dokument beschreibt den EventListScreen (Explore), den API-Client und die zugehörigen Architektur-Entscheidungen, einschließlich des responsiven Grid-Layouts für Web und Infinity Scroll.
 
 ## Übersicht
 
-Der EventListScreen zeigt alle öffentlichen Events in einem responsiven Layout mit **Infinite Scroll Pagination**. Auf Mobile und Tablet wird eine scrollbare Liste verwendet, auf Web ein mehrspaliges Grid-Layout. Nutzer können auf Events tippen/klicken, um zum EventScreen (Detail) zu navigieren.
+Der EventListScreen zeigt alle öffentlichen Events in einem responsiven Layout mit **Infinity Scroll**. Auf Mobile und Tablet wird eine scrollbare Liste verwendet, auf Web ein mehrspaliges Grid-Layout. 
 
-**Requirement:** M5 (Event-View-Grundlage), M11 (Öffentliche Event-Liste < 2s Ladezeit)
+**Neue Features (Mai 2026):**
+- ✅ **Infinity Scroll** (keine Pagination-Buttons mehr)
+- ✅ **Suchleiste** mit Filter & Saved Events Buttons
+- ✅ **Like-Funktionalität** (Heart-Icon auf Cards)
+- ✅ **Footer entfernt** (kein Impressum mehr)
+- ✅ **Keine Überschriften** (nur Suchleiste + Events)
 
-## Pagination & Performance
+## UI-Design
 
-Der Screen verwendet **Infinite Scroll** für optimale Performance und UX:
+### Header-Bereich
 
-### Pagination-Strategie
-
-- **Page Size:** 30 Events pro Request
-  - Desktop (3 Spalten): 3 × 10 Zeilen
-  - Ultrawide (5 Spalten): 5 × 6 Zeilen
-- **Initial Load:** Erste 30 Events beim Screen-Mount
-- **Lazy Loading:** Weitere Events werden automatisch nachgeladen beim Scrollen
-- **Trigger:** 500px vor Ende des Contents (Web) / `onEndReached` threshold 0.5 (Mobile)
-
-### Vorteile
-
-✅ **Schnellere Initial Load Time:** Nur 30 Events statt alle  
-✅ **Reduzierter Memory Footprint:** Weniger Daten im State  
-✅ **Skalierbar:** Funktioniert mit 1000+ Events ohne Performance-Einbußen  
-✅ **Bessere UX:** Keine expliziten "Load More" Buttons nötig  
-✅ **Backend-Effizienz:** Kleinere API-Responses
-
-### Implementation Details
-
-```typescript
-const EVENTS_PER_PAGE = 30;
-
-const [page, setPage] = useState(0);
-const [hasMore, setHasMore] = useState(true);
-const [loadingMore, setLoadingMore] = useState(false);
-
-// Load more events
-const loadMoreEvents = useCallback(async (isInitial = false) => {
-    // Load EVENTS_PER_PAGE starting from page * EVENTS_PER_PAGE
-    const data = await api.getPublicEvents(
-        EVENTS_PER_PAGE,
-        currentPage * EVENTS_PER_PAGE,
-        token
-    );
-    
-    // Check if last page
-    if (data.events.length < EVENTS_PER_PAGE) {
-        setHasMore(false);
-    }
-    
-    // Append or replace events
-    if (isInitial) {
-        setEvents(data.events);
-    } else {
-        setEvents(prev => [...prev, ...data.events]);
-    }
-}, [page, loadingMore, hasMore]);
+```
+┌────────────────────────────────────────┐
+│ Navbar (Logo links, Account rechts)   │
+├────────────────────────────────────────┤
+│ 🔍 [Suchleiste]  [Filter] [Bookmarks]│
+└────────────────────────────────────────┘
 ```
 
-### Scroll Detection
+**Suchleiste-Elemente:**
+- **Search Icon**: `search` (20px)
+- **Input**: "Events durchsuchen" Placeholder
+- **Filter Button**: `options-outline` (22px)
+- **Saved Button**: `bookmarks-outline` (22px) → `/saved-events`
 
-**Web (ScrollView):**
+**Styling:**
+- Background: `surfaceContainerHigh`
+- Border-Radius: 24px (Pill)
+- Padding: 16px horizontal, 12px vertical
+- Gap zwischen Buttons: 12px
+
+### Event-Cards
+
+```
+┌───────────────────────────────┐
+│ [Gradient/Bild]          ♥   │ ← Heart-Icon (Like)
+│ DEIN EVENT (Badge)           │ ← Nur bei is_host
+│                              │
+│ Event-Titel                  │
+│ 10. Mai 2026 • 19:00        │
+│ Stuttgart                    │
+│                              │
+│ [Musik] [Party]   42 Teiln. │
+└───────────────────────────────┘
+```
+
+**Like-Icon**:
+- Position: `top: 12px, right: 12px` (absolut)
+- Nicht gespeichert: `heart-outline`, weiß (#ffffff)
+- Gespeichert: `heart` (gefüllt), Primary-Farbe
+- Größe: 24px
+- Stop-Propagation beim Click (öffnet nicht Event-Detail)
+
+**"Dein Event" Badge** (nur für Hosts):
+- Position: `top: 12px, left: 12px` (absolut)
+- Background: Primary (E6 opacity)
+- Text: "DEIN EVENT" (11px, uppercase, bold)
+- **Kein Emoji!**
+
+**Kategorien**:
+- Maximal 2 angezeigt
+- Chips: 10px padding, 8px border-radius
+- Font: 12px, Font-Weight 600
+
+**Teilnehmerzahl**:
+- Position: Rechts unten in Card
+- Font: 12px, Color: `onSurfaceVariant`
+
+## Infinity Scroll
+
+### Strategie
+
+**Page Size:** 12 Events pro Request (EVENTS_PER_PAGE)
+
+**Behavior:**
+1. Initial Load: 12 Events beim Mount
+2. User scrollt nach unten
+3. Bei Erreichen von ~Scroll-Ende: Nächste 12 Events laden
+4. Events werden an Liste angehängt
+5. Repeat bis alle Events geladen
+
+### Implementation
+
 ```typescript
-const handleScroll = useCallback((event: any) => {
-    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-    const paddingToBottom = 500;
+const EVENTS_PER_PAGE = 12;
+
+const [events, setEvents] = useState<EventListItem[]>([]);
+const [loadingMore, setLoadingMore] = useState(false);
+const [hasMore, setHasMore] = useState(true);
+
+const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+    const offset = events.length;
+    const data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token);
     
-    const isCloseToBottom =
+    setEvents(prev => [...prev, ...data.events]);
+    setHasMore(events.length + data.events.length < data.count);
+    setLoadingMore(false);
+}, [events.length, hasMore, loadingMore]);
+```
+
+**Backend-Integration:**
+```typescript
+// Backend gibt jetzt Total-Count zurück
+interface EventListResponse {
+    events: EventListItem[];
+    count: number; // Gesamtzahl ALLER Events, nicht nur auf Seite
+}
+```
+
+### Scroll-Detection
+
+**Web:**
+```typescript
+const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 20;
+    const isCloseToBottom = 
         layoutMeasurement.height + contentOffset.y >= 
         contentSize.height - paddingToBottom;
-    
+
     if (isCloseToBottom && hasMore && !loadingMore) {
-        loadMoreEvents(false);
+        void loadMore();
     }
-}, [hasMore, loadingMore, loadMoreEvents]);
+};
 
 <ScrollView onScroll={handleScroll} scrollEventThrottle={400}>
 ```
 
-**Mobile (FlatList):**
+**Mobile:**
 ```typescript
 <FlatList
-    onEndReached={() => loadMoreEvents(false)}
+    onEndReached={() => {
+        if (hasMore && !loadingMore) {
+            void loadMore();
+        }
+    }}
     onEndReachedThreshold={0.5}
-    ListFooterComponent={renderLoadingFooter()}
+    ListFooterComponent={renderFooter()}
+/>
+```
+
+### Loading-Footer
+
+```typescript
+const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+        <View style={styles.footerLoader}>
+            <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+    );
+};
+```
+
+## Pull-to-Refresh
+
+```typescript
+const [refreshing, setRefreshing] = useState(false);
+
+const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    const data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token);
+    setEvents(data.events);
+    setHasMore(data.events.length < data.count);
+    setRefreshing(false);
+}, []);
+
+<RefreshControl
+    refreshing={refreshing}
+    onRefresh={handleRefresh}
+    tintColor={colors.primary}
 />
 ```
 
 ## Responsive Layout
 
-Der Screen verwendet ein **adaptives Layout-System**, das sich an die Plattform und Bildschirmgröße anpasst:
+### Mobile & Tablet
+- **FlatList** mit Virtualisierung
+- **Card-Width**: `SCREEN_WIDTH - 48px` (24px Margin pro Seite)
+- **Spacing**: 16px zwischen Cards
 
-### Mobile & Tablet (iOS/Android)
-- **Layout:** Vertikale `FlatList` mit Virtualisierung
-- **Breite:** Full-width Cards mit 24px Margin
-- **Performance:** Optimiert für lange Listen durch Item-Recycling
+### Web (Responsive Grid)
+
+**Breakpoints:**
+```typescript
+function getNumColumns(width: number): number {
+    if (width >= 2560) return 5; // 4K / Ultrawide 21:9
+    if (width >= 1920) return 4; // 2K / QHD
+    if (width >= 1200) return 3; // Desktop
+    if (width >= 768) return 2;  // Tablet Landscape
+    return 1;                     // Mobile / Tablet Portrait
+}
+```
+
+**Grid-Konfiguration:**
+- Max-Width: 2560px (Container)
+- Padding: 24px (GRID_PADDING)
+- Gap Horizontal: 20px (GRID_GAP_H)
+- Gap Vertical: 16px (GRID_GAP_V)
+
+**Card-Width-Berechnung:**
+```typescript
+const containerWidth = Math.min(dimensions.width, CONTAINER_MAX_WIDTH);
+const availableWidth = containerWidth - GRID_PADDING * 2;
+const cardWidth = (availableWidth - GRID_GAP_H * (numColumns - 1)) / numColumns;
+```
+
+## Like-Funktionalität
+
+### SavedEventsContext Integration
+
+```typescript
+import { useSavedEvents } from '@/src/contexts/SavedEventsContext';
+
+const { toggleSaveEvent, isSaved } = useSavedEvents();
+
+const handleToggleSave = (event: EventListItem, e?: any) => {
+    if (e) {
+        e.stopPropagation(); // Verhindert Navigation zu Event-Detail
+    }
+    toggleSaveEvent(event);
+};
+```
+
+### Heart-Icon Position
+
+```typescript
+<TouchableOpacity
+    style={styles.likeButton} // Absolut, top: 12, right: 12
+    onPress={(e) => handleToggleSave(item, e)}
+>
+    <Ionicons
+        name={isSaved(item.event_id) ? 'heart' : 'heart-outline'}
+        size={24}
+        color={isSaved(item.event_id) ? colors.primary : '#ffffff'}
+    />
+</TouchableOpacity>
+```
+
+## Navigation
+
+### Event-Card Click
+- **Als Teilnehmer**: → `/event/[id]` (EventScreen)
+- **Als Host**: → `/event/[id]/manage` (EventHostScreen)
+
+### Suchleiste-Buttons
+- **Filter-Button**: TODO: Filter-Modal öffnen
+- **Bookmarks-Button**: → `/saved-events` (SavedEventsScreen)
+
+## Backend-Integration
+
+### API-Call
+
+```typescript
+// GET /api/v1/events/?limit=12&offset=0
+const data = await api.getPublicEvents(limit, offset, token);
+```
+
+**Response:**
+```typescript
+{
+    events: EventListItem[];
+    count: number; // Gesamtzahl (z.B. 19), nicht nur auf Seite (12)
+}
+```
+
+**EventListItem:**
+```typescript
+interface EventListItem {
+    event_id: string;
+    title: string;
+    starts_at: string;
+    image_url?: string;
+    gradient_id?: number; // 0-3
+    location?: { city?: string };
+    category?: string; // Komma-separiert
+    participant_count: number;
+    is_host: boolean;
+}
+```
+
+## Performance
+
+### Optimizations
+
+1. **Small Page Size (12)**: Schneller Initial Load
+2. **Lazy Loading**: Events werden nur bei Bedarf geladen
+3. **FlatList Virtualisierung** (Mobile): Item-Recycling
+4. **ScrollView + Flexbox** (Web): Kein Virtualisierung-Overhead
+5. **Memoization**: Render-Callbacks memoized
+
+### Expected Performance
+
+- **Initial Load**: < 500ms (12 Events)
+- **Load More**: < 300ms (12 Events)
+- **Smooth Scroll**: 60 FPS
+- **Memory**: ~1-2MB für 100 Events
+
+## Betroffene Dateien
+
+### Modifiziert
+- `src/screens/EventListScreen.tsx`
+  - Infinity Scroll statt Pagination
+  - Suchleiste hinzugefügt
+  - Like-Button hinzugefügt
+  - Footer entfernt
+  - Überschriften entfernt
+
+### Abhängigkeiten
+- `src/contexts/SavedEventsContext.tsx` - Like-Funktionalität
+- `src/constants/gradients.ts` - Gradient-Display
+- `app/saved-events.tsx` - Saved Events Route
+
+## Migration Notes
+
+### Breaking Changes
+- ❌ **Pagination entfernt**: Keine Seitenzahlen mehr
+- ❌ **Footer entfernt**: Kein Impressum mehr im EventListScreen
+
+### Design-Änderungen
+- ✅ Suchleiste mit Filter & Bookmarks
+- ✅ Heart-Icon für Like
+- ✅ "Dein Event" Badge links oben (ohne Emoji)
+- ✅ Max 2 Kategorien angezeigt
+- ✅ Teilnehmerzahl rechts unten
+
+## Zukünftige Erweiterungen
+
+1. **Filter-Modal**: Filter nach Kategorie, Datum, Location
+2. **Search-Implementierung**: Events durchsuchen
+3. **Virtualisierung für Web**: Bei 1000+ Events
+4. **Skeleton-Loading**: Placeholder während Initial Load
+5. **Optimistic Updates**: Like ohne Backend-Wait
 
 ### Web
 - **Layout:** Flexbox Grid mit dynamischen Spalten

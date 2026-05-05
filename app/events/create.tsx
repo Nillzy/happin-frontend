@@ -1,1 +1,1 @@
-export { default } from '@/src/screens/EventCreateScreen';
+export { default } from '@/src/screens/EventCreateStepOneNew';

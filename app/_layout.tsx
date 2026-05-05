@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/src/contexts/AuthContext';
+import { SavedEventsProvider } from '@/src/contexts/SavedEventsContext';
 
 export default function RootLayout() {
   const scheme = useColorScheme();
@@ -11,8 +12,10 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <SavedEventsProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+        </SavedEventsProvider>
       </AuthProvider>
     </ThemeProvider>
   );

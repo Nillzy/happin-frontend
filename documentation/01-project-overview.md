@@ -49,17 +49,20 @@ happin-frontend/
 │   │   │   └── icons.tsx            # Shared SVG icon components
 │   │   ├── auth/
 │   │   │   └── AuthGate.tsx         # Auth guard component (redirects to /login)
-│   │   └── event/
-│   │       ├── EventHero.tsx        # Event hero section with image/gradient
-│   │       ├── EventDescription.tsx # Event description block
-│   │       ├── EventInfoBlock.tsx   # Event info cards (date, location, etc.)
-│   │       └── EventCategories.tsx  # Event category chips
+│   │   ├── event/
+│   │   │   ├── EventHero.tsx        # Event hero section with image/gradient
+│   │   │   ├── EventDescription.tsx # Event description block
+│   │   │   ├── EventInfoBlock.tsx   # Event info cards (date, location, etc.)
+│   │   │   └── EventCategories.tsx  # Event category chips
+│   │   └── map/
+│   │       └── MapView.tsx          # Simple MapTiler map component (web only)
 │   ├── contexts/
 │   │   └── AuthContext.tsx       # Global auth state (session, user, loading, signOut)
 │   ├── screens/
 │   │   ├── HomeScreen.tsx        # Landing page with animated Berlin city map
 │   │   ├── LoginScreen.tsx       # Passwordless E-Mail OTP login (3 steps)
 │   │   ├── AccountScreen.tsx     # User account page
+│   │   ├── MapScreen.tsx         # Map view with simple MapTiler integration
 │   │   ├── EventListScreen.tsx   # Public events list
 │   │   ├── EventScreen.tsx       # Event detail page (hero, RSVP, info)
 │   │   ├── EventHostScreen.tsx   # Host view for event management
