@@ -430,7 +430,7 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
         >
             {/* ── Nav ── */}
-            <Navbar showCta />
+            <Navbar />
 
             {/* ── Hero: City Map ── */}
             <View

@@ -393,7 +393,7 @@ export default function EventListScreen() {
     return (
         <ScreenWithNav>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                <Navbar showCta={false} showBack />
+                <Navbar showBack />
 
                 {loading ? (
                     <View style={styles.loadingContainer}>

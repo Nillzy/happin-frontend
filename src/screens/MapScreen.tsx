@@ -22,7 +22,7 @@ export default function MapScreen() {
     return (
         <ScreenWithNav>
             <View style={[styles.container, { backgroundColor: colors.background }]}>
-                <Navbar showCta={false} />
+                <Navbar />
 
                 <View style={styles.content}>
                     <View style={[styles.placeholder, { backgroundColor: colors.surfaceContainer }]}>

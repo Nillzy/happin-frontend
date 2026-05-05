@@ -200,7 +200,7 @@ export default function EventCreatePreview() {
         <ScreenWithNav>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-                <Navbar showCta={false} showBack onBackPress={onBack} />
+                <Navbar showBack onBackPress={onBack} />
 
             <ScrollView
                 style={styles.scroll}
