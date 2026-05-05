@@ -150,6 +150,18 @@ export async function updateName(firstName: string, lastName: string): Promise<v
     if (error) throw new Error(error.message);
 }
 
+export async function updateCity(city: string): Promise<void> {
+    const token = await getSession();
+    if (!token) return;
+
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+    await fetch(`${backendUrl}/api/v1/users/me/city`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ city }),
+    });
+}
+
 export async function signOut(): Promise<void> {
     const { error } = await getSupabase().auth.signOut();
     if (error) throw new Error(error.message);

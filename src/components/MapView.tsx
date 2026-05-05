@@ -15,10 +15,14 @@ interface MapViewProps {
     centerLat?: number;
     centerLng?: number;
     zoom?: number;
+    isDark?: boolean;
 }
 
 const DEFAULT_CENTER = { lat: 52.52, lng: 13.405 };
 const DEFAULT_ZOOM = 11;
+
+const MAP_STYLE_LIGHT = 'https://api.maptiler.com/maps/019df984-95c4-700c-903c-d2b6e4f609ac/style.json';
+const MAP_STYLE_DARK  = 'https://api.maptiler.com/maps/019df980-9d7f-7211-a4d0-6ed2331bf2c5/style.json';
 
 function buildMapHtml(
     apiKey: string,
@@ -26,7 +30,9 @@ function buildMapHtml(
     centerLat: number,
     centerLng: number,
     zoom: number,
+    isDark: boolean,
 ): string {
+    const styleUrl = `${isDark ? MAP_STYLE_DARK : MAP_STYLE_LIGHT}?key=${apiKey}`;
     const markersJson = JSON.stringify(markers);
     return `<!DOCTYPE html>
 <html>
@@ -44,9 +50,10 @@ function buildMapHtml(
   <div id="map"></div>
   <script>
     maptilersdk.config.apiKey = '${apiKey}';
+    maptilersdk.config.primaryLanguage = maptilersdk.Language.GERMAN;
     const map = new maptilersdk.Map({
       container: 'map',
-      style: maptilersdk.MapStyle.STREETS,
+      style: '${styleUrl}',
       center: [${centerLng}, ${centerLat}],
       zoom: ${zoom},
     });
@@ -79,24 +86,28 @@ export default function MapView({
     centerLat = DEFAULT_CENTER.lat,
     centerLng = DEFAULT_CENTER.lng,
     zoom = DEFAULT_ZOOM,
+    isDark = false,
 }: MapViewProps) {
     const apiKey = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const mapInstanceRef = useRef<any>(null);
 
     if (Platform.OS === 'web') {
+        const styleUrl = `${isDark ? MAP_STYLE_DARK : MAP_STYLE_LIGHT}?key=${apiKey}`;
+
         // eslint-disable-next-line react-hooks/rules-of-hooks
         useEffect(() => {
             let map: any;
             async function init() {
                 const sdk = await import('@maptiler/sdk');
                 sdk.config.apiKey = apiKey;
+                sdk.config.primaryLanguage = sdk.Language.GERMAN;
 
                 if (!mapContainerRef.current || mapInstanceRef.current) return;
 
                 map = new sdk.Map({
                     container: mapContainerRef.current,
-                    style: sdk.MapStyle.STREETS,
+                    style: styleUrl,
                     center: [centerLng, centerLat],
                     zoom,
                 });
@@ -124,7 +135,7 @@ export default function MapView({
             };
         // markers und onMarkerPress absichtlich nicht in deps — Karte wird einmalig initialisiert
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [apiKey, centerLat, centerLng, zoom]);
+        }, [apiKey, styleUrl, centerLat, centerLng, zoom]);
 
         return (
             <View style={styles.container}>
@@ -134,7 +145,7 @@ export default function MapView({
         );
     }
 
-    const html = buildMapHtml(apiKey, markers, centerLat, centerLng, zoom);
+    const html = buildMapHtml(apiKey, markers, centerLat, centerLng, zoom, isDark);
 
     return (
         <View style={styles.container}>

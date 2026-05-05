@@ -33,7 +33,12 @@ Vier `StatTile`-Kacheln via `GET /api/v1/users/me/stats`:
 
 ### Einstellungen
 
-- **Mein Standort** — Stadtname editierbar in-place; wird in `AsyncStorage` unter `happin_user_city` gespeichert. Der gespeicherte Wert wird beim Öffnen des Karten-Tabs als Kartenmittelpunkt verwendet.
+- **Mein Standort** — Stadtname editierbar in-place mit Autocomplete (`CityAutocomplete`). Zwei Speicherwege:
+  - **Autocomplete-Auswahl**: Klick auf einen Vorschlag speichert sofort `name` (für Geocoding) und `displayLabel` (z. B. „Karlsruhe, BW, Deutschland") via `saveCity(name, label)`
+  - **GPS-Button** (`GpsIcon`): Fragt `expo-location`-Berechtigung an, holt aktuelle Position, reverse-geocodet zu Stadt/Region/Land und speichert
+  - Gespeicherte Werte werden als Kartenmittelpunkt verwendet (Tab „Karte")
+  - Jede Standortänderung wird zusätzlich via `PATCH /api/v1/users/me/city` in die `person`-Tabelle geschrieben (fire-and-forget)
+- **Design** — `DarkLightToggle` zum Wechseln zwischen Light/Dark Mode
 
 ### Konto
 
@@ -50,6 +55,7 @@ Vier `StatTile`-Kacheln via `GET /api/v1/users/me/stats`:
 | `getUserProfile()` | Liest `email`, `display_name`, `first_name`, `last_name`, `avatar_url` aus `auth.getUser()` |
 | `updateDisplayName(name)` | Schreibt `display_name` via `auth.updateUser({ data: ... })` |
 | `updateName(firstName, lastName)` | PATCH `/api/v1/users/me/name` → `person`-Tabelle, dann `auth.updateUser()` |
+| `updateCity(city)` | PATCH `/api/v1/users/me/city` → `city`-Spalte in `person`-Tabelle (fire-and-forget) |
 | `signOut()` | Supabase `auth.signOut()` |
 | `deleteAccount()` | `DELETE /api/v1/users/me` via Backend, dann `signOut()` |
 
@@ -58,12 +64,14 @@ Vier `StatTile`-Kacheln via `GET /api/v1/users/me/stats`:
 ## Stadteinstellung (`hooks/use-user-city.ts`)
 
 ```typescript
-const { city, saveCity, loaded } = useUserCity();
+const { city, cityLabel, saveCity, loaded } = useUserCity();
 ```
 
-- Liest/schreibt `AsyncStorage`-Key `happin_user_city`
+- Liest/schreibt zwei `AsyncStorage`-Keys:
+  - `happin_user_city` — Rohname für Geocoding (z. B. `Karlsruhe`)
+  - `happin_user_city_label` — Anzeigetext (z. B. `Karlsruhe, BW, Deutschland`)
 - `loaded: boolean` — verhindert Render vor dem ersten AsyncStorage-Read
-- `saveCity('')` entfernt den Eintrag (kein leerer String gespeichert)
+- `saveCity(name, label?)` — speichert beide Keys; ruft zusätzlich `updateCity()` auf um den Wert in der `person`-Tabelle zu persistieren; `saveCity('')` entfernt beide Einträge
 
 ---
 
@@ -78,3 +86,28 @@ const { city, saveCity, loaded } = useUserCity();
 | `CalendarIcon` | Meine Events |
 | `TicketIcon` | Meine Tickets |
 | `MailIcon` | E-Mail (deaktiviert) |
+| `GpsIcon` | GPS-Standortermittlung (Happin-Pin mit Herz-Ausschnitt, `colors.primary`) |
+
+---
+
+## CityAutocomplete (`src/components/atoms/CityAutocomplete.tsx`)
+
+Wiederverwendbare Eingabe-Komponente für die Stadtsuche:
+
+- Debounced Suche (300 ms) via `searchCities()` aus `src/services/geocoding.ts`
+- Zeigt Dropdown mit bis zu 6 Vorschlägen — Name links, `regionCode, country` rechts
+- Klick auf Eintrag ruft sofort `onSelect(suggestion)` auf (kein OK nötig)
+- Lade-Spinner während Suche läuft
+
+Props:
+
+```typescript
+interface CityAutocompleteProps {
+    value: string;
+    onChange: (value: string) => void;
+    onSelect: (suggestion: CitySuggestion) => void;
+    onCancel: () => void;
+    onSubmit: () => void;
+    saving?: boolean;
+}
+```
