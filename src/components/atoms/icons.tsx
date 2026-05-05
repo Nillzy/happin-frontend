@@ -211,3 +211,19 @@ export function MailIcon({ size = 24, color = 'currentColor' }: IconProps) {
         </Svg>
     );
 }
+
+export function GpsIcon({ size = 24, color = 'currentColor' }: IconProps) {
+    return (
+        <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+            <Path
+                d="M16 2C10.477 2 6 6.477 6 12c0 7 10 18 10 18s10-11 10-18c0-5.523-4.477-10-10-10z"
+                fill={color}
+            />
+            <Path
+                d="M16 9.5c-1.5-1.5-4 0-4 2.2 0 2.8 4 5.3 4 5.3s4-2.5 4-5.3c0-2.2-2.5-3.7-4-2.2z"
+                fill="#fff"
+                opacity={0.9}
+            />
+        </Svg>
+    );
+}

@@ -28,6 +28,7 @@ interface MapViewProps {
     centerLat?: number;             // Default: 52.52 (Berlin)
     centerLng?: number;             // Default: 13.405 (Berlin)
     zoom?: number;                  // Default: 11
+    isDark?: boolean;               // Wechselt zwischen Custom MapTiler Styles
 }
 
 interface MapMarker {
@@ -41,6 +42,17 @@ interface MapMarker {
 Marker werden als pink-rote Teardrop-Pins dargestellt (Happin-Primärfarbe `#b32053`). Klick auf einen Pin öffnet ein Popup mit dem Event-Titel und löst `onMarkerPress(eventId)` aus.
 
 Auf Native wird `postMessage` genutzt um Klick-Events aus dem WebView-Kontext zurück in React Native zu übergeben.
+
+### Custom Map Styles
+
+Je nach `isDark`-Prop wird ein anderer MapTiler-Style geladen:
+
+| Theme | Style-URL |
+|---|---|
+| Light | `https://api.maptiler.com/maps/019df984-95c4-700c-903c-d2b6e4f609ac/style.json` |
+| Dark | `https://api.maptiler.com/maps/019df980-9d7f-7211-a4d0-6ed2331bf2c5/style.json` |
+
+Beide Styles sind eigene MapTiler-Custom-Maps, die im MapTiler Cloud Studio angelegt wurden.
 
 ---
 
@@ -117,8 +129,43 @@ Beim Öffnen des Karten-Tabs wird die gespeicherte Heimatstadt des Nutzers aus `
 
 - Implementierung: `hooks/use-user-city.ts` + `src/services/geocoding.ts`
 - Einstellung: AccountScreen → Sektion „Einstellungen" → „Mein Standort"
-- Bounding Box begrenzt Geocoding auf Europa: `bbox=-31.266,27.636,69.033,81.008`
+- Europa-Einschränkung via `country`-Parameter (alle europäischen ISO-2-Codes), nicht via `bbox` (wird von der MapTiler API nicht zuverlässig erzwungen)
 - Fallback bei leerem/ungültigem Wert: **Berlin** (lat: 52.52, lng: 13.405)
+
+---
+
+<<<<<<< HEAD
+## City Autocomplete (`src/services/geocoding.ts`)
+
+### `searchCities(query)`
+
+Sucht Städte für die Autocomplete-Eingabe im AccountScreen:
+
+- Fragt `https://api.maptiler.com/geocoding/{query}.json` ohne `types`-Filter ab (nötig weil MapTiler verschiedene Typen für Städte verwendet: `region` für Berlin, `county` für München, `municipal_district` für Karlsruhe etc.)
+- `limit=10`, danach client-seitiger Filter via `EXCLUDE_TYPES`
+- Slice auf maximal 6 Ergebnisse
+
+**`EXCLUDE_TYPES`** — gefilterte Typen:
+```
+locality, neighbourhood, place, poi, address, postal_code, major_landform, continental_marine
+```
+Dies entfernt Stadtteile, Viertel, POIs und geografische Features — es bleiben administrative Einheiten (Städte, Gemeinden, Regionen).
+
+### `CitySuggestion`
+
+```typescript
+interface CitySuggestion {
+    name: string;           // z.B. "Karlsruhe"
+    region: string | null;  // z.B. "Baden-Württemberg"
+    regionCode: string | null; // z.B. "BW"
+    country: string;        // z.B. "Deutschland"
+    displayLabel: string;   // z.B. "Karlsruhe, BW, Deutschland"
+    lat: number;
+    lng: number;
+}
+```
+
+`regionCode` wird aus der `REGION_CODES`-Map aufgelöst — enthält alle deutschen Bundesländer, österreichischen Bundesländer und Schweizer Kantone.
 
 ---
 

@@ -19,9 +19,10 @@ This is the central index for all project documentation in the `documentation/` 
 | [11-ticket-options.md](./11-ticket-options.md) | Ticket-Optionen: Preiskategorien, TicketOption-Type, Preisanzeige-Logik, Edit-Modal, API-Integration, Draft-Flow-Integration. |
 | [12-local-development-physical-devices.md](./12-local-development-physical-devices.md) | Lokale Entwicklung auf physischen Geräten (iPhone/Android): ngrok-Setup für Backend-Zugriff, Firewall-Probleme, Commands, Troubleshooting. |
 | [13-event-host-screen.md](./13-event-host-screen.md) | Event Host Screen: Verwaltungsoberfläche für Hosts mit Statistiken und Gästeliste. **VERALTET** - siehe 24-event-host-redesign-guest-navigation.md. |
-| [14-account-screen.md](./14-account-screen.md) | Konto-Screen: Profilbild-Platzhalter, Anzeigename bearbeiten, E-Mail, Statistiken, Events, Tickets, **Dark-Mode-Toggle** (aus Navbar verschoben), Logout, Account löschen. |
+| [14-account-screen.md](./14-account-screen.md) | Konto-Screen: Profilbild-Platzhalter, Anzeigename bearbeiten, E-Mail, Statistiken, Events, Tickets, Standort (AsyncStorage + `person.city` im Backend), Dark-Mode-Toggle, Logout, Account löschen. |
 | [15-bottom-navigation.md](./15-bottom-navigation.md) | Bottom Navigation Bar: 5 Haupt-Tabs (Explore, Karte, Erstellen, Events, Konto) mit Ionicons, ScreenWithNav Wrapper, Mobile-First Design. |
 | [16-event-screen-redesign.md](./16-event-screen-redesign.md) | Event Detail Screen: Luma-inspiriertes Layout mit Hero Image, Action Buttons, Location Card, Host Section, Material Design 3 Farben. |
+| [17-map-screen.md](./17-map-screen.md) | Kartenansicht (Tab „Karte"): MapTiler/MapLibre-Integration, plattformübergreifende MapView-Komponente, Geocoding beim Event-Erstellen, stadtbasierte Zentrierung, Custom Map Styles, City Autocomplete. |
 | [17-event-creation-apple-style-final.md](./17-event-creation-apple-style-final.md) | **Event Creation - Apple-Style Redesign (Final)**: Komplette Dokumentation des 2-Step Flows (Essentials + Details), SegmentedControl, ImageGalleryUploader, CategorySelector (Eventbrite-style), Full-width Buttons, Validation, Components, Migration Notes. **Aktualisiert mit Gradient-Auswahl** (siehe 23-gradient-selection.md). |
 | [18-event-detail-categories-gallery.md](./18-event-detail-categories-gallery.md) | **Event Detail - Kategorien & Galerie**: Integration von Kategorien-Chips und Bildergalerie in Event Detail Screen, EventImageGallery Component, Design-Entscheidungen, Material Design 3 Consistency. |
 | [20-map-screen-simple.md](./20-map-screen-simple.md) | **MapScreen - Einfache Kartenansicht**: Basis-Implementation mit MapTiler SDK, nur Zoom/Pan, keine Event-Marker, keine Interaktionen, Light/Dark Mode Support. |
@@ -43,6 +44,7 @@ This is the central index for all project documentation in the `documentation/` 
 - ✅ **Dark-Mode-Toggle** von Navbar zu Account-Screen verschoben
 - ✅ **Explore Screen** ohne Überschriften, mit Suchleiste + Filter/Saved Buttons
 - ✅ **Footer entfernt** in Explore & Saved Events
+- ✅ **Kartenansicht** mit Event-Pins, stadtbasierter Zentrierung, Custom Map Styles, City Autocomplete + GPS-Button
 
 ### Event-Management
 - ✅ **MyEventsScreen Redesign**: Collapsible Sections, QR-Code Ticket-Cards, Split-Navigation
@@ -58,4 +60,3 @@ This is the central index for all project documentation in the `documentation/` 
 ### Backend-Integration
 - ✅ **Infinity Scroll Backend-Fix**: Backend gibt jetzt Total-Count zurück (nicht nur Page-Count)
 - ✅ **Gradient-ID Support**: Backend speichert `gradient_id` (0-3) für Events ohne Bilder
-

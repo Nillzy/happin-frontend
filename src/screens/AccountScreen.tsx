@@ -11,13 +11,14 @@ import {
     Platform,
     Pressable,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import DarkLightToggle from '../components/atoms/DarkLightToggle';
-import { PersonIcon, EditIcon, LogoutIcon, TrashIcon, CalendarIcon, TicketIcon, ChevronRightIcon, MailIcon } from '../components/atoms/icons';
+import { PersonIcon, EditIcon, LogoutIcon, TrashIcon, CalendarIcon, TicketIcon, ChevronRightIcon, MailIcon, GpsIcon } from '../components/atoms/icons';
 import {
     getUserProfile,
     updateDisplayName,
@@ -27,6 +28,8 @@ import {
     getSession,
     UserProfile,
 } from '../services/supabase';
+import { useUserCity } from '@/hooks/use-user-city';
+import CityAutocomplete from '../components/atoms/CityAutocomplete';
 import { api } from '../services/api';
 
 // ── Profilbild-Platzhalter ────────────────────────────────────────────────────
@@ -196,6 +199,12 @@ export default function AccountScreen() {
     const [lastNameInput, setLastNameInput] = useState('');
     const [savingRealName, setSavingRealName] = useState(false);
 
+    const { city: savedCity, cityLabel: savedCityLabel, saveCity } = useUserCity();
+    const [editingCity, setEditingCity] = useState(false);
+    const [cityInput, setCityInput] = useState('');
+    const [savingCity, setSavingCity] = useState(false);
+    const [locating, setLocating] = useState(false);
+
     const loadProfile = useCallback(async () => {
         setLoading(true);
         const p = await getUserProfile();
@@ -246,6 +255,42 @@ export default function AccountScreen() {
             Alert.alert('Fehler', 'Name konnte nicht gespeichert werden.');
         } finally {
             setSavingRealName(false);
+        }
+    };
+
+    const handleSaveCity = async (name?: string, label?: string) => {
+        setSavingCity(true);
+        try {
+            await saveCity(name ?? cityInput, label);
+            setEditingCity(false);
+        } finally {
+            setSavingCity(false);
+        }
+    };
+
+    const handleLocateMe = async () => {
+        setLocating(true);
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Kein Zugriff', 'Standortzugriff wurde nicht erlaubt.');
+                return;
+            }
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const [result] = await Location.reverseGeocodeAsync({
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+            });
+            if (result) {
+                const name = result.city ?? result.subregion ?? result.region ?? '';
+                const parts = [name, result.region, result.country].filter(Boolean);
+                const label = parts.join(', ');
+                await saveCity(name, label);
+            }
+        } catch {
+            Alert.alert('Fehler', 'Standort konnte nicht ermittelt werden.');
+        } finally {
+            setLocating(false);
         }
     };
 
@@ -475,6 +520,47 @@ export default function AccountScreen() {
                 <View style={s.section}>
                     <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Einstellungen</Text>
                     <View style={[s.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                        <View style={[s.settingRow, { borderBottomColor: colors.outlineVariant }]}>
+                            <Text style={[s.settingLabel, { color: colors.onSurfaceVariant }]}>Mein Standort</Text>
+                            {editingCity ? (
+                                <CityAutocomplete
+                                    value={cityInput}
+                                    onChange={setCityInput}
+                                    onSelect={(suggestion) => {
+                                        handleSaveCity(suggestion.name, suggestion.displayLabel);
+                                    }}
+                                    onCancel={() => setEditingCity(false)}
+                                    onSubmit={() => handleSaveCity()}
+                                    saving={savingCity}
+                                />
+                            ) : (
+                                <View style={s.settingValueRow}>
+                                    <Text style={[s.settingValue, { color: savedCity ? colors.onSurface : colors.outline }]}>
+                                        {savedCityLabel || 'Nicht gesetzt'}
+                                    </Text>
+                                    <View style={s.settingActions}>
+                                        <TouchableOpacity
+                                            onPress={handleLocateMe}
+                                            activeOpacity={0.7}
+                                            style={s.editBtn}
+                                            disabled={locating}
+                                        >
+                                            {locating
+                                                ? <ActivityIndicator size="small" color={colors.primary} />
+                                                : <GpsIcon size={20} color={colors.primary} />
+                                            }
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() => { setCityInput(savedCity); setEditingCity(true); }}
+                                            activeOpacity={0.7}
+                                            style={s.editBtn}
+                                        >
+                                            <EditIcon size={16} color={colors.onSurfaceVariant} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
                         <View style={[actionStyles.row, { borderBottomWidth: 0 }]}>
                             <View style={actionStyles.left}>
                                 <Text style={[actionStyles.label, { color: colors.onSurface }]}>Design</Text>
@@ -626,5 +712,33 @@ const s = StyleSheet.create({
     },
     lastRow: {
         // letzte Zeile ohne untere Trennlinie
+    },
+
+    // Einstellungs-Zeile
+    settingRow: {
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        gap: 6,
+    },
+    settingLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+    },
+    settingValueRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    settingValue: {
+        fontSize: 15,
+        fontWeight: '500',
+        flex: 1,
+    },
+    settingActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
     },
 });
