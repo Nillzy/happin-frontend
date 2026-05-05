@@ -26,6 +26,7 @@ import {
     getSession,
     UserProfile,
 } from '../services/supabase';
+import { useUserCity } from '@/hooks/use-user-city';
 import { api } from '../services/api';
 
 // ── Profilbild-Platzhalter ────────────────────────────────────────────────────
@@ -195,6 +196,11 @@ export default function AccountScreen() {
     const [lastNameInput, setLastNameInput] = useState('');
     const [savingRealName, setSavingRealName] = useState(false);
 
+    const { city: savedCity, saveCity } = useUserCity();
+    const [editingCity, setEditingCity] = useState(false);
+    const [cityInput, setCityInput] = useState('');
+    const [savingCity, setSavingCity] = useState(false);
+
     const loadProfile = useCallback(async () => {
         setLoading(true);
         const p = await getUserProfile();
@@ -245,6 +251,16 @@ export default function AccountScreen() {
             Alert.alert('Fehler', 'Name konnte nicht gespeichert werden.');
         } finally {
             setSavingRealName(false);
+        }
+    };
+
+    const handleSaveCity = async () => {
+        setSavingCity(true);
+        try {
+            await saveCity(cityInput);
+            setEditingCity(false);
+        } finally {
+            setSavingCity(false);
         }
     };
 
@@ -476,6 +492,56 @@ export default function AccountScreen() {
                     </View>
                 </View>
 
+                {/* ── Einstellungen ── */}
+                <View style={s.section}>
+                    <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Einstellungen</Text>
+                    <View style={[s.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                        <View style={[s.settingRow, { borderBottomColor: colors.outlineVariant }]}>
+                            <Text style={[s.settingLabel, { color: colors.onSurfaceVariant }]}>Mein Standort</Text>
+                            {editingCity ? (
+                                <View style={s.settingEditRow}>
+                                    <TextInput
+                                        style={[s.settingInput, { color: colors.onSurface, borderColor: colors.primary, backgroundColor: colors.surfaceContainerLow }]}
+                                        value={cityInput}
+                                        onChangeText={setCityInput}
+                                        autoFocus
+                                        placeholder="z.B. Berlin"
+                                        placeholderTextColor={colors.outline}
+                                        returnKeyType="done"
+                                        onSubmitEditing={handleSaveCity}
+                                    />
+                                    <TouchableOpacity
+                                        style={[s.saveBtn, { backgroundColor: savingCity ? colors.surfaceContainerHigh : colors.primary }]}
+                                        onPress={handleSaveCity}
+                                        disabled={savingCity}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={[s.saveBtnText, { color: savingCity ? colors.onSurfaceVariant : colors.onPrimary }]}>
+                                            {savingCity ? '…' : 'OK'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => setEditingCity(false)} style={s.editBtn}>
+                                        <Text style={{ color: colors.onSurfaceVariant, fontSize: 13 }}>Abbrechen</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <View style={s.settingValueRow}>
+                                    <Text style={[s.settingValue, { color: savedCity ? colors.onSurface : colors.outline }]}>
+                                        {savedCity || 'Nicht gesetzt'}
+                                    </Text>
+                                    <TouchableOpacity
+                                        onPress={() => { setCityInput(savedCity); setEditingCity(true); }}
+                                        activeOpacity={0.7}
+                                        style={s.editBtn}
+                                    >
+                                        <EditIcon size={16} color={colors.onSurfaceVariant} />
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </View>
+
                 {/* ── Konto-Aktionen ── */}
                 <View style={s.section}>
                     <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Konto</Text>
@@ -618,5 +684,42 @@ const s = StyleSheet.create({
     },
     lastRow: {
         // letzte Zeile ohne untere Trennlinie
+    },
+
+    // Einstellungs-Zeile
+    settingRow: {
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        gap: 6,
+    },
+    settingLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+    },
+    settingValueRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    settingValue: {
+        fontSize: 15,
+        fontWeight: '500',
+        flex: 1,
+    },
+    settingEditRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    settingInput: {
+        flex: 1,
+        borderWidth: 1.5,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+        fontSize: 15,
+        fontWeight: '500',
     },
 });
