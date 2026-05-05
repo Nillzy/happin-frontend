@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
+import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { PersonIcon, EditIcon, LogoutIcon, TrashIcon, CalendarIcon, TicketIcon, ChevronRightIcon, MailIcon } from '../components/atoms/icons';
 import {
     getUserProfile,
@@ -284,22 +285,25 @@ export default function AccountScreen() {
 
     if (loading) {
         return (
-            <View style={[s.root, { backgroundColor: colors.background }]}>
-                <Navbar showBack />
-                <View style={s.centered}>
-                    <ActivityIndicator size="large" color={colors.primary} />
+            <ScreenWithNav>
+                <View style={[s.root, { backgroundColor: colors.background }]}>
+                    <Navbar showBack />
+                    <View style={s.centered}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                    </View>
                 </View>
-            </View>
+            </ScreenWithNav>
         );
     }
 
     return (
-        <View style={[s.root, { backgroundColor: colors.background }]}>
-            <Navbar showBack />
-            <ScrollView
-                contentContainerStyle={s.scroll}
-                showsVerticalScrollIndicator={false}
-            >
+        <ScreenWithNav>
+            <View style={[s.root, { backgroundColor: colors.background }]}>
+                <Navbar showBack />
+                <ScrollView
+                    contentContainerStyle={s.scroll}
+                    showsVerticalScrollIndicator={false}
+                >
                 {/* ── Profilkopf ── */}
                 <View style={[s.profileCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
                     <AvatarPlaceholder
@@ -505,6 +509,7 @@ export default function AccountScreen() {
                 <Footer />
             </ScrollView>
         </View>
+        </ScreenWithNav>
     );
 }
 

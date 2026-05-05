@@ -15,7 +15,6 @@ test:
   script:
     - npm run lint
   only:
-    - main
     - merge_requests
 
 # Build Docker image and push to GitLab Container Registry

@@ -248,9 +248,12 @@ EventListScreen
 │   └── Footer
 ├── [States] Loading: ActivityIndicator
 ├── [States] Error: Fehlermeldung + Retry-Button
-├── [States] Empty: "Keine Events gefunden"
-└── FAB (Floating Action Button): "+" zum Event erstellen
+└── [States] Empty: "Keine Events gefunden"
 ```
+
+**Navigation zu Event-Erstellung:**
+- Event-Erstellung erfolgt über den **"Erstellen" Tab** in der Bottom Navigation
+- Der ehemalige FAB ("+"-Button) wurde entfernt (siehe 15-bottom-navigation.md)
 
 ### Responsive Behavior
 

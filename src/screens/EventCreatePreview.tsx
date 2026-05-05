@@ -11,9 +11,10 @@ import {
     StatusBar,
 } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
+import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import DatePicker from '../components/atoms/DatePicker';
 import TimePicker from '../components/atoms/TimePicker';
 import EditModal from '../components/atoms/EditModal';
@@ -43,12 +44,6 @@ export interface PreviewFormData {
     country: string;
 }
 
-interface EventCreatePreviewProps {
-    data: PreviewFormData;
-    onChange: (updates: Partial<PreviewFormData>) => void;
-    onBack: () => void;
-}
-
 type EditSection = 'title' | 'description' | 'datetime' | 'location' | 'category' | 'capacity' | 'visibility' | null;
 
 function formatDateDisplay(date: string): string {
@@ -71,13 +66,41 @@ function formatTimeDisplay(time: string): string {
     return `${time} Uhr`;
 }
 
-export default function EventCreatePreview({ data, onChange, onBack }: EventCreatePreviewProps) {
+export default function EventCreatePreview() {
     const { colors } = useTheme();
     const router = useRouter();
+    const params = useLocalSearchParams<{ title?: string; date?: string; time?: string }>();
+
+    // Initialize form data from URL params (Step 1) with defaults
+    const [data, setData] = useState<PreviewFormData>({
+        title: params.title || '',
+        description: '',
+        date: params.date || '',
+        time: params.time || '',
+        endDate: '',
+        endTime: '',
+        category: '',
+        maxCapacity: '',
+        isPublic: true,
+        city: '',
+        street: '',
+        houseNumber: '',
+        postalCode: '',
+        country: 'Deutschland',
+    });
+
     const [editing, setEditing] = useState<EditSection>(null);
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [editedSections, setEditedSections] = useState<Set<EditSection>>(new Set());
+
+    const onChange = (updates: Partial<PreviewFormData>) => {
+        setData(prev => ({ ...prev, ...updates }));
+    };
+
+    const onBack = () => {
+        router.back();
+    };
 
     // Builds an ISO string with the device's local UTC offset so Supabase stores the correct UTC time.
     const localIso = (date: string, time: string): string => {
@@ -159,7 +182,8 @@ export default function EventCreatePreview({ data, onChange, onBack }: EventCrea
                 return;
             }
             const result = await api.createEvent(payload, token);
-            router.replace(`/event/${result.event_id}`);
+            // Navigate to Host-Ansicht (manage) so user can see stats and guest list
+            router.replace(`/event/${result.event_id}/manage`);
         } catch (e) {
             console.error('Event creation failed:', e);
             setSubmitError('Fehler beim Erstellen. Bitte versuche es erneut.');
@@ -173,9 +197,10 @@ export default function EventCreatePreview({ data, onChange, onBack }: EventCrea
     };
 
     return (
-        <View style={[styles.root, { backgroundColor: colors.background }]}>
-            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-            <Navbar showCta={false} showBack onBackPress={onBack} />
+        <ScreenWithNav>
+            <View style={[styles.root, { backgroundColor: colors.background }]}>
+                <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+                <Navbar showCta={false} showBack onBackPress={onBack} />
 
             <ScrollView
                 style={styles.scroll}
@@ -483,6 +508,7 @@ export default function EventCreatePreview({ data, onChange, onBack }: EventCrea
                 </View>
             </EditModal>
         </View>
+        </ScreenWithNav>
     );
 }
 

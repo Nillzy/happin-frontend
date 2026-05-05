@@ -20,4 +20,5 @@ This is the central index for all project documentation in the `documentation/` 
 | [12-local-development-physical-devices.md](./12-local-development-physical-devices.md) | Lokale Entwicklung auf physischen Geräten (iPhone/Android): ngrok-Setup für Backend-Zugriff, Firewall-Probleme, Commands, Troubleshooting. |
 | [13-event-host-screen.md](./13-event-host-screen.md) | Event Host Screen: Verwaltungsoberfläche für Hosts mit Statistiken und Gästeliste. |
 | [14-account-screen.md](./14-account-screen.md) | Konto-Screen: Profilbild-Platzhalter, Anzeigename bearbeiten, E-Mail, Statistiken, Events, Tickets, Logout, Account löschen. |
-| [15-pagination.md](./15-pagination.md) | Pagination der Event-Liste: Seitengröße, Datenfluss (limit/offset), State-Variablen, Pagination-UI (max. 5 Seiten, Ellipsis, Vor/Zurück). |
+| [15-bottom-navigation.md](./15-bottom-navigation.md) | Bottom Navigation Bar: 5 Haupt-Tabs (Explore, Karte, Erstellen, Events, Konto) mit Ionicons, ScreenWithNav Wrapper, Mobile-First Design. |
+| [16-event-screen-redesign.md](./16-event-screen-redesign.md) | Event Detail Screen: Luma-inspiriertes Layout mit Hero Image, Action Buttons, Location Card, Host Section, Material Design 3 Farben. |
