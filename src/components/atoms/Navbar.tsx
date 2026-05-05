@@ -3,19 +3,16 @@ import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native
 import { useTheme } from '@/hooks/use-theme';
 import HappinLogo from './HappinLogo';
 import DarkLightToggle from './DarkLightToggle';
-import AccountButton from './AccountButton';
 import { useRouter } from 'expo-router';
 
 interface NavbarProps {
-    /** Show the "App laden" CTA button (default: true) */
-    showCta?: boolean;
     /** Show the back-navigation arrow instead of CTA (default: false) */
     showBack?: boolean;
     /** Custom back handler (default: router.back()) */
     onBackPress?: () => void;
 }
 
-export default function Navbar({ showCta = true, showBack = false, onBackPress }: NavbarProps) {
+export default function Navbar({ showBack = false, onBackPress }: NavbarProps) {
     const { colors, isDark } = useTheme();
     const router = useRouter();
 
@@ -39,15 +36,6 @@ export default function Navbar({ showCta = true, showBack = false, onBackPress }
 
             <View style={styles.right}>
                 <DarkLightToggle />
-                {showCta && !showBack && (
-                    <TouchableOpacity
-                        style={[styles.cta, { borderColor: colors.primary }]}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={[styles.ctaText, { color: colors.primary }]}>App laden</Text>
-                    </TouchableOpacity>
-                )}
-                <AccountButton />
             </View>
         </View>
     );
@@ -74,15 +62,5 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-    },
-    cta: {
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderRadius: 8,
-        borderWidth: 1,
-    },
-    ctaText: {
-        fontSize: 13,
-        fontWeight: '600',
     },
 });

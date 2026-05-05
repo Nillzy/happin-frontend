@@ -60,7 +60,7 @@ export default function EventCreateStepOne() {
     return (
         <ScreenWithNav>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                <Navbar showCta={false} showBack />
+                <Navbar showBack />
 
             <KeyboardAvoidingView
                 style={styles.flex}

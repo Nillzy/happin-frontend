@@ -29,7 +29,7 @@ export default function MyEventsScreen() {
     return (
         <ScreenWithNav>
             <View style={[styles.container, { backgroundColor: colors.background }]}>
-                <Navbar showCta={false} />
+                <Navbar />
 
                 <ScrollView
                     style={styles.scroll}
