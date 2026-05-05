@@ -15,6 +15,8 @@ export interface EventLocation {
     postal_code?: string;
     country?: string;
     type?: string;
+    latitude?: number | null;
+    longitude?: number | null;
 }
 
 export interface EventListItem {

@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-Der `AccountScreen` (`src/screens/AccountScreen.tsx`) ist über den `AccountButton` in der Navbar erreichbar und zeigt dem eingeloggten Nutzer alle persönlichen Informationen und Aktionen auf einen Blick.
+Der `AccountScreen` (`src/screens/AccountScreen.tsx`) zeigt dem eingeloggten Nutzer alle persönlichen Informationen und Aktionen auf einen Blick.
 
 Route: `/account` → `app/account.tsx` → `src/screens/AccountScreen.tsx`
 
@@ -12,68 +12,69 @@ Route: `/account` → `app/account.tsx` → `src/screens/AccountScreen.tsx`
 
 ### Profilkopf
 
-Zeigt:
-- **Profilbild-Platzhalter** (`AvatarPlaceholder`): Kreis mit Initialen (aus Anzeigename) oder `PersonIcon`, wenn kein Name gesetzt. Wird durch ein echtes Bild ersetzt, sobald das Backend einen `avatar_url` liefert.
-- **Anzeigename** (editierbar in-place via `EditIcon`-Button)
-- **E-Mail** (read-only, aus Supabase Auth)
-- **Registrierter Name** (`user_metadata.full_name`, read-only, nur sichtbar wenn vorhanden)
+- **Profilbild-Platzhalter** (`AvatarPlaceholder`): Kreis mit Initialen (aus Anzeigename) oder `PersonIcon`, wenn kein Name gesetzt. Hover-Overlay mit `EditIcon` (Web). Bild-Upload folgt wenn Backend `avatar_url` liefert.
+- **Anzeigename** — editierbar in-place via `EditIcon` → `updateDisplayName()` → Supabase `user_metadata.display_name`
+- **E-Mail** — read-only, aus Supabase Auth
+- **Vor- & Nachname** — editierbar in-place; `updateName()` ruft zuerst `PATCH /api/v1/users/me/name` auf (schreibt in `person`-Tabelle), danach `auth.updateUser()` für `user_metadata`
 
 ### Übersicht (Statistiken)
 
-Drei `StatTile`-Kacheln: **Events**, **Tickets**, **Teilnehmer**.  
-Alle Werte zeigen derzeit `—` — Platzhalter für spätere Backend-Endpoints.
+Vier `StatTile`-Kacheln via `GET /api/v1/users/me/stats`:
+- Events besucht, Events erstellt, Tickets, Teilnehmer
 
 ### Meine Events
 
-Zwei `ActionRow`-Einträge:
-- **Aktuelle & geplante Events** → `/events`
-- **Vergangene Events** → `/events` (Platzhalter; eigener Filter-Screen folgt)
+- **Aktuelle & geplante Events** → `/events?period=upcoming&role=organizer`
+- **Vergangene Events** → `/events?period=past&role=organizer`
 
 ### Meine Tickets
 
-- **Alle Tickets anzeigen** → Platzhalter (Ticket-Screen noch nicht implementiert)
+- **Alle Tickets anzeigen** → `GET /api/v1/users/me/tickets` → `Alert.alert` mit Liste
+
+### Einstellungen
+
+- **Mein Standort** — Stadtname editierbar in-place; wird in `AsyncStorage` unter `happin_user_city` gespeichert. Der gespeicherte Wert wird beim Öffnen des Karten-Tabs als Kartenmittelpunkt verwendet.
 
 ### Konto
 
-- **Abmelden** — `signOut()` aus Supabase, dann Redirect zu `/login`
-- **Konto löschen** — `deleteAccount()` (Platzhalter, s. u.), dann Redirect zu `/login`
-
-Beide Aktionen zeigen einen `Alert.alert`-Dialog zur Bestätigung.
-
----
-
-## Profilbild-Platzhalter
-
-`AvatarPlaceholder` ist eine reine Frontend-Komponente (kein Bild-Upload). Sie rendert:
-1. Initialen aus `displayName` (max. 2 Buchstaben) auf `primaryContainer`-Hintergrund
-2. Fallback: `PersonIcon`, wenn kein Name gesetzt
-
-Sobald das Backend einen `avatar_url` im `user_metadata` liefert, kann die Komponente durch ein `<Image>` ersetzt werden — der Typ `UserProfile.avatarUrl` ist bereits vorbereitet.
+- **E-Mail-Adresse ändern** — deaktiviert (Label „Demnächst")
+- **Abmelden** — `signOut()` → Redirect zu `/login`
+- **Konto löschen** — `DELETE /api/v1/users/me` + `signOut()` → Redirect zu `/login`
 
 ---
 
-## Account löschen — Platzhalter
-
-`deleteAccount()` in `src/services/supabase.ts` ruft aktuell nur `signOut()` auf. Die eigentliche Löschung erfordert einen Backend-Endpoint (`DELETE /api/v1/users/me`). Sobald dieser existiert, muss `deleteAccount()` zuerst diesen Endpoint mit dem aktuellen Token aufrufen und danach abmelden.
-
----
-
-## Neue Supabase-Funktionen
+## Supabase-Funktionen (`src/services/supabase.ts`)
 
 | Funktion | Beschreibung |
 |---|---|
-| `getUserProfile()` | Liest `email`, `display_name`, `full_name`, `avatar_url` aus `auth.getUser()` |
+| `getUserProfile()` | Liest `email`, `display_name`, `first_name`, `last_name`, `avatar_url` aus `auth.getUser()` |
 | `updateDisplayName(name)` | Schreibt `display_name` via `auth.updateUser({ data: ... })` |
+| `updateName(firstName, lastName)` | PATCH `/api/v1/users/me/name` → `person`-Tabelle, dann `auth.updateUser()` |
 | `signOut()` | Supabase `auth.signOut()` |
-| `deleteAccount()` | Platzhalter — ruft `signOut()` auf |
+| `deleteAccount()` | `DELETE /api/v1/users/me` via Backend, dann `signOut()` |
 
 ---
 
-## Neue Icons (`src/components/atoms/icons.tsx`)
+## Stadteinstellung (`hooks/use-user-city.ts`)
+
+```typescript
+const { city, saveCity, loaded } = useUserCity();
+```
+
+- Liest/schreibt `AsyncStorage`-Key `happin_user_city`
+- `loaded: boolean` — verhindert Render vor dem ersten AsyncStorage-Read
+- `saveCity('')` entfernt den Eintrag (kein leerer String gespeichert)
+
+---
+
+## Icons (`src/components/atoms/icons.tsx`)
 
 | Export | Verwendung |
 |---|---|
-| `EditIcon` | Anzeigename bearbeiten |
+| `EditIcon` | Name, Standort bearbeiten |
 | `LogoutIcon` | Abmelden |
 | `TrashIcon` | Konto löschen |
 | `ChevronRightIcon` | Aktionszeilen-Pfeil |
+| `CalendarIcon` | Meine Events |
+| `TicketIcon` | Meine Tickets |
+| `MailIcon` | E-Mail (deaktiviert) |
