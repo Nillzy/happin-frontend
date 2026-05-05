@@ -15,6 +15,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
+import EventCategories from '../components/event/EventCategories';
+import EventImageGallery from '../components/atoms/EventImageGallery';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
 import type { EventDetailResponse } from '../types/events';
@@ -73,6 +75,8 @@ export default function EventScreen() {
             console.log('[EventScreen] Token available:', !!token);
             const data = await api.getEventById(id, token || undefined);
             console.log('[EventScreen] Event loaded:', data.title);
+            console.log('[EventScreen] Category:', data.category);
+            console.log('[EventScreen] Media URLs:', data.media_urls);
             setEvent(data);
         } catch (e) {
             console.error('[EventScreen] Load error:', e);
@@ -124,6 +128,10 @@ export default function EventScreen() {
     }
 
     const hostInitial = event.host_name?.charAt(0).toUpperCase() || 'H';
+    const categories = event.category ? event.category.split(',').map(c => c.trim()) : [];
+
+    console.log('[EventScreen] Parsed categories:', categories);
+    console.log('[EventScreen] Media URLs count:', event.media_urls?.length || 0);
 
     return (
         <ScreenWithNav showBottomNav={false}>
@@ -149,7 +157,13 @@ export default function EventScreen() {
                         {/* Back Button */}
                         <TouchableOpacity
                             style={[styles.backButton, { backgroundColor: colors.surfaceContainerHigh }]}
-                            onPress={() => router.back()}
+                            onPress={() => {
+                                if (router.canGoBack()) {
+                                    router.back();
+                                } else {
+                                    router.push('/events');
+                                }
+                            }}
                         >
                             <Ionicons name="arrow-back" size={24} color={colors.onSurface} />
                         </TouchableOpacity>
@@ -203,7 +217,7 @@ export default function EventScreen() {
                                 ]}
                                 onPress={handleRegister}
                             >
-                                <Ionicons name="checkbox-outline" size={20} color={colors.onSurface} />
+                                <Ionicons name="calendar" size={20} color={colors.onSurface} />
                                 <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Register</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -227,6 +241,23 @@ export default function EventScreen() {
                                 <Text style={[styles.actionButtonText, { color: colors.onSurfaceVariant }]}>More</Text>
                             </TouchableOpacity>
                         </View>
+
+                        {/* Kategorien Section */}
+                        {categories.length > 0 && (
+                            <View style={styles.section}>
+                                <EventCategories categories={categories} editMode={false} />
+                            </View>
+                        )}
+
+                        {/* About Event Section */}
+                        {event.description && (
+                            <View style={styles.section}>
+                                <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>About Event</Text>
+                                <Text style={[styles.description, { color: colors.onSurface }]}>
+                                    {event.description}
+                                </Text>
+                            </View>
+                        )}
 
                         {/* Location Section */}
                         {event.location && (
@@ -262,6 +293,13 @@ export default function EventScreen() {
                             </View>
                         )}
 
+                        {/* Galerie Section */}
+                        {event.media_urls && event.media_urls.length > 0 && (
+                            <View style={styles.section}>
+                                <EventImageGallery images={event.media_urls} />
+                            </View>
+                        )}
+
                         {/* Host Section */}
                         <View style={styles.section}>
                             <View style={styles.sectionHeader}>
@@ -280,14 +318,6 @@ export default function EventScreen() {
                                     {event.host_name || 'Host'}
                                 </Text>
                             </View>
-                        </View>
-
-                        {/* About Event Section */}
-                        <View style={styles.section}>
-                            <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>About Event</Text>
-                            <Text style={[styles.description, { color: colors.onSurface }]}>
-                                {event.description || 'Keine Beschreibung verfügbar.'}
-                            </Text>
                         </View>
 
                         {/* Accept Invite CTA Button (Luma-style) */}

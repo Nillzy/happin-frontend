@@ -10,15 +10,18 @@ import {
     ActivityIndicator,
     Image,
     Platform,
+    TextInput,
+    RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import Navbar from '../components/atoms/Navbar';
-import Footer from '../components/atoms/Footer';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { api } from '../services/api';
 import { authorize, getSession } from '../services/supabase';
+import { useSavedEvents } from '../contexts/SavedEventsContext';
 import type { EventListItem, EventListResponse } from '../types/events';
 
 /**
@@ -90,22 +93,26 @@ export default function EventListScreen() {
     const isOrganizerView = role === 'organizer';
     const eventPeriod = (period === 'past' ? 'past' : 'upcoming') as 'upcoming' | 'past';
 
+    const { toggleSaveEvent, isSaved } = useSavedEvents();
+
     const [events, setEvents] = useState<EventListItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [dimensions, setDimensions] = useState(Dimensions.get('window'));
-    const [currentPage, setCurrentPage] = useState(0);
-    const [totalCount, setTotalCount] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [refreshing, setRefreshing] = useState(false);
 
-    const totalPages = Math.max(1, Math.ceil(totalCount / EVENTS_PER_PAGE));
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
 
-    const loadPage = useCallback(async (page: number) => {
-        setLoading(true);
+        setLoadingMore(true);
         setError(null);
 
         try {
             const token = await getSession();
-            const offset = page * EVENTS_PER_PAGE;
+            const offset = events.length;
             let data: EventListResponse;
 
             if (isOrganizerView) {
@@ -115,13 +122,36 @@ export default function EventListScreen() {
                 data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token || undefined);
             }
 
-            setEvents(data.events);
-            setTotalCount(data.count);
-            setCurrentPage(page);
+            setEvents(prev => [...prev, ...data.events]);
+            setHasMore(events.length + data.events.length < data.count);
         } catch (e) {
             setError('Fehler beim Laden der Events');
         } finally {
-            setLoading(false);
+            setLoadingMore(false);
+        }
+    }, [events.length, hasMore, loadingMore, isOrganizerView, eventPeriod]);
+
+    const handleRefresh = useCallback(async () => {
+        setRefreshing(true);
+        setError(null);
+
+        try {
+            const token = await getSession();
+            let data: EventListResponse;
+
+            if (isOrganizerView) {
+                if (!token) { router.replace('/login'); return; }
+                data = await api.getUserEvents(token, eventPeriod, EVENTS_PER_PAGE, 0);
+            } else {
+                data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined);
+            }
+
+            setEvents(data.events);
+            setHasMore(data.events.length < data.count);
+        } catch (e) {
+            setError('Fehler beim Laden der Events');
+        } finally {
+            setRefreshing(false);
         }
     }, [isOrganizerView, eventPeriod]);
 
@@ -132,7 +162,31 @@ export default function EventListScreen() {
     }, []);
 
     useEffect(() => {
-        void loadPage(0);
+        const loadInitial = async () => {
+            setLoading(true);
+            setError(null);
+
+            try {
+                const token = await getSession();
+                let data: EventListResponse;
+
+                if (isOrganizerView) {
+                    if (!token) { router.replace('/login'); return; }
+                    data = await api.getUserEvents(token, eventPeriod, EVENTS_PER_PAGE, 0);
+                } else {
+                    data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined);
+                }
+
+                setEvents(data.events);
+                setHasMore(data.events.length < data.count);
+            } catch (e) {
+                setError('Fehler beim Laden der Events');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        void loadInitial();
     }, []);
 
     // Listen to window resize for responsive grid on Web
@@ -154,8 +208,11 @@ export default function EventListScreen() {
         }
     };
 
-    const handlePageChange = (page: number) => {
-        void loadPage(page);
+    const handleToggleSave = (event: EventListItem, e?: any) => {
+        if (e) {
+            e.stopPropagation();
+        }
+        toggleSaveEvent(event);
     };
 
     const renderCard = ({ item, index }: { item: EventListItem; index: number }) => {
@@ -191,10 +248,21 @@ export default function EventListScreen() {
                     )}
                     {item.is_host && (
                         <View style={[styles.hostBadge, { backgroundColor: `${colors.primary}E6` }]}>
-                            <Text style={styles.hostBadgeIcon}>👑</Text>
                             <Text style={[styles.hostBadgeText, { color: colors.onPrimary }]}>Dein Event</Text>
                         </View>
                     )}
+                    {/* Like Button */}
+                    <TouchableOpacity
+                        style={styles.likeButton}
+                        onPress={(e) => handleToggleSave(item, e)}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons
+                            name={isSaved(item.event_id) ? 'heart' : 'heart-outline'}
+                            size={24}
+                            color={isSaved(item.event_id) ? colors.primary : '#ffffff'}
+                        />
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.cardBody}>
@@ -230,18 +298,6 @@ export default function EventListScreen() {
         );
     };
 
-    const renderHeader = () => (
-        <View style={styles.header}>
-            <Text style={[styles.headerLabel, { color: colors.tertiary }]}>Events</Text>
-            <Text style={[styles.headerTitle, { color: colors.onBackground }]}>
-                Entdecke Events
-            </Text>
-            <Text style={[styles.headerSub, { color: colors.onSurfaceVariant }]}>
-                Finde die besten Veranstaltungen in deiner Nähe.
-            </Text>
-        </View>
-    );
-
     const renderEmpty = () => {
         if (loading) return null;
         return (
@@ -253,6 +309,15 @@ export default function EventListScreen() {
         );
     };
 
+    const renderFooter = () => {
+        if (!loadingMore) return null;
+        return (
+            <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+        );
+    };
+
     const numColumns = getNumColumns(dimensions.width);
 
     // Calculate grid container width
@@ -260,91 +325,32 @@ export default function EventListScreen() {
     const availableWidth = containerWidth - GRID_PADDING * 2;
     const cardWidth = (availableWidth - GRID_GAP_H * (numColumns - 1)) / numColumns;
 
-    const renderPagination = () => {
-        if (events.length === 0) return null;
+    const handleScroll = (event: any) => {
+        if (!isWeb) return;
 
-        const maxVisible = 5;
-        const half = Math.floor(maxVisible / 2);
-        let startPage = Math.max(0, currentPage - half);
-        const endPage = Math.min(totalPages - 1, startPage + maxVisible - 1);
-        if (endPage - startPage < maxVisible - 1) {
-            startPage = Math.max(0, endPage - maxVisible + 1);
+        const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+        const paddingToBottom = 20;
+        const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+
+        if (isCloseToBottom && hasMore && !loadingMore) {
+            void loadMore();
         }
-        const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
-
-        return (
-            <View style={styles.pagination}>
-                <TouchableOpacity
-                    style={[styles.pageBtn, currentPage === 0 && styles.pageBtnDisabled, { borderColor: colors.outlineVariant }]}
-                    onPress={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 0}
-                >
-                    <Text style={[styles.pageBtnText, { color: currentPage === 0 ? colors.onSurfaceVariant : colors.onSurface }]}>‹</Text>
-                </TouchableOpacity>
-
-                {startPage > 0 && (
-                    <>
-                        <TouchableOpacity
-                            style={[styles.pageBtn, { borderColor: colors.outlineVariant }]}
-                            onPress={() => handlePageChange(0)}
-                        >
-                            <Text style={[styles.pageBtnText, { color: colors.onSurface }]}>1</Text>
-                        </TouchableOpacity>
-                        {startPage > 1 && (
-                            <Text style={[styles.pageEllipsis, { color: colors.onSurfaceVariant }]}>…</Text>
-                        )}
-                    </>
-                )}
-
-                {pageNumbers.map(p => (
-                    <TouchableOpacity
-                        key={p}
-                        style={[
-                            styles.pageBtn,
-                            { borderColor: colors.outlineVariant },
-                            p === currentPage && { backgroundColor: colors.primary, borderColor: colors.primary },
-                        ]}
-                        onPress={() => handlePageChange(p)}
-                        disabled={p === currentPage}
-                    >
-                        <Text style={[styles.pageBtnText, { color: p === currentPage ? colors.onPrimary : colors.onSurface }]}>
-                            {p + 1}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-
-                {endPage < totalPages - 1 && (
-                    <>
-                        {endPage < totalPages - 2 && (
-                            <Text style={[styles.pageEllipsis, { color: colors.onSurfaceVariant }]}>…</Text>
-                        )}
-                        <TouchableOpacity
-                            style={[styles.pageBtn, { borderColor: colors.outlineVariant }]}
-                            onPress={() => handlePageChange(totalPages - 1)}
-                        >
-                            <Text style={[styles.pageBtnText, { color: colors.onSurface }]}>{totalPages}</Text>
-                        </TouchableOpacity>
-                    </>
-                )}
-
-                <TouchableOpacity
-                    style={[styles.pageBtn, currentPage === totalPages - 1 && styles.pageBtnDisabled, { borderColor: colors.outlineVariant }]}
-                    onPress={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages - 1}
-                >
-                    <Text style={[styles.pageBtnText, { color: currentPage === totalPages - 1 ? colors.onSurfaceVariant : colors.onSurface }]}>›</Text>
-                </TouchableOpacity>
-            </View>
-        );
     };
 
     const renderWebGrid = () => (
         <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
+            onScroll={handleScroll}
+            scrollEventThrottle={400}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    tintColor={colors.primary}
+                />
+            }
         >
-            {renderHeader()}
-
             {events.length === 0 ? (
                 renderEmpty()
             ) : (
@@ -367,8 +373,7 @@ export default function EventListScreen() {
                 </View>
             )}
 
-            {renderPagination()}
-            <Footer />
+            {renderFooter()}
         </ScrollView>
     );
 
@@ -377,13 +382,20 @@ export default function EventListScreen() {
             data={events}
             keyExtractor={(item) => String(item.event_id)}
             renderItem={renderCard}
-            ListHeaderComponent={renderHeader}
             ListEmptyComponent={renderEmpty}
-            ListFooterComponent={
-                <>
-                    {renderPagination()}
-                    <Footer />
-                </>
+            ListFooterComponent={renderFooter}
+            onEndReached={() => {
+                if (hasMore && !loadingMore) {
+                    void loadMore();
+                }
+            }}
+            onEndReachedThreshold={0.5}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    tintColor={colors.primary}
+                />
             }
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -393,7 +405,39 @@ export default function EventListScreen() {
     return (
         <ScreenWithNav>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                <Navbar showBack />
+                <Navbar showCta={false} />
+
+                {/* Search Bar with Filter and Saved */}
+                <View style={[styles.searchContainer, { backgroundColor: colors.background, borderBottomColor: colors.outlineVariant }]}>
+                    <View style={[styles.searchBar, { backgroundColor: colors.surfaceContainerHigh }]}>
+                        <Ionicons name="search" size={20} color={colors.onSurfaceVariant} />
+                        <TextInput
+                            style={[styles.searchInput, { color: colors.onSurface }]}
+                            placeholder="Events durchsuchen"
+                            placeholderTextColor={colors.onSurfaceVariant}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
+                        <TouchableOpacity
+                            style={styles.filterButton}
+                            onPress={() => {
+                                // TODO: Filter Modal öffnen
+                                console.log('Filter öffnen');
+                            }}
+                        >
+                            <Ionicons name="options-outline" size={22} color={colors.onSurface} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity
+                        style={[styles.savedButton, { backgroundColor: colors.surfaceContainerHigh }]}
+                        onPress={() => {
+                            router.push('/saved-events');
+                        }}
+                    >
+                        <Ionicons name="bookmarks-outline" size={22} color={colors.onSurface} />
+                    </TouchableOpacity>
+                </View>
 
                 {loading ? (
                     <View style={styles.loadingContainer}>
@@ -404,7 +448,7 @@ export default function EventListScreen() {
                         <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
                         <TouchableOpacity
                             style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                            onPress={() => void loadPage(currentPage)}
+                            onPress={handleRefresh}
                         >
                             <Text style={[styles.retryText, { color: colors.onPrimary }]}>
                                 Erneut versuchen
@@ -422,6 +466,37 @@ export default function EventListScreen() {
 const styles = StyleSheet.create({
     root: {
         flex: 1,
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 20,
+        gap: 12,
+    },
+    searchBar: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 24,
+        gap: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '400',
+    },
+    filterButton: {
+        padding: 4,
+    },
+    savedButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     loadingContainer: {
         flex: 1,
@@ -449,6 +524,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     scrollContent: {
+        paddingTop: 16,
         paddingBottom: 0,
     },
     gridContainer: {
@@ -460,6 +536,7 @@ const styles = StyleSheet.create({
         // Width and margins are set dynamically
     },
     listContent: {
+        paddingTop: 16,
         paddingBottom: 0,
     },
     header: {
@@ -510,22 +587,27 @@ const styles = StyleSheet.create({
     hostBadge: {
         position: 'absolute',
         top: 12,
-        right: 12,
+        left: 12,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 8,
-        gap: 6,
-    },
-    hostBadgeIcon: {
-        fontSize: 12,
     },
     hostBadgeText: {
         fontSize: 11,
         fontWeight: '700',
         textTransform: 'uppercase',
         letterSpacing: 0.3,
+    },
+    likeButton: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     cardBody: {
         padding: 16,
@@ -567,33 +649,8 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 16,
     },
-    pagination: {
-        flexDirection: 'row',
-        justifyContent: 'center',
+    footerLoader: {
+        paddingVertical: 20,
         alignItems: 'center',
-        paddingVertical: 24,
-        paddingHorizontal: 16,
-        gap: 6,
-        flexWrap: 'wrap',
-    },
-    pageBtn: {
-        minWidth: 40,
-        height: 40,
-        borderRadius: 10,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 8,
-    },
-    pageBtnDisabled: {
-        opacity: 0.35,
-    },
-    pageBtnText: {
-        fontSize: 15,
-        fontWeight: '600',
-    },
-    pageEllipsis: {
-        fontSize: 15,
-        paddingHorizontal: 4,
     },
 });

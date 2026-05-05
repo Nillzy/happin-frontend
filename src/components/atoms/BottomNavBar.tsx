@@ -119,7 +119,42 @@ export default function BottomNavBar() {
                 const isActive = activeTab?.name === tab.name;
                 const iconColor = isActive ? colors.primary : colors.onSurfaceVariant;
                 const iconName = isActive ? tab.activeIcon : tab.icon;
+                const isCreateButton = tab.name === 'create';
 
+                // Create Button: Floating Style mit größerem Icon und Kreis-Hintergrund
+                if (isCreateButton) {
+                    return (
+                        <View key={tab.name} style={styles.createButtonWrapper}>
+                            {/* Äußerer Kreis (Hintergrund) */}
+                            <View
+                                style={[
+                                    styles.createButtonOuter,
+                                    { backgroundColor: colors.surfaceContainerLowest },
+                                ]}
+                            />
+                            {/* Innerer Button */}
+                            <TouchableOpacity
+                                style={[
+                                    styles.createButton,
+                                    {
+                                        backgroundColor: colors.primary,
+                                        shadowColor: colors.primary,
+                                    },
+                                ]}
+                                onPress={() => handleTabPress(tab)}
+                                activeOpacity={0.85}
+                            >
+                                <Ionicons
+                                    name={isActive ? 'add' : 'add'}
+                                    size={32}
+                                    color={colors.onPrimary}
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    );
+                }
+
+                // Normale Tabs
                 return (
                     <TouchableOpacity
                         key={tab.name}
@@ -172,6 +207,40 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 8,
         gap: 4,
+    },
+    createButtonWrapper: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+    },
+    createButtonOuter: {
+        position: 'absolute',
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        top: -34,
+    },
+    createButton: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: -28, // Floating über der Bottom Nav
+        ...Platform.select({
+            ios: {
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+            },
+            android: {
+                elevation: 12,
+            },
+            web: {
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            },
+        }),
     },
     label: {
         fontSize: 11,
