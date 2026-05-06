@@ -48,45 +48,45 @@ export const api = {
         }),
 
     getEventById: (eventId: string, token?: string) =>
-        request<EventDetailResponse>(`/api/v1/events/${eventId}`, token ? {
+        request<EventDetailResponse>(`api/v1/events/${eventId}`, token ? {
             headers: { Authorization: `Bearer ${token}` },
         } : undefined),
 
     createEvent: (data: EventCreateRequest, token: string) =>
-        request<EventDetailResponse>('/api/v1/events/', {
+        request<EventDetailResponse>('api/v1/events/', {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify(data),
         }),
 
     updateEvent: (eventId: string, data: EventUpdateRequest, token: string) =>
-        request<EventDetailResponse>(`/api/v1/events/${eventId}`, {
+        request<EventDetailResponse>(`api/v1/events/${eventId}`, {
             method: 'PATCH',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify(data),
         }),
 
     syncTicketOptions: (eventId: string, options: TicketOption[], token: string) =>
-        request<TicketOption[]>(`/api/v1/events/${eventId}/ticket-options`, {
+        request<TicketOption[]>(`api/v1/events/${eventId}/ticket-options`, {
             method: 'PUT',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ ticket_options: options }),
         }),
 
     rsvpEvent: (eventId: string, status: RsvpStatus, token: string) =>
-        request<RsvpResponse>(`/api/v1/events/${eventId}/rsvp`, {
+        request<RsvpResponse>(`api/v1/events/${eventId}/rsvp`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ status }),
         }),
 
     getEventParticipants: (eventId: string, token: string) =>
-        request<ParticipantListResponse>(`/api/v1/events/${eventId}/participants`, {
+        request<ParticipantListResponse>(`api/v1/events/${eventId}/participants`, {
             headers: { Authorization: `Bearer ${token}` },
         }),
 
     removeParticipants: (eventId: string, participationIds: string[], token: string) =>
-        request<RemoveParticipantsResponse>(`/api/v1/events/${eventId}/participants`, {
+        request<RemoveParticipantsResponse>(`api/v1/events/${eventId}/participants`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ participation_ids: participationIds }),
@@ -95,25 +95,25 @@ export const api = {
     getUserEvents: (token: string, period: 'upcoming' | 'past' = 'upcoming', limit = 50, offset = 0, role?: 'organizer' | 'attendee') => {
         const params = new URLSearchParams({ period, limit: String(limit), offset: String(offset) });
         if (role) params.set('role', role);
-        return request<EventListResponse>(`/api/v1/events/me?${params}`, {
+        return request<EventListResponse>(`api/v1/events/me?${params}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
     },
 
     getUserTickets: (token: string) =>
         request<{ tickets: { ticket_id: string; event_title: string; ticket_option_name: string; status: string }[]; total: number }>(
-            '/api/v1/users/me/tickets',
+            'api/v1/users/me/tickets',
             { headers: { Authorization: `Bearer ${token}` } }
         ),
 
     getUserStats: (token: string) =>
         request<{ events_attended: number; events_created: number; tickets_total: number; participants_total: number }>(
-            '/api/v1/users/me/stats',
+            'api/v1/users/me/stats',
             { headers: { Authorization: `Bearer ${token}` } }
         ),
 
     searchStockImages: (query: string, perPage = 8) =>
         request<{ url: string; thumbnail: string; photographer: string; unsplash_link: string }[]>(
-            `/api/v1/images/search?q=${encodeURIComponent(query)}&per_page=${perPage}`
+            `api/v1/images/search?q=${encodeURIComponent(query)}&per_page=${perPage}`
         ),
 };
