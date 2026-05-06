@@ -162,6 +162,19 @@ export async function updateCity(city: string): Promise<void> {
     });
 }
 
+export async function fetchCityFromBackend(): Promise<string> {
+    const token = await getSession();
+    if (!token) return '';
+
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+    const res = await fetch(`${backendUrl}/api/v1/users/me/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return '';
+    const data = await res.json();
+    return data.city ?? '';
+}
+
 export async function signOut(): Promise<void> {
     const { error } = await getSupabase().auth.signOut();
     if (error) throw new Error(error.message);
