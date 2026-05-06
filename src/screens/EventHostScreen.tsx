@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     capacityBarFill: {
         height: '100%',
         borderRadius: 8,
-        backgroundColor: '#ffb1c0',
+        backgroundColor: '#FFB3CE',
     },
 
     linkCard: {

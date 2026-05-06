@@ -20,7 +20,7 @@ export default function GradientHero({
     return (
         <View style={[styles.container, { height }]}>
             <LinearGradient
-                colors={['#b32053', '#6645c7'] as const}
+                colors={['#D4006B', '#8B3DC8'] as const}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}

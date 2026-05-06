@@ -43,10 +43,10 @@ function getNumColumns(width: number): number {
 }
 
 const GRADIENT_PAIRS = [
-    ['#b32053', '#6645c7'],
-    ['#6645c7', '#42dae2'],
-    ['#00677f', '#6645c7'],
-    ['#ff5c8a', '#b32053'],
+    ['#D4006B', '#8B3DC8'],
+    ['#8B3DC8', '#42dae2'],
+    ['#00677f', '#8B3DC8'],
+    ['#FF6FA8', '#D4006B'],
 ];
 
 function formatDateGerman(isoDate: string): string {

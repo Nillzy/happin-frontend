@@ -7,10 +7,10 @@
  */
 
 export const GRADIENT_PAIRS: [string, string][] = [
-    ['#b32053', '#6645c7'], // Pink → Lila
-    ['#6645c7', '#42dae2'], // Lila → Cyan
-    ['#00677f', '#6645c7'], // Teal → Lila
-    ['#ff5c8a', '#b32053'], // Hell-Pink → Pink
+    ['#D4006B', '#8B3DC8'], // Pink → Lila
+    ['#8B3DC8', '#42dae2'], // Lila → Cyan
+    ['#00677f', '#8B3DC8'], // Teal → Lila
+    ['#FF6FA8', '#D4006B'], // Hell-Pink → Pink
 ];
 
 export type GradientId = 0 | 1 | 2 | 3;
