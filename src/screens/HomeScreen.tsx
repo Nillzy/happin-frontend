@@ -45,8 +45,8 @@ const EVENTS = [
         venue: 'Berghain, Berlin',
         date: 'Sa, 26. Apr · 23:00',
         price: 'ab 12 €',
-        color1: '#b32053',
-        color2: '#6645c7',
+        color1: '#D4006B',
+        color2: '#8B3DC8',
     },
     {
         id: 1,
@@ -54,7 +54,7 @@ const EVENTS = [
         venue: 'Tresor, Berlin',
         date: 'Fr, 25. Apr · 22:00',
         price: 'ab 15 €',
-        color1: '#6645c7',
+        color1: '#8B3DC8',
         color2: '#42dae2',
     },
     {
@@ -64,7 +64,7 @@ const EVENTS = [
         date: 'So, 27. Apr · 19:00',
         price: 'Eintritt frei',
         color1: '#00677f',
-        color2: '#6645c7',
+        color2: '#8B3DC8',
     },
     {
         id: 3,
@@ -72,8 +72,8 @@ const EVENTS = [
         venue: 'SO36, Berlin',
         date: 'Sa, 26. Apr · 21:00',
         price: 'ab 8 €',
-        color1: '#ff5c8a',
-        color2: '#b32053',
+        color1: '#FF6FA8',
+        color2: '#D4006B',
     },
     {
         id: 4,
@@ -110,10 +110,10 @@ const DOT_POSITIONS = [
 ];
 
 const DOT_COLORS = [
-    '#ffb1c0', '#cdbdff', '#42dae2', '#ffb1c0', '#cdbdff',
-    '#42dae2', '#ffb1c0', '#cdbdff', '#42dae2', '#ffb1c0',
-    '#cdbdff', '#42dae2', '#ffb1c0', '#cdbdff', '#42dae2',
-    '#ffb1c0', '#cdbdff', '#42dae2',
+    '#FFB3CE', '#E0A8F8', '#42dae2', '#FFB3CE', '#E0A8F8',
+    '#42dae2', '#FFB3CE', '#E0A8F8', '#42dae2', '#FFB3CE',
+    '#E0A8F8', '#42dae2', '#FFB3CE', '#E0A8F8', '#42dae2',
+    '#FFB3CE', '#E0A8F8', '#42dae2',
 ];
 
 const FEATURES = [
@@ -430,7 +430,7 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
         >
             {/* ── Nav ── */}
-            {Platform.OS === 'web' && <Navbar showNavItems={false} />}
+            <Navbar landingPage showNavItems={false} />
 
             {/* ── Hero: City Map ── */}
             <View
@@ -718,10 +718,10 @@ const styles = StyleSheet.create({
     eventCardPrice: {
         fontSize: 11,
         fontWeight: '700',
-        color: '#ffb1c0',
+        color: '#FFB3CE',
     },
     eventCardBtn: {
-        backgroundColor: '#b32053',
+        backgroundColor: '#D4006B',
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 6,

@@ -63,7 +63,7 @@ function buildMapHtml(
     map.on('load', function () {
       markers.forEach(function (m) {
         const el = document.createElement('div');
-        el.style.cssText = 'width:32px;height:32px;background:#b32053;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.4);';
+        el.style.cssText = 'width:32px;height:32px;background:#D4006B;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.4);';
         el.addEventListener('click', function () {
           window.ReactNativeWebView
             ? window.ReactNativeWebView.postMessage(m.eventId)
@@ -118,7 +118,7 @@ export default function MapView({
                     markers.forEach((m) => {
                         const el = document.createElement('div');
                         el.style.cssText =
-                            'width:32px;height:32px;background:#b32053;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.4);';
+                            'width:32px;height:32px;background:#D4006B;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.4);';
                         el.addEventListener('click', () => onMarkerPress?.(m.eventId));
 
                         new sdk.Marker({ element: el })
