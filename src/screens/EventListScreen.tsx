@@ -100,7 +100,7 @@ export default function EventListScreen() {
             let data: EventListResponse;
             if (isOrganizerViewRef.current) {
                 if (!token) { router.replace('/login'); return; }
-                data = await api.getUserEvents(token, eventPeriodRef.current, EVENTS_PER_PAGE, 0);
+                data = await api.getUserEvents(token, eventPeriodRef.current, EVENTS_PER_PAGE, 0, 'organizer');
             } else {
                 data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined);
             }
@@ -129,7 +129,7 @@ export default function EventListScreen() {
             let data: EventListResponse;
             if (isOrganizerViewRef.current) {
                 if (!token) { router.replace('/login'); return; }
-                data = await api.getUserEvents(token, eventPeriodRef.current, EVENTS_PER_PAGE, offset);
+                data = await api.getUserEvents(token, eventPeriodRef.current, EVENTS_PER_PAGE, offset, 'organizer');
             } else {
                 data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token || undefined);
             }
@@ -167,7 +167,7 @@ export default function EventListScreen() {
                 let data: EventListResponse;
                 if (isOrganizerView) {
                     if (!token) { router.replace('/login'); return; }
-                    data = await api.getUserEvents(token, eventPeriod, EVENTS_PER_PAGE, 0);
+                    data = await api.getUserEvents(token, eventPeriod, EVENTS_PER_PAGE, 0, 'organizer');
                 } else {
                     data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined);
                 }

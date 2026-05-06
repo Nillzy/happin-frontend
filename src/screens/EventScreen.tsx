@@ -11,6 +11,8 @@ import {
     Platform,
     Animated,
     Pressable,
+    Modal,
+    Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
@@ -21,7 +23,7 @@ import EventCategories from '../components/event/EventCategories';
 import EventImageGallery from '../components/atoms/EventImageGallery';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
-import type { EventDetailResponse } from '../types/events';
+import type { EventDetailResponse, RsvpStatus } from '../types/events';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.75; // 3:4 aspect ratio
@@ -34,6 +36,12 @@ const MOCK_TICKET_OPTIONS = [
     { name: 'Standard', price: 29.90, sort_order: 1, quantity_limit: 200 },
     { name: 'VIP', price: 59.00, sort_order: 2, quantity_limit: 30, description: 'Eigener Bereich mit Lounge-Zugang, Willkommensdrink & Priority-Einlass' },
     { name: 'Gruppenticket (4 Pers.)', price: 99.00, sort_order: 3, quantity_limit: 20 },
+];
+
+const RSVP_OPTIONS: { status: RsvpStatus; icon: string; label: string; sublabel: string }[] = [
+    { status: 'Accepted', icon: '✓', label: 'Zusagen', sublabel: 'Ich bin dabei' },
+    { status: 'Pending', icon: '~', label: 'Unsicher', sublabel: 'Vielleicht bin ich dabei' },
+    { status: 'Declined', icon: '✕', label: 'Absagen', sublabel: 'Ich kann leider nicht' },
 ];
 
 function formatDateGerman(isoDate: string): string {
@@ -71,6 +79,10 @@ export default function EventScreen() {
     const [selectedTicketIdx, setSelectedTicketIdx] = useState(0);
     const [ticketCount, setTicketCount] = useState(1);
     const drawerAnim = useRef(new Animated.Value(0)).current;
+
+    const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus | null>(null);
+    const [rsvpMenuVisible, setRsvpMenuVisible] = useState(false);
+    const [rsvpLoading, setRsvpLoading] = useState(false);
 
     const openDrawer = () => {
         setDrawerOpen(true);
@@ -143,6 +155,7 @@ export default function EventScreen() {
             const token = await getSession();
             const data = await api.getEventById(id, token || undefined);
             setEvent(data);
+            setRsvpStatus(data.my_rsvp_status ?? null);
         } catch (e) {
             console.error('[EventScreen] Load error:', e);
             setError(e instanceof Error ? e.message : 'Event konnte nicht geladen werden');
@@ -154,6 +167,50 @@ export default function EventScreen() {
     const handleRegister = () => {
         // TODO: RSVP Logic
         console.log('Register for event');
+    };
+
+    const handleRsvp = async (newStatus: RsvpStatus) => {
+        if (!event) return;
+        const token = await getSession();
+        if (!token) {
+            router.navigate('/login');
+            return;
+        }
+        setRsvpLoading(true);
+        try {
+            await api.rsvpEvent(event.event_id, newStatus, token);
+            const prevStatus = rsvpStatus;
+            setRsvpStatus(newStatus);
+            if (newStatus === 'Accepted' && prevStatus !== 'Accepted') {
+                setEvent({ ...event, participant_count: event.participant_count + 1 });
+            } else if (newStatus !== 'Accepted' && prevStatus === 'Accepted') {
+                setEvent({ ...event, participant_count: Math.max(0, event.participant_count - 1) });
+            }
+        } catch (err: unknown) {
+            let msg = 'RSVP konnte nicht gespeichert werden.';
+            if (err instanceof Error) {
+                const match = err.message.match(/\{.*\}/);
+                if (match) {
+                    try { msg = JSON.parse(match[0]).detail ?? msg; } catch { /* ignore */ }
+                }
+            }
+            Alert.alert('Fehler', msg);
+        } finally {
+            setRsvpLoading(false);
+        }
+    };
+
+    const handleStickyBarPress = () => {
+        if (!event) return;
+        if (event.is_free) {
+            if (event.is_public) {
+                handleRsvp(rsvpStatus === 'Accepted' ? 'Declined' : 'Accepted');
+            } else {
+                setRsvpMenuVisible(true);
+            }
+        } else {
+            openDrawer();
+        }
     };
 
     const handleContact = () => {
@@ -411,6 +468,53 @@ export default function EventScreen() {
 
             {/* Sticky Bottom Bar */}
             {(() => {
+                if (event.is_free) {
+                    const statusHint = rsvpStatus === 'Accepted' ? 'Du hast zugesagt'
+                        : rsvpStatus === 'Declined' ? 'Du hast abgesagt'
+                        : rsvpStatus === 'Pending' ? 'Noch unsicher'
+                        : `${event.participant_count} Teilnehmer`;
+                    const btnLabel = rsvpLoading ? '...'
+                        : event.is_public
+                            ? (rsvpStatus === 'Accepted' ? 'Absagen' : 'Zusagen')
+                            : 'RSVP';
+                    const btnBg = (event.is_public && rsvpStatus === 'Accepted')
+                        ? 'transparent'
+                        : colors.primary;
+                    const btnBorder = (event.is_public && rsvpStatus === 'Accepted')
+                        ? colors.outline
+                        : 'transparent';
+                    const btnTextColor = (event.is_public && rsvpStatus === 'Accepted')
+                        ? colors.onSurface
+                        : colors.onPrimary;
+                    return (
+                        <View style={[
+                            styles.stickyBar,
+                            { borderTopColor: colors.outlineVariant },
+                            isWeb
+                                ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
+                                : { backgroundColor: colors.surface },
+                        ]}>
+                            <View style={styles.stickyBarInfo}>
+                                <Text style={[styles.stickyBarPrice, { color: colors.onSurface }]}>
+                                    Kostenlos
+                                </Text>
+                                <Text style={[styles.stickyBarHint, { color: colors.onSurfaceVariant }]}>
+                                    {statusHint}
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.stickyBarButton, { backgroundColor: btnBg, borderColor: btnBorder, borderWidth: btnBorder === 'transparent' ? 0 : 1.5 }]}
+                                onPress={handleStickyBarPress}
+                                disabled={rsvpLoading}
+                            >
+                                <Text style={[styles.stickyBarButtonText, { color: btnTextColor }]}>
+                                    {btnLabel}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    );
+                }
+
                 const tickets = event.ticket_options?.length ? event.ticket_options : MOCK_TICKET_OPTIONS;
                 const cheapest = Math.min(...tickets.map(t => t.price));
                 return (
@@ -611,6 +715,63 @@ export default function EventScreen() {
                     </>
                 );
             })()}
+
+            {/* RSVP Modal (for free private events) */}
+            <Modal
+                visible={rsvpMenuVisible}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setRsvpMenuVisible(false)}
+            >
+                <Pressable style={rsvpStyles.backdrop} onPress={() => setRsvpMenuVisible(false)} />
+                <View style={[rsvpStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
+                    <View style={[rsvpStyles.handle, { backgroundColor: colors.outlineVariant }]} />
+                    <Text style={[rsvpStyles.title, { color: colors.onSurface }]}>Teilnahme</Text>
+
+                    {RSVP_OPTIONS.map((opt, idx) => {
+                        const isActive = rsvpStatus === opt.status;
+                        return (
+                            <React.Fragment key={opt.status}>
+                                <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    onPress={() => {
+                                        handleRsvp(opt.status);
+                                        setRsvpMenuVisible(false);
+                                    }}
+                                    style={[
+                                        rsvpStyles.optionRow,
+                                        {
+                                            backgroundColor: isActive ? `${colors.primary}14` : 'transparent',
+                                            borderColor: isActive ? `${colors.primary}28` : 'transparent',
+                                        },
+                                    ]}
+                                >
+                                    <View style={[
+                                        rsvpStyles.iconBadge,
+                                        { backgroundColor: isActive ? `${colors.primary}22` : colors.surfaceContainer },
+                                    ]}>
+                                        <Text style={[rsvpStyles.iconText, { color: isActive ? colors.primary : colors.onSurfaceVariant }]}>
+                                            {opt.icon}
+                                        </Text>
+                                    </View>
+                                    <View style={rsvpStyles.optionText}>
+                                        <Text style={[rsvpStyles.optionLabel, { color: colors.onSurface }]}>{opt.label}</Text>
+                                        <Text style={[rsvpStyles.optionSublabel, { color: colors.onSurfaceVariant }]}>{opt.sublabel}</Text>
+                                    </View>
+                                    {isActive && (
+                                        <Text style={[rsvpStyles.checkmark, { color: colors.primary }]}>✓</Text>
+                                    )}
+                                </TouchableOpacity>
+                                {idx < RSVP_OPTIONS.length - 1 && (
+                                    <View style={[rsvpStyles.separator, { backgroundColor: colors.outlineVariant }]} />
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
+
+                    <View style={rsvpStyles.bottomSpacer} />
+                </View>
+            </Modal>
 
         </ScreenWithNav>
     );
@@ -1038,5 +1199,62 @@ const styles = StyleSheet.create({
     checkoutButtonText: {
         fontSize: 17,
         fontWeight: '700',
+    },
+});
+
+const rsvpStyles = StyleSheet.create({
+    backdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    sheet: {
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 12,
+        paddingHorizontal: 0,
+    },
+    handle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    title: {
+        fontSize: 17,
+        fontWeight: '700',
+        paddingHorizontal: 20,
+        marginBottom: 8,
+    },
+    optionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 14,
+        borderWidth: 1,
+        gap: 14,
+    },
+    iconBadge: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    iconText: {
+        fontSize: 17,
+        fontWeight: '700',
+    },
+    optionText: { flex: 1, gap: 2 },
+    optionLabel: { fontSize: 15, fontWeight: '700' },
+    optionSublabel: { fontSize: 12 },
+    checkmark: { fontSize: 16, fontWeight: '800' },
+    separator: {
+        height: StyleSheet.hairlineWidth,
+        marginHorizontal: 20,
+        opacity: 0.4,
+    },
+    bottomSpacer: {
+        height: Platform.OS === 'ios' ? 34 : 20,
     },
 });

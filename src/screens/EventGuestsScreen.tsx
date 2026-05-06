@@ -7,6 +7,9 @@ import {
     StyleSheet,
     ActivityIndicator,
     Alert,
+    Platform,
+    Modal,
+    Pressable,
 } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -25,6 +28,7 @@ export default function EventGuestsScreen() {
     const [error, setError] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [removing, setRemoving] = useState(false);
+    const [confirmVisible, setConfirmVisible] = useState(false);
 
     useEffect(() => {
         void loadData();
@@ -68,35 +72,30 @@ export default function EventGuestsScreen() {
         });
     };
 
-    const handleRemove = async () => {
+    const handleRemove = () => {
         if (selectedIds.size === 0) return;
+        setConfirmVisible(true);
+    };
 
-        Alert.alert(
-            'Gäste entfernen?',
-            `${selectedIds.size} ${selectedIds.size === 1 ? 'Gast wird' : 'Gäste werden'} von der Teilnehmerliste entfernt.`,
-            [
-                { text: 'Abbrechen', style: 'cancel' },
-                {
-                    text: 'Entfernen',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            setRemoving(true);
-                            const token = await getSession();
-                            if (!token) return;
+    const doRemove = async () => {
+        setConfirmVisible(false);
+        try {
+            setRemoving(true);
+            const token = await getSession();
+            if (!token) return;
 
-                            await api.removeParticipants(eventId, Array.from(selectedIds), token);
-                            setSelectedIds(new Set());
-                            await loadData();
-                        } catch {
-                            Alert.alert('Fehler', 'Gäste konnten nicht entfernt werden.');
-                        } finally {
-                            setRemoving(false);
-                        }
-                    },
-                },
-            ]
-        );
+            await api.removeParticipants(eventId, Array.from(selectedIds), token);
+            setSelectedIds(new Set());
+            await loadData();
+        } catch {
+            if (Platform.OS === 'web') {
+                window.alert('Gäste konnten nicht entfernt werden.');
+            } else {
+                Alert.alert('Fehler', 'Gäste konnten nicht entfernt werden.');
+            }
+        } finally {
+            setRemoving(false);
+        }
     };
 
     const getStatusColor = () => {
@@ -246,6 +245,51 @@ export default function EventGuestsScreen() {
                     )}
                 </View>
             </ScrollView>
+
+            {/* Bestätigungs-Modal */}
+            <Modal
+                visible={confirmVisible}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setConfirmVisible(false)}
+            >
+                <Pressable style={modalStyles.backdrop} onPress={() => setConfirmVisible(false)} />
+                <View style={[modalStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
+                    <View style={[modalStyles.handle, { backgroundColor: colors.outlineVariant }]} />
+
+                    <View style={modalStyles.iconContainer}>
+                        <View style={[modalStyles.iconCircle, { backgroundColor: `${colors.error}18` }]}>
+                            <Text style={[modalStyles.iconText, { color: colors.error }]}>!</Text>
+                        </View>
+                    </View>
+
+                    <Text style={[modalStyles.title, { color: colors.onSurface }]}>
+                        Gäste entfernen?
+                    </Text>
+                    <Text style={[modalStyles.message, { color: colors.onSurfaceVariant }]}>
+                        {selectedIds.size} {selectedIds.size === 1 ? 'Gast wird' : 'Gäste werden'} unwiderruflich von der Teilnehmerliste entfernt.
+                    </Text>
+
+                    <View style={modalStyles.actions}>
+                        <TouchableOpacity
+                            style={[modalStyles.cancelBtn, { borderColor: colors.outlineVariant }]}
+                            onPress={() => setConfirmVisible(false)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[modalStyles.cancelBtnText, { color: colors.onSurface }]}>Abbrechen</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[modalStyles.confirmBtn, { backgroundColor: colors.error }]}
+                            onPress={doRemove}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[modalStyles.confirmBtnText, { color: colors.onError }]}>Entfernen</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={modalStyles.bottomSpacer} />
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -318,4 +362,79 @@ const styles = StyleSheet.create({
     guestName: { fontSize: 15, fontWeight: '600' },
     guestPhone: { fontSize: 12, marginTop: 2 },
     emptyText: { fontSize: 14, textAlign: 'center', padding: 40 },
+});
+
+const modalStyles = StyleSheet.create({
+    backdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    sheet: {
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 12,
+        paddingHorizontal: 24,
+    },
+    handle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 24,
+    },
+    iconContainer: {
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    iconCircle: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    iconText: {
+        fontSize: 28,
+        fontWeight: '800',
+    },
+    title: {
+        fontSize: 19,
+        fontWeight: '700',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    message: {
+        fontSize: 14,
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 24,
+    },
+    actions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    cancelBtn: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 9999,
+        borderWidth: 1.5,
+        alignItems: 'center',
+    },
+    cancelBtnText: {
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    confirmBtn: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 9999,
+        alignItems: 'center',
+    },
+    confirmBtnText: {
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    bottomSpacer: {
+        height: Platform.OS === 'ios' ? 34 : 24,
+    },
 });

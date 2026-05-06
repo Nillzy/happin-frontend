@@ -83,7 +83,8 @@ export default function MyEventsScreen() {
     const isWeb = Platform.OS === 'web';
 
     const [dimensions, setDimensions] = useState(Dimensions.get('window'));
-    const [upcomingEvents, setUpcomingEvents] = useState<EventListItem[]>([]);
+    const [organizedEvents, setOrganizedEvents] = useState<EventListItem[]>([]);
+    const [attendingEvents, setAttendingEvents] = useState<EventListItem[]>([]);
     const [pastEvents, setPastEvents] = useState<EventListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -114,12 +115,14 @@ export default function MyEventsScreen() {
                 return;
             }
 
-            const [upcomingData, pastData] = await Promise.all([
-                api.getUserEvents(token, 'upcoming', 100, 0),
+            const [organizedData, attendingData, pastData] = await Promise.all([
+                api.getUserEvents(token, 'upcoming', 100, 0, 'organizer'),
+                api.getUserEvents(token, 'upcoming', 100, 0, 'attendee'),
                 api.getUserEvents(token, 'past', 100, 0),
             ]);
 
-            setUpcomingEvents(upcomingData.events);
+            setOrganizedEvents(organizedData.events);
+            setAttendingEvents(attendingData.events);
             setPastEvents(pastData.events);
         } catch (err) {
             console.error('Failed to load events:', err);
@@ -140,7 +143,7 @@ export default function MyEventsScreen() {
     }, [loadEvents]);
 
     // MOCK: Fake Events zum Testen der UI — entfernen wenn echte Daten da sind
-    const MOCK_EVENTS: (EventListItem & Record<string, any>)[] = [
+    const MOCK_ORGANIZED: (EventListItem & Record<string, any>)[] = [
         {
             event_id: 'mock-private-001',
             title: 'Drink and Drive mit Lukas Auto',
@@ -186,7 +189,6 @@ export default function MyEventsScreen() {
         },
     ];
 
-    // MOCK: Fake Ticket-Event zum Testen der UI — entfernen wenn echte Daten da sind
     const MOCK_ATTENDING: EventListItem = {
         event_id: 'mock-attending-001',
         title: 'Boiler Room Stuttgart',
@@ -200,19 +202,8 @@ export default function MyEventsScreen() {
         location: { location_id: 'mock', city: 'Stuttgart' },
     };
 
-    const organizedEvents = [...MOCK_EVENTS, ...upcomingEvents.filter(e => e.is_host)];
-    const attendingEvents = [MOCK_ATTENDING, ...upcomingEvents.filter(e => !e.is_host)];
-
-    // TODO: Diese Felder werden vom Backend noch nicht geliefert.
-    // EventListItem muss um folgende Felder erweitert werden:
-    //   Öffentliche Events:
-    //     - rsvp_accepted: number
-    //     - ticket_revenue_cents: number
-    //     - waitlist_count: number  (nur wenn ausverkauft)
-    //   Private Events (Link-basierte Einladung, kein individuelles Tracking):
-    //     - rsvp_accepted: number
-    //     - rsvp_declined: number
-    //     (max_capacity existiert bereits in EventListItem)
+    const displayOrganized = [...MOCK_ORGANIZED, ...organizedEvents];
+    const displayAttending = [MOCK_ATTENDING, ...attendingEvents];
 
     const renderHostCard = (event: EventListItem, index: number) => {
         const gradient = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
@@ -355,17 +346,15 @@ export default function MyEventsScreen() {
         );
     };
 
-    const renderTicketCard = (event: EventListItem) => (
-        <View
+    const renderTicketCard = (event: EventListItem, showQR: boolean = true) => (
+        <TouchableOpacity
             key={event.event_id}
             style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
+            onPress={() => router.push(showQR ? `/ticket/${event.event_id}` : `/event/${event.event_id}`)}
+            activeOpacity={0.85}
         >
             <View style={styles.cardBodyWithQR}>
-                <TouchableOpacity
-                    style={styles.cardBodyContent}
-                    onPress={() => router.push(`/event/${event.event_id}`)}
-                    activeOpacity={0.85}
-                >
+                <View style={styles.cardBodyContent}>
                     <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2}>
                         {event.title}
                     </Text>
@@ -387,21 +376,19 @@ export default function MyEventsScreen() {
                             ))}
                         </View>
                     )}
-                </TouchableOpacity>
+                </View>
 
-                <TouchableOpacity
-                    style={styles.qrContainerSmall}
-                    onPress={() => router.push(`/ticket/${event.event_id}`)}
-                    activeOpacity={0.85}
-                >
-                    <QRCode
-                        value={`happin://ticket/${event.event_id}`}
-                        size={76}
-                        backgroundColor="#FFFFFF"
-                    />
-                </TouchableOpacity>
+                {showQR && (
+                    <View style={styles.qrContainerSmall}>
+                        <QRCode
+                            value={`happin://ticket/${event.event_id}`}
+                            size={76}
+                            backgroundColor="#FFFFFF"
+                        />
+                    </View>
+                )}
             </View>
-        </View>
+        </TouchableOpacity>
     );
 
     const renderEventCard = (event: EventListItem, index: number) => {
@@ -453,24 +440,35 @@ export default function MyEventsScreen() {
         title: string,
         events: EventListItem[],
         isCollapsed: boolean,
-        onToggle: () => void
+        onToggle: () => void,
+        forceTicketStyle: boolean = false,
     ) => (
         <View style={styles.section}>
             {renderSectionHeader(title, events.length, true, isCollapsed, onToggle)}
             {!isCollapsed && (
-                <View style={[
-                    styles.cardGrid,
-                    numColumns > 1 && styles.cardGridMultiCol,
-                ]}>
-                    {events.map((event, index) => (
-                        <View
-                            key={event.event_id}
-                            style={cardWidth != null ? { width: cardWidth } : undefined}
-                        >
-                            {renderEventCard(event, index)}
-                        </View>
-                    ))}
-                </View>
+                events.length === 0 ? (
+                    <View style={styles.emptySection}>
+                        <Text style={[styles.emptySectionText, { color: colors.onSurfaceVariant }]}>
+                            Noch keine Events in diesem Bereich
+                        </Text>
+                    </View>
+                ) : (
+                    <View style={[
+                        styles.cardGrid,
+                        numColumns > 1 && styles.cardGridMultiCol,
+                    ]}>
+                        {events.map((event, index) => (
+                            <View
+                                key={event.event_id}
+                                style={cardWidth != null ? { width: cardWidth } : undefined}
+                            >
+                                {forceTicketStyle
+                                    ? renderTicketCard(event, false)
+                                    : renderEventCard(event, index)}
+                            </View>
+                        ))}
+                    </View>
+                )
             )}
         </View>
     );
@@ -538,16 +536,16 @@ export default function MyEventsScreen() {
                             </Text>
                         </View>
 
-                        {organizedEvents.length > 0 && renderSection(
+                        {displayOrganized.length > 0 && renderSection(
                             'Von dir organisiert',
-                            organizedEvents,
+                            displayOrganized,
                             organizedCollapsed,
                             () => setOrganizedCollapsed(!organizedCollapsed)
                         )}
 
-                        {attendingEvents.length > 0 && renderSection(
+                        {renderSection(
                             'Deine Events',
-                            attendingEvents,
+                            displayAttending,
                             attendingCollapsed,
                             () => setAttendingCollapsed(!attendingCollapsed)
                         )}
@@ -556,7 +554,8 @@ export default function MyEventsScreen() {
                             'Vergangene Events',
                             pastEvents,
                             pastCollapsed,
-                            () => setPastCollapsed(!pastCollapsed)
+                            () => setPastCollapsed(!pastCollapsed),
+                            true
                         )}
                     </View>
                 </ScrollView>
@@ -595,6 +594,15 @@ const styles = StyleSheet.create({
     // Section
     section: {
         marginBottom: 32,
+    },
+    emptySection: {
+        marginHorizontal: 24,
+        paddingVertical: 24,
+        alignItems: 'center',
+    },
+    emptySectionText: {
+        fontSize: 14,
+        fontWeight: '400',
     },
     sectionHeader: {
         flexDirection: 'row',

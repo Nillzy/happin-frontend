@@ -92,10 +92,13 @@ export const api = {
             body: JSON.stringify({ participation_ids: participationIds }),
         }),
 
-    getUserEvents: (token: string, period: 'upcoming' | 'past' = 'upcoming', limit = 50, offset = 0) =>
-        request<EventListResponse>(`/api/v1/users/me/events?period=${period}&limit=${limit}&offset=${offset}`, {
+    getUserEvents: (token: string, period: 'upcoming' | 'past' = 'upcoming', limit = 50, offset = 0, role?: 'organizer' | 'attendee') => {
+        const params = new URLSearchParams({ period, limit: String(limit), offset: String(offset) });
+        if (role) params.set('role', role);
+        return request<EventListResponse>(`/api/v1/events/me?${params}`, {
             headers: { Authorization: `Bearer ${token}` },
-        }),
+        });
+    },
 
     getUserTickets: (token: string) =>
         request<{ tickets: { ticket_id: string; event_title: string; ticket_option_name: string; status: string }[]; total: number }>(

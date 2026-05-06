@@ -178,16 +178,16 @@ const panResponder = PanResponder.create({
 ### API-Calls
 
 ```typescript
-// Aktuelle Events
-const upcoming = await api.getUserEvents(token, 'upcoming', 100, 0);
+// Organisierte Events
+const organized = await api.getUserEvents(token, 'upcoming', 100, 0, 'organizer');
+
+// Events als Teilnehmer
+const attending = await api.getUserEvents(token, 'upcoming', 100, 0, 'attendee');
 
 // Vergangene Events
 const past = await api.getUserEvents(token, 'past', 100, 0);
 
-// Client-Side Filtering (3 Kategorien)
-const organizedEvents = upcoming.events.filter(e => e.is_host);
-const attendingEvents = upcoming.events.filter(e => !e.is_host);
-// pastEvents enthält alle vergangenen Events (Host + Teilnehmer)
+// Kein client-seitiges Filtern nötig — jeder Call liefert genau eine Sektion
 ```
 
 ### Pull-to-Refresh
