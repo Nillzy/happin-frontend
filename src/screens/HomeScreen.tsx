@@ -430,7 +430,7 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
         >
             {/* ── Nav ── */}
-            <Navbar />
+            {Platform.OS === 'web' && <Navbar showNavItems={false} />}
 
             {/* ── Hero: City Map ── */}
             <View

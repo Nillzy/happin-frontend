@@ -333,7 +333,7 @@ export default function AccountScreen() {
         return (
             <ScreenWithNav>
                 <View style={[s.root, { backgroundColor: colors.background }]}>
-                    <Navbar showBack />
+                    {Platform.OS === 'web' && <Navbar showCta={false} />}
                     <View style={s.centered}>
                         <ActivityIndicator size="large" color={colors.primary} />
                     </View>
@@ -345,7 +345,7 @@ export default function AccountScreen() {
     return (
         <ScreenWithNav>
             <View style={[s.root, { backgroundColor: colors.background }]}>
-                <Navbar showBack />
+                <Navbar showCta={false} />
                 <ScrollView
                     contentContainerStyle={s.scroll}
                     showsVerticalScrollIndicator={false}

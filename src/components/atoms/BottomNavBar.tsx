@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import HappinLogo from './HappinLogo';
 
 /**
  * BottomNavBar - Mobile Bottom Navigation
@@ -145,11 +146,14 @@ export default function BottomNavBar() {
                                 activeOpacity={0.85}
                             >
                                 <Ionicons
-                                    name={isActive ? 'add' : 'add'}
+                                    name="add"
                                     size={32}
                                     color={colors.onPrimary}
                                 />
                             </TouchableOpacity>
+                            <View style={styles.logoWrapper}>
+                                <HappinLogo size="sm" />
+                            </View>
                         </View>
                     );
                 }
@@ -246,5 +250,10 @@ const styles = StyleSheet.create({
         fontSize: 11,
         letterSpacing: 0.2,
         marginTop: 2,
+    },
+    logoWrapper: {
+        marginTop: 4,
+        opacity: 0.8,
+        transform: [{ scale: 0.7 }],
     },
 });

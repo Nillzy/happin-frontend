@@ -63,6 +63,10 @@ This is the central index for all project documentation in the `documentation/` 
 - ✅ **"Zur Gast-Ansicht" Button**: Im EventHostScreen, navigiert zu normaler Event-Ansicht
 - ✅ **Gästelisten**: Öffnen als separate Seiten (`/event/[id]/guests?status=...`)
 - ✅ **Navbar bereinigt**: Account-Button entfernt (Konto-Tab in Bottom Nav); DarkLightToggle entfernt (im Account-Screen)
+- ✅ **Responsive Navigation**: Mobile → Bottom Nav, Desktop/Tablet (≥768px Web) → Top-Navbar mit Tab-Links + „Event erstellen"-Button
+- ✅ **Navbar auf Mobile unsichtbar**: Rendert `null` bei `width < 768` oder Native — kein Logo-Balken oben
+- ✅ **HappinLogo in Bottom Nav**: Klein (scale 0.7, opacity 0.8) unter dem Erstellen-Button
+- ✅ **Mobiler Zurück-Header**: EventCreate Step 1 & 2 zeigen auf Mobile `arrow-back` Icon + „Zurück" statt Navbar
 
 ### Backend-Integration
 - ✅ **Infinity Scroll Backend-Fix**: Backend gibt jetzt Total-Count zurück (nicht nur Page-Count)

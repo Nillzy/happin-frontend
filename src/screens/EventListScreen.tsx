@@ -405,7 +405,7 @@ export default function EventListScreen() {
     return (
         <ScreenWithNav>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                <Navbar showCta={false} />
+                {isWeb && <Navbar showCta={false} />}
 
                 {/* Search Bar with Filter and Saved */}
                 <View style={[styles.searchContainer, { backgroundColor: colors.background, borderBottomColor: colors.outlineVariant }]}>

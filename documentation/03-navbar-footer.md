@@ -40,49 +40,49 @@ import Navbar from '@/src/components/atoms/Navbar';
 <Navbar showCta />          // Logo (links) + "App laden"-Button (rechts)
 <Navbar showBack />         // "← Zurück"-Button (links)
 <Navbar />                  // Nur Logo, kein CTA
+<Navbar showNavItems={false} /> // Desktop-Nav-Items unterdrücken (z.B. Startseite)
 ```
 
 **Props:**
 
 | Prop | Default | Beschreibung |
 |------|---------|-------------|
-| `showCta` | `false` | Zeigt „App laden"-Button rechts |
+| `showCta` | `false` | Zeigt „App laden"-Button rechts (nur wenn keine Nav-Items aktiv) |
 | `showBack` | `false` | Ersetzt Logo durch „← Zurück"-Button |
 | `onBackPress` | `router.back()` | Optionaler Custom-Handler für Zurück |
+| `showNavItems` | `true` | Nav-Items auf Desktop anzeigen (auf `false` z.B. für Startseite) |
 
-- Hintergrund: `colors.background`
-- Bottom-Border: `rgba(255,255,255,0.06)` (dark) / `rgba(0,0,0,0.06)` (light)
-- iOS: `paddingTop: 54` für Safe-Area-Ausgleich
-- **Links**: Logo (klickbar → `/`) oder Back-Button
-- **Rechts**: optionaler CTA „App laden"
-- **Account-Button entfernt**: Konto-Tab in der Bottom Nav übernimmt die Funktion
-- **DarkLightToggle entfernt**: Jetzt im Account-Screen (Einstellungen)
+- **Rendert `null`** wenn `Platform.OS !== 'web'` oder Viewport `< 768px` — auf Mobile nie sichtbar
+- Feste Höhe: 52px (+ iOS Safe Area)
+- Hintergrund: `colors.background`, Bottom-Border subtil
 
----
+### Desktop-Navigation (≥ 768px, Web)
 
-## Footer
+Wenn `showNavItems={true}` (default) und `showBack={false}`, werden die 4 Tab-Links rechts angezeigt:
 
-```tsx
-import Footer from '@/src/components/atoms/Footer';
+| Tab | Route | Icon |
+|-----|-------|------|
+| Explore | `/events` | `compass` |
+| Karte | `/map` | `map` |
+| Events | `/my-events` | `calendar` |
+| Konto | `/account` | `person` |
 
-<Footer />
-```
+Plus outlined „Event erstellen"-Button ganz rechts (`borderWidth: 1`, `borderColor: colors.primary`, Pill-Form).
 
-- Zeigt HappinLogo (klickbar → navigiert zu Home)
-- Links: Datenschutz · Impressum · Kontakt (Platzhalter, noch ohne Routing)
-- Copyright: © 2025 Happin. Alle Rechte vorbehalten.
+- Aktiver Tab: `colors.primary`, leichter `primaryContainer`-Hintergrund
+- Inaktiver Tab: `colors.onSurfaceVariant`
+- `fontWeight: '600'` immer (kein Layout-Shift beim Aktivieren)
 
 ---
 
 ## Integration
 
-Alle drei Screens nutzen die Komponenten:
-
-| Screen | Navbar-Modus | Footer |
+| Screen | Navbar-Modus | Mobile |
 |--------|-------------|--------|
-| `HomeScreen` | `showCta` | ✓ |
-| `LoginScreen` | `showBack` | ✓ |
-| `EventScreen` | `showBack` | ✓ |
-
-Die bisherigen Inline-Nav/-Footer in `HomeScreen` sowie der Back-Button und das Logo-`<Text>` in `LoginScreen` wurden entfernt.
-Die heroNav-Buttons im EventScreen (← / ↑) wurden entfernt, da die Navbar die Zurück-Navigation übernimmt.
+| `HomeScreen` | `showNavItems={false}` | nicht sichtbar (null) |
+| `EventListScreen` | `showCta={false}` | nicht sichtbar (null) |
+| `MapScreen` | `showCta={false}` | nicht sichtbar (null) |
+| `MyEventsScreen` | `showCta={false}` | nicht sichtbar (null) |
+| `AccountScreen` | `showCta={false}` | nicht sichtbar (null) |
+| `EventCreateStepOneNew` | `showBack` | nicht sichtbar → eigener mobiler Zurück-Header |
+| `EventCreateStepTwo` | `showBack` | nicht sichtbar → eigener mobiler Zurück-Header |

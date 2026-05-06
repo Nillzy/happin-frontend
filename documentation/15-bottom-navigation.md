@@ -8,26 +8,35 @@ status: implemented
 
 ## Überblick
 
-Die Bottom Navigation Bar ist die primäre Navigationsmethode für Mobile-Ansichten. Sie zeigt 5 Haupt-Tabs am unteren Bildschirmrand und ermöglicht schnelles Wechseln zwischen den Hauptbereichen der App.
+Die Bottom Navigation Bar ist die primäre Navigationsmethode für **Mobile**. Ab Viewport-Breite ≥ 768px (Tablet/Desktop/Web) wird sie ausgeblendet — die Navigation erfolgt dann über die Top-Navbar.
+
+## Responsive Verhalten
+
+| Viewport | Navigation |
+|----------|-----------|
+| < 768px (Mobile/Web-schmal) | Bottom Nav sichtbar, Navbar versteckt |
+| ≥ 768px (Tablet/Desktop) | Bottom Nav versteckt, Navbar mit Tab-Links |
+
+Gesteuert in `ScreenWithNav.tsx`:
+```tsx
+const isMobile = Platform.OS !== 'web' || width < 768;
+{showBottomNav && isMobile && <BottomNavBar />}
+```
 
 ## Design
 
-### Position
-- **Fixed** am unteren Bildschirmrand
-- **Safe Area Support** für iOS (berücksichtigt Home Indicator)
-- **Höhe**: 60px + Safe Area Inset
+### HappinLogo in der Mitte
+Unter dem Erstellen-Button wird das `HappinLogo size="sm"` angezeigt — skaliert auf 70% (`transform: scale(0.7)`) und `opacity: 0.8`.
 
-### Styling
+### Tab-Struktur
 
-**Dark Mode (Neon Horizon):**
-- Hintergrund: `rgba(30, 31, 38, 0.85)` (surface-container-low mit Transparenz)
-- Border Top: `rgba(255, 255, 255, 0.08)`
-- Shadow: Platform-spezifisch (iOS: shadowOpacity 0.1, Android: elevation 8)
-
-**Light Mode (Happin Light):**
-- Hintergrund: `surfaceContainerLowest` (vollständig opak)
-- Border Top: `rgba(0, 0, 0, 0.08)`
-- Shadow: Identisch zu Dark Mode
+| Tab | Route | Icon (Ionicons) |
+|-----|-------|-----------------|
+| **Explore** | `/events` | `compass-outline` / `compass` |
+| **Karte** | `/map` | `map-outline` / `map` |
+| **Erstellen** | `/events/create` | Floating `add-circle` + HappinLogo darunter |
+| **Events** | `/my-events` | `calendar-outline` / `calendar` |
+| **Konto** | `/account` | `person-outline` / `person` |
 
 ### Tab-States
 

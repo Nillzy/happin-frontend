@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { useUserCity } from '@/hooks/use-user-city';
@@ -89,7 +89,7 @@ export default function MapScreen() {
     return (
         <ScreenWithNav>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                <Navbar />
+                {Platform.OS === 'web' && <Navbar showCta={false} />}
 
                 {loading ? (
                     <View style={styles.centered}>
