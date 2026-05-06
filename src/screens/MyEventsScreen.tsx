@@ -8,6 +8,7 @@ import {
     ActivityIndicator,
     Image,
     Platform,
+    Dimensions,
     RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +19,10 @@ import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
 import { EventListItem } from '../types/events';
+import QRCode from 'react-native-qrcode-svg';
+
+const CONTAINER_MAX_WIDTH = 900;
+const GRID_GAP = 16;
 
 // Gradient Fallbacks
 const GRADIENT_PAIRS = [
@@ -44,6 +49,27 @@ function formatEventDate(isoString: string): string {
     }
 }
 
+function formatCountdown(isoString: string): string | null {
+    try {
+        const now = Date.now();
+        const target = new Date(isoString).getTime();
+        if (isNaN(target)) return null;
+
+        const diffMs = target - now;
+        if (diffMs <= 0) return null;
+
+        const minutes = Math.floor(diffMs / 60_000);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        if (days > 0) return `in ${days} ${days === 1 ? 'Tag' : 'Tagen'}`;
+        if (hours > 0) return `in ${hours} ${hours === 1 ? 'Stunde' : 'Stunden'}`;
+        return `in ${minutes} Min`;
+    } catch {
+        return null;
+    }
+}
+
 /**
  * MyEventsScreen
  *
@@ -54,18 +80,28 @@ function formatEventDate(isoString: string): string {
 export default function MyEventsScreen() {
     const { colors } = useTheme();
     const router = useRouter();
+    const isWeb = Platform.OS === 'web';
 
+    const [dimensions, setDimensions] = useState(Dimensions.get('window'));
     const [upcomingEvents, setUpcomingEvents] = useState<EventListItem[]>([]);
     const [pastEvents, setPastEvents] = useState<EventListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
-    // Collapsed State für alle Sections
-    const [ticketsCollapsed, setTicketsCollapsed] = useState(false);
-    const [hostingCollapsed, setHostingCollapsed] = useState(false);
-    const [pastTicketsCollapsed, setPastTicketsCollapsed] = useState(true);
-    const [pastHostingCollapsed, setPastHostingCollapsed] = useState(true);
+    useEffect(() => {
+        if (!isWeb) return;
+        const subscription = Dimensions.addEventListener('change', ({ window }) => {
+            setDimensions(window);
+        });
+        return () => subscription?.remove();
+    }, [isWeb]);
+
+    const numColumns = dimensions.width >= 768 ? 2 : 1;
+
+    const [organizedCollapsed, setOrganizedCollapsed] = useState(false);
+    const [attendingCollapsed, setAttendingCollapsed] = useState(false);
+    const [pastCollapsed, setPastCollapsed] = useState(true);
 
     const loadEvents = useCallback(async () => {
         setLoading(true);
@@ -103,133 +139,242 @@ export default function MyEventsScreen() {
         void loadEvents();
     }, [loadEvents]);
 
-    const upcomingTickets = upcomingEvents.filter(e => !e.is_host);
-    const pastTickets = pastEvents.filter(e => !e.is_host);
-    const upcomingHosting = upcomingEvents.filter(e => e.is_host);
-    const pastHosting = pastEvents.filter(e => e.is_host);
+    // MOCK: Fake Events zum Testen der UI — entfernen wenn echte Daten da sind
+    const MOCK_EVENTS: (EventListItem & Record<string, any>)[] = [
+        {
+            event_id: 'mock-private-001',
+            title: 'Drink and Drive mit Lukas Auto',
+            starts_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            is_public: false,
+            is_free: true,
+            status: 'published',
+            participant_count: 8,
+            max_capacity: 20,
+            is_host: true,
+            location: { location_id: 'mock', city: 'Stuttgart' },
+            rsvp_accepted: 8,
+            rsvp_declined: 3,
+        },
+        {
+            event_id: 'mock-public-001',
+            title: 'Summer Rooftop Session',
+            starts_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            is_public: true,
+            is_free: false,
+            status: 'published',
+            participant_count: 42,
+            max_capacity: 100,
+            is_host: true,
+            location: { location_id: 'mock', city: 'Berlin' },
+            rsvp_accepted: 42,
+            ticket_revenue_cents: 126000,
+        },
+        {
+            event_id: 'mock-public-002',
+            title: 'Techno Warehouse Rave',
+            starts_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+            is_public: true,
+            is_free: false,
+            status: 'published',
+            participant_count: 200,
+            max_capacity: 200,
+            is_host: true,
+            location: { location_id: 'mock', city: 'Stuttgart' },
+            rsvp_accepted: 200,
+            ticket_revenue_cents: 599800,
+            waitlist_count: 37,
+        },
+    ];
 
-    // Event Card rendern
-    const renderEventCard = (event: EventListItem, index: number, isTicket: boolean) => {
+    // MOCK: Fake Ticket-Event zum Testen der UI — entfernen wenn echte Daten da sind
+    const MOCK_ATTENDING: EventListItem = {
+        event_id: 'mock-attending-001',
+        title: 'Boiler Room Stuttgart',
+        starts_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+        is_public: true,
+        is_free: false,
+        status: 'published',
+        participant_count: 340,
+        is_host: false,
+        category: 'Musik,Techno',
+        location: { location_id: 'mock', city: 'Stuttgart' },
+    };
+
+    const organizedEvents = [...MOCK_EVENTS, ...upcomingEvents.filter(e => e.is_host)];
+    const attendingEvents = [MOCK_ATTENDING, ...upcomingEvents.filter(e => !e.is_host)];
+
+    // TODO: Diese Felder werden vom Backend noch nicht geliefert.
+    // EventListItem muss um folgende Felder erweitert werden:
+    //   Öffentliche Events:
+    //     - rsvp_accepted: number
+    //     - ticket_revenue_cents: number
+    //     - waitlist_count: number  (nur wenn ausverkauft)
+    //   Private Events (Link-basierte Einladung, kein individuelles Tracking):
+    //     - rsvp_accepted: number
+    //     - rsvp_declined: number
+    //     (max_capacity existiert bereits in EventListItem)
+
+    const renderHostCard = (event: EventListItem, index: number) => {
         const gradient = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
+        const isPublic = event.is_public;
 
-        if (isTicket) {
-            // Ticket-Card: Card Body mit QR-Code rechts (kein Titelbild)
-            return (
-                <View
-                    key={event.event_id}
-                    style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
-                >
-                    {/* Card Body mit QR-Code rechts */}
-                    <View style={styles.cardBodyWithQR}>
-                        <TouchableOpacity
-                            style={styles.cardBodyContent}
-                            onPress={() => router.push(`/event/${event.event_id}`)}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2}>
-                                {event.title}
-                            </Text>
+        const accepted = (event as any).rsvp_accepted ?? event.participant_count ?? 0;
+        const declined = (event as any).rsvp_declined ?? 0;
+        const waitlist = (event as any).waitlist_count ?? 0;
+        const revenueCents = (event as any).ticket_revenue_cents ?? 0;
+        const revenueFormatted = (revenueCents / 100).toLocaleString('de-DE', {
+            style: 'currency',
+            currency: 'EUR',
+        });
+        const capacityText = event.max_capacity
+            ? `${accepted}/${event.max_capacity}`
+            : `${accepted}`;
 
-                            <View style={styles.cardMeta}>
-                                <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
-                                    {formatEventDate(event.starts_at)}
-                                </Text>
-                                {event.location?.city && (
-                                    <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
-                                        {event.location.city}
-                                    </Text>
-                                )}
-                            </View>
-
-                            {event.category && (
-                                <View style={styles.chipContainer}>
-                                    {event.category.split(',').slice(0, 2).map((cat, idx) => (
-                                        <View key={idx} style={[styles.chip, { backgroundColor: colors.surfaceContainerHigh }]}>
-                                            <Text style={[styles.chipText, { color: colors.primary }]}>
-                                                {cat.trim()}
-                                            </Text>
-                                        </View>
-                                    ))}
-                                </View>
-                            )}
-                        </TouchableOpacity>
-
-                        {/* QR-Code rechts */}
-                        <TouchableOpacity
-                            style={styles.qrContainerSmall}
-                            onPress={() => router.push(`/ticket/${event.event_id}`)}
-                            activeOpacity={0.85}
-                        >
-                            <View style={[styles.qrGridSmall, { backgroundColor: '#FFFFFF' }]}>
-                                {[...Array(16)].map((_, i) => (
-                                    <View
-                                        key={i}
-                                        style={[
-                                            styles.qrPixelSmall,
-                                            { backgroundColor: i % 3 !== 0 ? '#000000' : 'transparent' }
-                                        ]}
-                                    />
-                                ))}
-                            </View>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Teilnehmer unten rechts */}
-                    <View style={styles.cardBottomRight}>
-                        <Text style={[styles.attendees, { color: colors.onSurfaceVariant }]}>
-                            {event.participant_count} Teilnehmer
-                        </Text>
-                    </View>
-                </View>
-            );
-        }
-
-        // Host-Card: Eine TouchableOpacity für die ganze Card
         return (
             <TouchableOpacity
                 key={event.event_id}
-                style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
+                style={[styles.hostCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
                 onPress={() => router.push(`/event/${event.event_id}/manage`)}
                 activeOpacity={0.85}
             >
-                {/* Image/QR Container */}
-                <View style={styles.imageContainer}>
-                    {/* Titelbild für Host-Events */}
-                    {event.image_url ? (
-                        <Image
-                            source={{ uri: event.image_url }}
-                            style={styles.cardImage}
-                            resizeMode="cover"
-                        />
-                    ) : (
-                        <LinearGradient
-                            colors={gradient as [string, string]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.cardImage}
-                        />
-                    )}
-                    <View style={[styles.hostBadge, { backgroundColor: `${colors.secondary}E6` }]}>
-                        <Text style={[styles.hostBadgeText, { color: colors.onSecondary }]}>Host</Text>
+                <View style={styles.hostCardRow}>
+                    <View style={styles.hostCardThumb}>
+                        {event.image_url ? (
+                            <Image
+                                source={{ uri: event.image_url }}
+                                style={styles.hostCardThumbImage}
+                                resizeMode="cover"
+                            />
+                        ) : (
+                            <LinearGradient
+                                colors={gradient as [string, string]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.hostCardThumbImage}
+                            />
+                        )}
+                    </View>
+
+                    <View style={styles.hostCardBody}>
+                        <Text style={[styles.hostCardTitle, { color: colors.onSurface }]} numberOfLines={2}>
+                            {event.title}
+                        </Text>
+                    </View>
+
+                    <View style={[
+                        styles.hostCardLabel,
+                        { backgroundColor: isPublic ? `${colors.tertiary}18` : `${colors.secondary}18` }
+                    ]}>
+                        <Text style={[
+                            styles.hostCardLabelText,
+                            { color: isPublic ? colors.tertiary : colors.secondary }
+                        ]}>
+                            {isPublic ? 'Öffentlich' : 'Privat'}
+                        </Text>
                     </View>
                 </View>
 
-                {/* Card Body */}
-                <View style={styles.cardBody}>
+                <Text style={[styles.hostCardDate, { color: colors.onSurfaceVariant }]}>
+                    {formatEventDate(event.starts_at)}
+                    {event.location?.city ? ` · ${event.location.city}` : ''}
+                    {formatCountdown(event.starts_at) ? (
+                        <Text style={{ color: colors.primary, fontWeight: '600' }}>
+                            {` · ${formatCountdown(event.starts_at)}`}
+                        </Text>
+                    ) : null}
+                </Text>
+
+                <View style={[styles.hostCardStats, { borderTopColor: colors.outlineVariant }]}>
+                    {isPublic ? (
+                        <>
+                            <View style={styles.hostCardStatItem}>
+                                <Text style={[styles.hostCardStatValue, { color: colors.onSurface }]}>
+                                    {capacityText}
+                                </Text>
+                                <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
+                                    Plätze
+                                </Text>
+                            </View>
+                            {waitlist > 0 && (
+                                <>
+                                    <View style={[styles.hostCardStatDivider, { backgroundColor: colors.outlineVariant }]} />
+                                    <View style={styles.hostCardStatItem}>
+                                        <Text style={[styles.hostCardStatValue, { color: colors.outline }]}>
+                                            {waitlist}
+                                        </Text>
+                                        <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
+                                            Warteliste
+                                        </Text>
+                                    </View>
+                                </>
+                            )}
+                            <View style={[styles.hostCardStatDivider, { backgroundColor: colors.outlineVariant }]} />
+                            <View style={styles.hostCardStatItem}>
+                                <Text style={[styles.hostCardStatValue, { color: colors.primary }]}>
+                                    {revenueFormatted}
+                                </Text>
+                                <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
+                                    Umsatz
+                                </Text>
+                            </View>
+                        </>
+                    ) : (
+                        <>
+                            <View style={styles.hostCardStatItem}>
+                                <Text style={[styles.hostCardStatValue, { color: '#16a34a' }]}>
+                                    {accepted}
+                                </Text>
+                                <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
+                                    Zusagen
+                                </Text>
+                            </View>
+                            <View style={[styles.hostCardStatDivider, { backgroundColor: colors.outlineVariant }]} />
+                            <View style={styles.hostCardStatItem}>
+                                <Text style={[styles.hostCardStatValue, { color: colors.error }]}>
+                                    {declined}
+                                </Text>
+                                <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
+                                    Absagen
+                                </Text>
+                            </View>
+                            <View style={[styles.hostCardStatDivider, { backgroundColor: colors.outlineVariant }]} />
+                            <View style={styles.hostCardStatItem}>
+                                <Text style={[styles.hostCardStatValue, { color: colors.onSurface }]}>
+                                    {event.max_capacity
+                                        ? `${accepted}/${event.max_capacity}`
+                                        : `${accepted}`}
+                                </Text>
+                                <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
+                                    Plätze
+                                </Text>
+                            </View>
+                        </>
+                    )}
+                </View>
+            </TouchableOpacity>
+        );
+    };
+
+    const renderTicketCard = (event: EventListItem) => (
+        <View
+            key={event.event_id}
+            style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
+        >
+            <View style={styles.cardBodyWithQR}>
+                <TouchableOpacity
+                    style={styles.cardBodyContent}
+                    onPress={() => router.push(`/event/${event.event_id}`)}
+                    activeOpacity={0.85}
+                >
                     <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2}>
                         {event.title}
                     </Text>
 
-                    <View style={styles.cardMeta}>
-                        <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
-                            {formatEventDate(event.starts_at)}
-                        </Text>
-                        {event.location?.city && (
-                            <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
-                                {event.location.city}
-                            </Text>
-                        )}
-                    </View>
+                    <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
+                        {formatEventDate(event.starts_at)}
+                        {event.location?.city ? ` · ${event.location.city}` : ''}
+                        {` · ${event.participant_count} Teilnehmer`}
+                    </Text>
 
                     {event.category && (
                         <View style={styles.chipContainer}>
@@ -242,16 +387,26 @@ export default function MyEventsScreen() {
                             ))}
                         </View>
                     )}
-                </View>
+                </TouchableOpacity>
 
-                {/* Teilnehmer unten rechts */}
-                <View style={styles.cardBottomRight}>
-                    <Text style={[styles.attendees, { color: colors.onSurfaceVariant }]}>
-                        {event.participant_count} Teilnehmer
-                    </Text>
-                </View>
-            </TouchableOpacity>
-        );
+                <TouchableOpacity
+                    style={styles.qrContainerSmall}
+                    onPress={() => router.push(`/ticket/${event.event_id}`)}
+                    activeOpacity={0.85}
+                >
+                    <QRCode
+                        value={`happin://ticket/${event.event_id}`}
+                        size={76}
+                        backgroundColor="#FFFFFF"
+                    />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
+    const renderEventCard = (event: EventListItem, index: number) => {
+        if (event.is_host) return renderHostCard(event, index);
+        return renderTicketCard(event);
     };
 
     // Section Header
@@ -286,36 +441,36 @@ export default function MyEventsScreen() {
         </TouchableOpacity>
     );
 
-    // Empty State
-    const renderSectionEmpty = (text: string) => (
-        <View style={[styles.sectionEmpty, { backgroundColor: colors.surfaceContainerLow }]}>
-            <Text style={[styles.sectionEmptyText, { color: colors.onSurfaceVariant }]}>
-                {text}
-            </Text>
-        </View>
-    );
-
     // Section
+    const containerWidth = Math.min(dimensions.width, CONTAINER_MAX_WIDTH);
+    const gridPadding = 24;
+    const availableGridWidth = containerWidth - gridPadding * 2;
+    const cardWidth = numColumns > 1
+        ? (availableGridWidth - GRID_GAP * (numColumns - 1)) / numColumns
+        : undefined;
+
     const renderSection = (
         title: string,
-        count: number,
         events: EventListItem[],
-        emptyText: string,
-        isTicket: boolean = false,
-        isCollapsible: boolean = false,
-        isCollapsed: boolean = false,
-        onToggle?: () => void
+        isCollapsed: boolean,
+        onToggle: () => void
     ) => (
         <View style={styles.section}>
-            {renderSectionHeader(title, count, isCollapsible, isCollapsed, onToggle)}
+            {renderSectionHeader(title, events.length, true, isCollapsed, onToggle)}
             {!isCollapsed && (
-                events.length > 0 ? (
-                    <View style={styles.cardGrid}>
-                        {events.map((event, index) => renderEventCard(event, index, isTicket))}
-                    </View>
-                ) : (
-                    renderSectionEmpty(emptyText)
-                )
+                <View style={[
+                    styles.cardGrid,
+                    numColumns > 1 && styles.cardGridMultiCol,
+                ]}>
+                    {events.map((event, index) => (
+                        <View
+                            key={event.event_id}
+                            style={cardWidth != null ? { width: cardWidth } : undefined}
+                        >
+                            {renderEventCard(event, index)}
+                        </View>
+                    ))}
+                </View>
             )}
         </View>
     );
@@ -363,7 +518,10 @@ export default function MyEventsScreen() {
 
                 <ScrollView
                     style={styles.scroll}
-                    contentContainerStyle={styles.scrollContent}
+                    contentContainerStyle={[
+                        styles.scrollContent,
+                        isWeb && styles.scrollContentWeb,
+                    ]}
                     showsVerticalScrollIndicator={false}
                     refreshControl={
                         <RefreshControl
@@ -373,55 +531,34 @@ export default function MyEventsScreen() {
                         />
                     }
                 >
-                    <View style={styles.header}>
-                        <Text style={[styles.title, { color: colors.onSurface }]}>
-                            Deine Events
-                        </Text>
+                    <View style={[styles.innerContainer, isWeb && { maxWidth: CONTAINER_MAX_WIDTH }]}>
+                        <View style={styles.header}>
+                            <Text style={[styles.title, { color: colors.onSurface }]}>
+                                Deine Events
+                            </Text>
+                        </View>
+
+                        {organizedEvents.length > 0 && renderSection(
+                            'Von dir organisiert',
+                            organizedEvents,
+                            organizedCollapsed,
+                            () => setOrganizedCollapsed(!organizedCollapsed)
+                        )}
+
+                        {attendingEvents.length > 0 && renderSection(
+                            'Deine Events',
+                            attendingEvents,
+                            attendingCollapsed,
+                            () => setAttendingCollapsed(!attendingCollapsed)
+                        )}
+
+                        {pastEvents.length > 0 && renderSection(
+                            'Vergangene Events',
+                            pastEvents,
+                            pastCollapsed,
+                            () => setPastCollapsed(!pastCollapsed)
+                        )}
                     </View>
-
-                    {renderSection(
-                        'Tickets',
-                        upcomingTickets.length,
-                        upcomingTickets,
-                        'Du hast aktuell keine Tickets für Events',
-                        true,
-                        true,
-                        ticketsCollapsed,
-                        () => setTicketsCollapsed(!ticketsCollapsed)
-                    )}
-
-                    {renderSection(
-                        'Von dir organisiert',
-                        upcomingHosting.length,
-                        upcomingHosting,
-                        'Du hostest aktuell keine Events',
-                        false,
-                        true,
-                        hostingCollapsed,
-                        () => setHostingCollapsed(!hostingCollapsed)
-                    )}
-
-                    {renderSection(
-                        'Vergangene Tickets',
-                        pastTickets.length,
-                        pastTickets,
-                        'Du hast noch keine Events besucht',
-                        true,
-                        true,
-                        pastTicketsCollapsed,
-                        () => setPastTicketsCollapsed(!pastTicketsCollapsed)
-                    )}
-
-                    {renderSection(
-                        'Bisher von dir organisiert',
-                        pastHosting.length,
-                        pastHosting,
-                        'Keine vergangenen Events',
-                        false,
-                        true,
-                        pastHostingCollapsed,
-                        () => setPastHostingCollapsed(!pastHostingCollapsed)
-                    )}
                 </ScrollView>
             </View>
         </ScreenWithNav>
@@ -437,6 +574,12 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingBottom: 48,
+    },
+    scrollContentWeb: {
+        alignItems: 'center',
+    },
+    innerContainer: {
+        width: '100%',
     },
     header: {
         marginHorizontal: 24,
@@ -486,80 +629,97 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: '300',
     },
-    sectionEmpty: {
-        marginHorizontal: 24,
-        paddingVertical: 32,
-        paddingHorizontal: 16,
-        borderRadius: 16,
-        alignItems: 'center',
-    },
-    sectionEmptyText: {
-        fontSize: 14,
-        textAlign: 'center',
-        fontStyle: 'italic',
-    },
-
     // Card Grid
     cardGrid: {
         marginHorizontal: 24,
         gap: 16,
     },
+    cardGridMultiCol: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+    },
 
-    // Card (ähnlich EventListScreen)
+    // Host Card (kompakt)
+    hostCard: {
+        borderRadius: 16,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    hostCardRow: {
+        flexDirection: 'row',
+        padding: 12,
+        gap: 12,
+        alignItems: 'center',
+    },
+    hostCardThumb: {
+        width: 56,
+        height: 56,
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    hostCardThumbImage: {
+        width: '100%',
+        height: '100%',
+    },
+    hostCardBody: {
+        flex: 1,
+        gap: 2,
+    },
+    hostCardTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        lineHeight: 22,
+    },
+    hostCardLabel: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        alignSelf: 'flex-start',
+    },
+    hostCardLabelText: {
+        fontSize: 10,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    hostCardDate: {
+        fontSize: 13,
+        fontWeight: '400',
+        paddingHorizontal: 12,
+        paddingBottom: 8,
+    },
+    hostCardStats: {
+        flexDirection: 'row',
+        borderTopWidth: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+    },
+    hostCardStatItem: {
+        flex: 1,
+        alignItems: 'center',
+        gap: 2,
+    },
+    hostCardStatValue: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    hostCardStatLabel: {
+        fontSize: 11,
+        fontWeight: '500',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    hostCardStatDivider: {
+        width: 1,
+        alignSelf: 'stretch',
+        marginVertical: 2,
+    },
+
+    // Ticket Card
     card: {
         borderRadius: 20,
         borderWidth: 1,
         overflow: 'hidden',
-    },
-    imageContainer: {
-        width: '100%',
-        height: 100,
-        position: 'relative',
-    },
-    cardImage: {
-        width: '100%',
-        height: '100%',
-    },
-    qrContainer: {
-        width: '100%',
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 40,
-    },
-    qrGrid: {
-        width: '100%',
-        maxWidth: 120,
-        aspectRatio: 1,
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 3,
-    },
-    qrPixel: {
-        width: '22%',
-        height: '22%',
-        borderRadius: 2,
-    },
-    hostBadge: {
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    hostBadgeText: {
-        fontSize: 12,
-        fontWeight: '700',
-        letterSpacing: 0.5,
-        textTransform: 'uppercase',
-    },
-    cardBody: {
-        padding: 12,
-        gap: 6,
     },
     cardBodyWithQR: {
         flexDirection: 'row',
@@ -577,26 +737,9 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     qrContainerSmall: {
-        width: 100,
-        height: 100,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 8,
+        padding: 4,
         borderRadius: 12,
-    },
-    qrGridSmall: {
-        width: '100%',
-        height: '100%',
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 2,
-        padding: 6,
-        borderRadius: 8,
-    },
-    qrPixelSmall: {
-        width: '20%',
-        height: '20%',
-        borderRadius: 1,
+        backgroundColor: '#FFFFFF',
     },
     cardTitle: {
         fontSize: 18,

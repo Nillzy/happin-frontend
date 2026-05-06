@@ -8,20 +8,20 @@ Dedizierter Screen für Event-Verwaltung mit Unterscheidung zwischen Tickets (Te
 
 ### Collapsible Sections
 
-Vier aufklappbare Bereiche statt Filter-Chips:
+Drei aufklappbare Bereiche, die nur angezeigt werden wenn Events vorhanden sind:
 
-1. **Aktuelle Tickets** (Standard: offen)
-2. **Meine Events (aktiv)** (Standard: offen)
-3. **Vergangene Tickets** (Standard: geschlossen)
-4. **Meine Events (vergangen)** (Standard: geschlossen)
+1. **Von dir organisiert** (Standard: offen) — Events, bei denen der User Host ist
+2. **Deine Events** (Standard: offen) — Events, an denen der User teilnimmt
+3. **Vergangene Events** (Standard: geschlossen) — Alle vergangenen Events (Host + Teilnehmer)
+
+Wenn eine Kategorie leer ist, wird der gesamte Abschnitt ausgeblendet.
 
 ### State Management
 
 ```typescript
-const [ticketsCollapsed, setTicketsCollapsed] = useState(false);
-const [hostingCollapsed, setHostingCollapsed] = useState(false);
-const [pastTicketsCollapsed, setPastTicketsCollapsed] = useState(true);
-const [pastHostingCollapsed, setPastHostingCollapsed] = useState(true);
+const [organizedCollapsed, setOrganizedCollapsed] = useState(false);
+const [attendingCollapsed, setAttendingCollapsed] = useState(false);
+const [pastCollapsed, setPastCollapsed] = useState(true);
 ```
 
 ## Card-Design
@@ -49,26 +49,51 @@ const [pastHostingCollapsed, setPastHostingCollapsed] = useState(true);
 - Location: 12px, Color: outline
 - Card-Höhe: 100px
 
-### Host-Cards (Eigene Events)
+### Host-Cards (Kompakt, "Von dir organisiert")
 
-**Layout**: Titel-Bild + Event-Info
+Kompakte Karten mit kleinem Thumbnail und Fokus auf Kennzahlen.
+Unterscheidung zwischen öffentlichen und privaten Events durch farbiges Label und unterschiedliche Stats.
 
+**Gemeinsames Layout**:
 ```
-┌───────────────────────────────────┐
-│ [Gradient/Bild]                   │
-│ Event-Titel               >       │
-│ 10. Mai 2026 • 19:00             │
-│ 42 Teilnehmer                    │
-└───────────────────────────────────┘
+┌───────────────────────────────────────┐
+│ ┌────┐  Event-Titel     [ÖFFENTLICH] │
+│ │IMG │  12. Mai • 19:00 · Stuttgart  │
+│ └────┘                               │
+├───────────────────────────────────────┤
+│  (Stats je nach Event-Typ, s.u.)     │
+└───────────────────────────────────────┘
 ```
 
-**Navigation**: → `/event/[eventId]/host` (EventHostScreen)
+**Navigation**: → `/event/[eventId]/manage` (EventHostScreen)
+**Thumbnail**: 56x56px, border-radius 12px, Event-Bild oder Gradient-Fallback
+**Label**: Kleiner Chip neben dem Titel
+- Öffentlich: tertiary-Farbe mit 18% Opacity-Background
+- Privat: secondary-Farbe mit 18% Opacity-Background
+- Text: 10px, uppercase, bold
 
-**Badge**: "DEIN EVENT" Badge (links oben, ohne Emoji)
-- Position: `top: 12px, left: 12px`
-- Background: Primary (E6 opacity)
-- Text: 11px, Font-Weight 700, uppercase
-- Keine Icons/Emojis
+#### Öffentliche Events (is_public: true)
+
+Fokus auf **Verkauf und Reichweite**.
+
+**Stats-Row**: 4 Spalten
+| Zusagen (grün) | Absagen (error) | Offen (outline) | Umsatz (primary, EUR) |
+
+#### Private Events (is_public: false)
+
+Fokus auf **Gästemanagement und Planung**. Kein Umsatz.
+
+**Stats-Row**: 4 Spalten
+| Eingeladen (onSurface) | Zusagen (grün) | Absagen (error) | Ausstehend (outline) |
+
+**Datenquellen (TODO)**:
+Die RSVP-Daten und Ticketumsatz werden aktuell noch nicht vom Backend geliefert.
+Benötigte Felder pro Event in `EventListItem`:
+- `rsvp_accepted: number`
+- `rsvp_declined: number`
+- `rsvp_pending: number`
+- `ticket_revenue_cents: number` (nur öffentliche Events)
+- `invited_count: number` (nur private Events)
 
 ## TicketDetailScreen
 
@@ -154,16 +179,15 @@ const panResponder = PanResponder.create({
 
 ```typescript
 // Aktuelle Events
-const upcoming = await api.getUserEvents(token, 'upcoming', 50, 0);
+const upcoming = await api.getUserEvents(token, 'upcoming', 100, 0);
 
 // Vergangene Events
-const past = await api.getUserEvents(token, 'past', 50, 0);
+const past = await api.getUserEvents(token, 'past', 100, 0);
 
-// Client-Side Filtering
-const upcomingTickets = upcoming.events.filter(e => !e.is_host);
-const upcomingHosting = upcoming.events.filter(e => e.is_host);
-const pastTickets = past.events.filter(e => !e.is_host);
-const pastHosting = past.events.filter(e => e.is_host);
+// Client-Side Filtering (3 Kategorien)
+const organizedEvents = upcoming.events.filter(e => e.is_host);
+const attendingEvents = upcoming.events.filter(e => !e.is_host);
+// pastEvents enthält alle vergangenen Events (Host + Teilnehmer)
 ```
 
 ### Pull-to-Refresh

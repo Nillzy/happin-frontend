@@ -347,9 +347,10 @@ export default function AccountScreen() {
             <View style={[s.root, { backgroundColor: colors.background }]}>
                 <Navbar showCta={false} />
                 <ScrollView
-                    contentContainerStyle={s.scroll}
+                    contentContainerStyle={[s.scroll, Platform.OS === 'web' && s.scrollWeb]}
                     showsVerticalScrollIndicator={false}
                 >
+                <View style={[s.innerContainer, Platform.OS === 'web' && { maxWidth: 700 }]}>
                 {/* ── Profilkopf ── */}
                 <View style={[s.profileCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
                     <AvatarPlaceholder
@@ -559,6 +560,7 @@ export default function AccountScreen() {
                 </View>
 
                 <Footer />
+                </View>
             </ScrollView>
         </View>
         </ScreenWithNav>
@@ -576,6 +578,12 @@ const s = StyleSheet.create({
     },
     scroll: {
         paddingBottom: 48,
+    },
+    scrollWeb: {
+        alignItems: 'center',
+    },
+    innerContainer: {
+        width: '100%',
     },
 
     // Profil-Karte
