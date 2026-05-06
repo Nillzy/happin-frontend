@@ -16,7 +16,7 @@ const EVENTS_PER_PAGE = 12;
 1. `loadPage(page)` berechnet den Offset: `offset = page * EVENTS_PER_PAGE`
 2. API-Aufruf mit `limit` und `offset`:
    - Öffentliche Events: `GET /api/v1/events/?limit=12&offset=<n>`
-   - Eigene Events: `GET /api/v1/users/me/events?period=upcoming&limit=12&offset=<n>`
+   - Eigene Events: `GET /api/v1/events/me?period=upcoming&limit=12&offset=<n>`
 3. Die Antwort (`EventListResponse`) liefert `{ events, count }` – `count` ist die Gesamtanzahl aller passenden Events.
 4. `totalPages = Math.ceil(count / EVENTS_PER_PAGE)`
 
