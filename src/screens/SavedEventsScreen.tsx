@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
     FlatList,
+    ScrollView,
     TouchableOpacity,
     StyleSheet,
+    Dimensions,
     Image,
+    Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
@@ -15,6 +18,21 @@ import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { useSavedEvents } from '../contexts/SavedEventsContext';
 import type { EventListItem } from '../types/events';
+
+const isWeb = Platform.OS === 'web';
+
+const CONTAINER_MAX_WIDTH = 2560;
+const GRID_PADDING = 24;
+const GRID_GAP_H = 20;
+const GRID_GAP_V = 16;
+
+function getNumColumns(width: number): number {
+    if (width >= 2560) return 5;
+    if (width >= 1920) return 4;
+    if (width >= 1200) return 3;
+    if (width >= 768) return 2;
+    return 1;
+}
 
 const GRADIENT_PAIRS = [
     ['#b32053', '#6645c7'],
@@ -34,15 +52,24 @@ function formatDateGerman(isoDate: string): string {
     }).format(d);
 }
 
-/**
- * SavedEventsScreen - Gespeicherte Events
- *
- * Zeigt alle Events an, die der User mit dem Herz-Button gespeichert hat.
- */
 export default function SavedEventsScreen() {
     const { colors } = useTheme();
     const router = useRouter();
-    const { savedEvents } = useSavedEvents();
+    const { savedEvents, toggleSaveEvent } = useSavedEvents();
+    const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+
+    useEffect(() => {
+        if (!isWeb) return;
+        const subscription = Dimensions.addEventListener('change', ({ window }) => {
+            setDimensions(window);
+        });
+        return () => subscription?.remove();
+    }, []);
+
+    const numColumns = getNumColumns(dimensions.width);
+    const containerWidth = Math.min(dimensions.width, CONTAINER_MAX_WIDTH);
+    const availableWidth = containerWidth - GRID_PADDING * 2;
+    const cardWidth = (availableWidth - GRID_GAP_H * (numColumns - 1)) / numColumns;
 
     const renderCard = ({ item, index }: { item: EventListItem; index: number }) => {
         const gradient = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
@@ -51,7 +78,7 @@ export default function SavedEventsScreen() {
             <TouchableOpacity
                 activeOpacity={0.85}
                 style={[
-                    styles.card,
+                    isWeb ? styles.cardWeb : styles.card,
                     {
                         backgroundColor: colors.surfaceContainer,
                         borderColor: colors.outlineVariant,
@@ -74,6 +101,16 @@ export default function SavedEventsScreen() {
                             style={styles.cardImage}
                         />
                     )}
+                    <TouchableOpacity
+                        style={styles.likeButton}
+                        onPress={(e) => {
+                            e.stopPropagation?.();
+                            toggleSaveEvent(item);
+                        }}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="heart" size={24} color={colors.primary} />
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.cardBody}>
@@ -129,6 +166,46 @@ export default function SavedEventsScreen() {
         </View>
     );
 
+    const renderWebGrid = () => (
+        <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+        >
+            {savedEvents.length === 0 ? (
+                renderEmpty()
+            ) : (
+                <View style={[styles.gridContainer, { maxWidth: CONTAINER_MAX_WIDTH, alignSelf: 'center', width: '100%' }]}>
+                    {savedEvents.map((item, index) => (
+                        <View
+                            key={String(item.event_id)}
+                            style={[
+                                styles.gridItem,
+                                {
+                                    width: cardWidth,
+                                    marginRight: (index + 1) % numColumns === 0 ? 0 : GRID_GAP_H,
+                                    marginBottom: GRID_GAP_V,
+                                }
+                            ]}
+                        >
+                            {renderCard({ item, index })}
+                        </View>
+                    ))}
+                </View>
+            )}
+        </ScrollView>
+    );
+
+    const renderMobileList = () => (
+        <FlatList
+            data={savedEvents}
+            keyExtractor={(item) => String(item.event_id)}
+            renderItem={renderCard}
+            ListEmptyComponent={renderEmpty}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+        />
+    );
+
     return (
         <ScreenWithNav>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -143,14 +220,7 @@ export default function SavedEventsScreen() {
                     </Text>
                 </View>
 
-                <FlatList
-                    data={savedEvents}
-                    keyExtractor={(item) => String(item.event_id)}
-                    renderItem={renderCard}
-                    ListEmptyComponent={renderEmpty}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                />
+                {isWeb ? renderWebGrid() : renderMobileList()}
             </View>
         </ScreenWithNav>
     );
@@ -174,7 +244,20 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
     },
+    scrollContent: {
+        paddingTop: 8,
+        paddingBottom: 24,
+    },
+    gridContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingHorizontal: GRID_PADDING,
+    },
+    gridItem: {
+        // Width and margins set dynamically
+    },
     listContent: {
+        paddingTop: 8,
         paddingBottom: 24,
     },
     card: {
@@ -184,12 +267,29 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         overflow: 'hidden',
     },
+    cardWeb: {
+        borderRadius: 20,
+        borderWidth: 1,
+        overflow: 'hidden',
+        width: '100%',
+    },
     imageContainer: {
         position: 'relative',
     },
     cardImage: {
         width: '100%',
         height: 180,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+    },
+    likeButton: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     cardBody: {
         padding: 16,
@@ -201,12 +301,12 @@ const styles = StyleSheet.create({
         lineHeight: 24,
     },
     cardMeta: {
+        flexDirection: 'row',
+        gap: 16,
         marginBottom: 12,
-        gap: 4,
     },
     cardMetaText: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 13,
     },
     cardFooter: {
         flexDirection: 'row',

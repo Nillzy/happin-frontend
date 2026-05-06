@@ -18,7 +18,7 @@ import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import DarkLightToggle from '../components/atoms/DarkLightToggle';
-import { PersonIcon, EditIcon, LogoutIcon, TrashIcon, CalendarIcon, TicketIcon, ChevronRightIcon, MailIcon, GpsIcon } from '../components/atoms/icons';
+import { PersonIcon, EditIcon, LogoutIcon, TrashIcon, ChevronRightIcon, MailIcon, GpsIcon } from '../components/atoms/icons';
 import {
     getUserProfile,
     updateDisplayName,
@@ -474,48 +474,6 @@ export default function AccountScreen() {
                     </View>
                 </View>
 
-                {/* ── Events ── */}
-                <View style={s.section}>
-                    <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Events</Text>
-                    <View style={[s.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-                        <ActionRow
-                            icon={<CalendarIcon size={20} color={colors.primary} />}
-                            label="Meine Events verwalten"
-                            onPress={() => router.push('/my-events')}
-                            colors={colors}
-                        />
-                    </View>
-                </View>
-
-                {/* ── Tickets ── */}
-                <View style={s.section}>
-                    <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Meine Tickets</Text>
-                    <View style={[s.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-                        <ActionRow
-                            icon={<TicketIcon size={20} color={colors.secondary} />}
-                            label="Alle Tickets anzeigen"
-                            onPress={async () => {
-                                try {
-                                    const token = await getSession();
-                                    if (!token) { router.replace('/login'); return; }
-                                    const { tickets, total } = await api.getUserTickets(token);
-                                    if (total === 0) {
-                                        Alert.alert('Meine Tickets', 'Du hast noch keine Tickets.');
-                                        return;
-                                    }
-                                    const list = tickets.map(t =>
-                                        `• ${t.event_title} — ${t.ticket_option_name} (${t.status})`
-                                    ).join('\n');
-                                    Alert.alert(`Meine Tickets (${total})`, list);
-                                } catch {
-                                    Alert.alert('Fehler', 'Tickets konnten nicht geladen werden.');
-                                }
-                            }}
-                            colors={colors}
-                        />
-                    </View>
-                </View>
-
                 {/* ── Einstellungen ── */}
                 <View style={s.section}>
                     <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Einstellungen</Text>
@@ -661,6 +619,7 @@ const s = StyleSheet.create({
         paddingVertical: Platform.OS === 'ios' ? 8 : 4,
         fontSize: 15,
         fontWeight: '600',
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
     },
     saveBtn: {
         borderRadius: 10,

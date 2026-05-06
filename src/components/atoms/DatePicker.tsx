@@ -410,14 +410,14 @@ const styles = StyleSheet.create({
     },
     dayCell: {
         width: '14.28%',
-        aspectRatio: 1,
+        height: 34,
         alignItems: 'center',
         justifyContent: 'center',
     },
     dayButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
     },

@@ -487,6 +487,7 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 15,
         fontWeight: '400',
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
     },
     filterButton: {
         padding: 4,

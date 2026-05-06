@@ -22,15 +22,6 @@ Route: `/account` → `app/account.tsx` → `src/screens/AccountScreen.tsx`
 Vier `StatTile`-Kacheln via `GET /api/v1/users/me/stats`:
 - Events besucht, Events erstellt, Tickets, Teilnehmer
 
-### Meine Events
-
-- **Aktuelle & geplante Events** → `/events?period=upcoming&role=organizer`
-- **Vergangene Events** → `/events?period=past&role=organizer`
-
-### Meine Tickets
-
-- **Alle Tickets anzeigen** → `GET /api/v1/users/me/tickets` → `Alert.alert` mit Liste
-
 ### Einstellungen
 
 - **Mein Standort** — Stadtname editierbar in-place mit Autocomplete (`CityAutocomplete`). Zwei Speicherwege:
@@ -83,8 +74,6 @@ const { city, cityLabel, saveCity, loaded } = useUserCity();
 | `LogoutIcon` | Abmelden |
 | `TrashIcon` | Konto löschen |
 | `ChevronRightIcon` | Aktionszeilen-Pfeil |
-| `CalendarIcon` | Meine Events |
-| `TicketIcon` | Meine Tickets |
 | `MailIcon` | E-Mail (deaktiviert) |
 | `GpsIcon` | GPS-Standortermittlung (Happin-Pin mit Herz-Ausschnitt, `colors.primary`) |
 

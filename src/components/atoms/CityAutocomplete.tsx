@@ -150,6 +150,7 @@ const styles = StyleSheet.create({
         paddingVertical: Platform.OS === 'ios' ? 8 : 4,
         fontSize: 15,
         fontWeight: '500',
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
     },
     spinner: {
         position: 'absolute',

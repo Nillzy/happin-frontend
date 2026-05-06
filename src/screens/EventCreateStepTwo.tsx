@@ -486,6 +486,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderRadius: 12,
         marginBottom: 12,
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
     },
     inputNoMargin: {
         marginBottom: 0,
@@ -498,6 +499,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderRadius: 12,
         minHeight: 100,
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
     },
     row: {
         flexDirection: 'row',

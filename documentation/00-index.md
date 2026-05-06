@@ -30,6 +30,7 @@ This is the central index for all project documentation in the `documentation/` 
 | [22-saved-events-like-functionality.md](./22-saved-events-like-functionality.md) | **Saved Events & Like-Funktionalität**: SavedEventsContext (AsyncStorage), Heart-Icon auf Event-Cards, SavedEventsScreen, Navigation von Explore, Persistierung, Performance-Optimierungen. |
 | [23-gradient-selection.md](./23-gradient-selection.md) | **Gradient-Auswahl für Event-Titelbilder**: 4 vordefinierte Gradients, ImageSelectionModal (Bottom Sheet), Integration in EventCreateStepTwo, Backend-Integration (gradient_id), Display-Logik. |
 | [24-event-host-redesign-guest-navigation.md](./24-event-host-redesign-guest-navigation.md) | **Event Host Screen Redesign**: Tab-Navigation entfernt, Gästelisten als separate Seiten (/event/[id]/guests?status=...), EventGuestsScreen, "Zur Gast-Ansicht" Button, Statistik-Cards anklickbar. |
+| [25-web-input-styling.md](./25-web-input-styling.md) | **Web Input Styling**: `outlineStyle: 'none'` auf allen TextInputs — entfernt den blauen Browser-Fokusrahmen, eigener Fokus-State via `borderColor`. |
 | [CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md](./CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md) | Vollständiger Claude-Prompt für Event-Creation UI Redesign & Feature-Implementierung (Phasen 1-3). |
 | [EVENT_CREATION_UX_ANALYSIS.md](./EVENT_CREATION_UX_ANALYSIS.md) | UX-Analyse des bestehenden Event-Creation Flows mit identifizierten Problemen und Verbesserungsvorschlägen. |
 | [EVENT_CREATION_PHASE_1_IMPLEMENTATION.md](./EVENT_CREATION_PHASE_1_IMPLEMENTATION.md) | Phase 1 Implementation (P0): Titelbild-Upload, Location-Validation, Category-Chips mit Multi-Select. |
@@ -40,11 +41,16 @@ This is the central index for all project documentation in the `documentation/` 
 ### UI/UX Updates
 - ✅ **Infinity Scroll** in EventListScreen (keine Pagination mehr)
 - ✅ **Saved Events** System mit Like-Funktionalität (Heart-Icon)
+- ✅ **Saved Events Grid**: Responsives Grid-Layout (1–5 Spalten) identisch zu Explore; Herz-Button (gefüllt) entfernt Event aus Liste
 - ✅ **Gradient-Auswahl** für Event-Titelbilder (4 Vorlagen)
 - ✅ **Dark-Mode-Toggle** von Navbar zu Account-Screen verschoben
 - ✅ **Explore Screen** ohne Überschriften, mit Suchleiste + Filter/Saved Buttons
 - ✅ **Footer entfernt** in Explore & Saved Events
 - ✅ **Kartenansicht** mit Event-Pins, stadtbasierter Zentrierung, Custom Map Styles, City Autocomplete + GPS-Button
+- ✅ **Web Input Outline** entfernt (`outlineStyle: 'none'` auf allen TextInputs)
+- ✅ **DatePicker kompakter**: Tageszellen feste Höhe 34px statt `aspectRatio: 1`
+- ✅ **DatePicker/TimePicker z-index**: Inline-Popover liegt korrekt über nachfolgenden Cards (`zIndex: 100` auf Datum&Uhrzeit-Card, `overflow: visible` auf ScrollView + Card)
+- ✅ **Account-Screen**: Sektionen „Meine Events" und „Meine Tickets" entfernt; GPS-Button als Happin-Pin-SVG (statt Emoji)
 
 ### Event-Management
 - ✅ **MyEventsScreen Redesign**: Collapsible Sections, QR-Code Ticket-Cards, Split-Navigation
@@ -56,7 +62,9 @@ This is the central index for all project documentation in the `documentation/` 
 - ✅ **"Dein Event" Badge**: Jetzt links oben (statt rechts), ohne Emoji
 - ✅ **"Zur Gast-Ansicht" Button**: Im EventHostScreen, navigiert zu normaler Event-Ansicht
 - ✅ **Gästelisten**: Öffnen als separate Seiten (`/event/[id]/guests?status=...`)
+- ✅ **Navbar bereinigt**: Account-Button entfernt (Konto-Tab in Bottom Nav); DarkLightToggle entfernt (im Account-Screen)
 
 ### Backend-Integration
 - ✅ **Infinity Scroll Backend-Fix**: Backend gibt jetzt Total-Count zurück (nicht nur Page-Count)
 - ✅ **Gradient-ID Support**: Backend speichert `gradient_id` (0-3) für Events ohne Bilder
+- ✅ **`person.city` Spalte**: Standortänderungen werden via `PATCH /api/v1/users/me/city` in die `person`-Tabelle geschrieben

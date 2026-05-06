@@ -33,8 +33,11 @@ Wiederverwendbare Datum- und Uhrzeit-Auswahl-Komponenten im shadcn/ui-Stil. Beid
 - Direkteingabe: Fokussieren des Feldes ermöglicht Tastatureingabe im `YYYY-MM-DD` Format
 
 **Web vs. Native:**
-- Web: Absolut positionierter Popover unterhalb des Triggers
-- Native (iOS/Android): Modal-Overlay mit zentriertem Kalender
+- Web (Viewport ≥ 600px): Absolut positionierter Inline-Popover unterhalb des Triggers. Der umgebende `ScrollView` und die Card brauchen `overflow: visible` damit der Popover nicht geclippt wird. Der Datum&Uhrzeit-Card bekommt `zIndex: 100`, der Sichtbarkeits-Card `zIndex: 1`.
+- Alle anderen Fälle: Modal-Overlay mit zentriertem Kalender.
+
+**Kompaktheit:**
+- Tageszellen: feste Höhe 34px (statt `aspectRatio: 1`), Tagesbutton 30×30px — passt einen vollen Monat (6 Wochen) auf den Bildschirm.
 
 ---
 

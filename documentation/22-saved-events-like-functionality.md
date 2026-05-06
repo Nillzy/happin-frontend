@@ -8,7 +8,8 @@ Globales State Management für gespeicherte/gelikte Events mit AsyncStorage-Pers
 
 - **Like/Unlike Events**: Heart-Icon auf Event-Cards (Explore, Saved Events)
 - **Persistente Speicherung**: AsyncStorage für App-Restart-sichere Daten
-- **Saved Events Screen**: Dedizierte Seite für alle gespeicherten Events
+- **Saved Events Screen**: Dedizierte Seite für alle gespeicherten Events — **Responsives Grid-Layout** identisch zu Explore (1–5 Spalten je nach Viewport)
+- **Herz-Button auf Saved-Cards**: Immer gefüllt (aktiv); Klick entfernt Event aus der gespeicherten Liste
 - **Navigation**: Button in Explore-Screen Suchleiste
 
 ## Architektur
@@ -84,10 +85,10 @@ const { toggleSaveEvent, isSaved } = useSavedEvents();
 **Route**: `/saved-events`
 
 **Features**:
-- Liste aller gespeicherten Events
-- Gleiche Card-Darstellung wie Explore
+- **Responsives Grid-Layout** (identisch zu EventListScreen): Web → flexbox grid 1–5 Spalten; Mobile → FlatList
+- Breakpoints: <768px→1, 768–1199px→2, 1200–1919px→3, 1920–2559px→4, ≥2560px→5
+- **Herz-Button** (gefüllt, `colors.primary`) oben rechts auf jeder Card — Klick ruft `toggleSaveEvent(item)` auf und entfernt das Event sofort aus der Liste
 - Empty State: "Keine Events gespeichert" mit Button "Events entdecken"
-- Kein Footer (Impressum entfernt wie in Explore)
 
 ## Design
 

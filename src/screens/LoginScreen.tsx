@@ -477,6 +477,7 @@ const s = StyleSheet.create({
         fontSize: 17,
         fontWeight: '500',
         height: 54,
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
     },
 
     // OTP
@@ -490,6 +491,7 @@ const s = StyleSheet.create({
         width: 1,
         height: 1,
         opacity: 0,
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
     },
     otpCell: {
         width: 46,

@@ -37,24 +37,26 @@ import HappinLogo from '@/src/components/atoms/HappinLogo';
 ```tsx
 import Navbar from '@/src/components/atoms/Navbar';
 
-<Navbar showCta />          // Standard: Logo (links) + Account-Button (rechts) + "App laden"-Button
-<Navbar showBack />         // Back-Variante: "← Zurück" + Account-Button
-<Navbar />                  // Logo + Account-Button, kein CTA
+<Navbar showCta />          // Logo (links) + "App laden"-Button (rechts)
+<Navbar showBack />         // "← Zurück"-Button (links)
+<Navbar />                  // Nur Logo, kein CTA
 ```
 
 **Props:**
 
 | Prop | Default | Beschreibung |
 |------|---------|-------------|
-| `showCta` | `false` | Zeigt „App laden"-Button rechts neben Account-Button |
+| `showCta` | `false` | Zeigt „App laden"-Button rechts |
 | `showBack` | `false` | Ersetzt Logo durch „← Zurück"-Button |
+| `onBackPress` | `router.back()` | Optionaler Custom-Handler für Zurück |
 
 - Hintergrund: `colors.background`
 - Bottom-Border: `rgba(255,255,255,0.06)` (dark) / `rgba(0,0,0,0.06)` (light)
 - iOS: `paddingTop: 54` für Safe-Area-Ausgleich
-- **Links**: Logo oder Back-Button
-- **Rechts**: Account-Button (immer sichtbar)
-- **DarkLightToggle entfernt**: Jetzt im Account-Screen (siehe 14-account-screen.md)
+- **Links**: Logo (klickbar → `/`) oder Back-Button
+- **Rechts**: optionaler CTA „App laden"
+- **Account-Button entfernt**: Konto-Tab in der Bottom Nav übernimmt die Funktion
+- **DarkLightToggle entfernt**: Jetzt im Account-Screen (Einstellungen)
 
 ---
 

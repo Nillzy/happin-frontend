@@ -78,6 +78,7 @@ export default function EventCreateStepOneNew() {
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
+                        style={Platform.OS === 'web' ? { overflow: 'visible' } as any : undefined}
                     >
                         {/* Header */}
                         <View style={styles.header}>
@@ -119,12 +120,12 @@ export default function EventCreateStepOneNew() {
                         </View>
 
                         {/* Datum & Uhrzeit Card */}
-                        <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
+                        <View style={[styles.card, { backgroundColor: colors.surfaceContainer, zIndex: 100 }, Platform.OS === 'web' ? { overflow: 'visible' } as any : null]}>
                             <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>
                                 Datum & Uhrzeit
                             </Text>
-                            <View style={[styles.row, { zIndex: 50 }]}>
-                                <View style={styles.halfField}>
+                            <View style={[styles.row, Platform.OS === 'web' ? { overflow: 'visible' } as any : null]}>
+                                <View style={[styles.halfField, { zIndex: 51 }]}>
                                     <DatePicker
                                         value={date}
                                         onChange={(v) => {
@@ -136,7 +137,7 @@ export default function EventCreateStepOneNew() {
                                         minDate={new Date()}
                                     />
                                 </View>
-                                <View style={styles.halfField}>
+                                <View style={[styles.halfField, { zIndex: 50 }]}>
                                     <TimePicker
                                         value={time}
                                         onChange={(v) => {
@@ -156,7 +157,7 @@ export default function EventCreateStepOneNew() {
                         </View>
 
                         {/* Sichtbarkeit Card */}
-                        <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
+                        <View style={[styles.card, { backgroundColor: colors.surfaceContainer, zIndex: 1 }]}>
                             <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>
                                 Sichtbarkeit
                             </Text>
@@ -243,6 +244,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 0,
         borderBottomWidth: 0,
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } as any : {}),
     },
     row: {
         flexDirection: 'row',
