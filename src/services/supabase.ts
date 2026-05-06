@@ -199,3 +199,25 @@ export async function updateEmail(newEmail: string): Promise<void> {
 export function getSupabaseClient(): SupabaseClient {
     return getSupabase();
 }
+
+export async function uploadEventImage(imageUri: string): Promise<string> {
+    const response = await fetch(imageUri);
+    const blob = await response.blob();
+
+    const ext = imageUri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
+    const finalExt = ext === 'png' ? 'png' : 'jpg';
+    const mimeType = finalExt === 'png' ? 'image/png' : 'image/jpeg';
+    const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${finalExt}`;
+
+    const { error } = await getSupabase().storage
+        .from('event-images')
+        .upload(path, blob, { contentType: mimeType, upsert: true });
+
+    if (error) throw new Error(`Upload failed: ${error.message}`);
+
+    const { data } = getSupabase().storage
+        .from('event-images')
+        .getPublicUrl(path);
+
+    return data.publicUrl;
+}

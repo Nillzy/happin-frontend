@@ -31,6 +31,7 @@ export interface EventListItem {
     is_free: boolean;
     status: string;
     image_url?: string;
+    gradient_id?: number | null;
     location?: EventLocation;
     participant_count: number;
     is_host?: boolean;
@@ -81,6 +82,8 @@ export interface EventCreateRequest {
     is_free?: boolean;
     status?: string;
     location: LocationCreate;
+    image_url?: string;
+    gradient_id?: number | null;
 }
 
 export interface EventUpdateRequest {
@@ -94,4 +97,6 @@ export interface EventUpdateRequest {
     is_free?: boolean;
     status?: string;
     location?: Partial<LocationCreate>;
+    image_url?: string;
+    gradient_id?: number | null;
 }

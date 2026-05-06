@@ -1,8 +1,9 @@
-import React from 'react';
-import { View, TouchableOpacity, Image, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, TouchableOpacity, Image, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
+import { uploadEventImage } from '@/src/services/supabase';
 
 interface ImageGalleryUploaderProps {
     images: string[];
@@ -13,26 +14,29 @@ interface ImageGalleryUploaderProps {
 export default function ImageGalleryUploader({
     images,
     onChange,
-    maxImages = 6
+    maxImages = 10
 }: ImageGalleryUploaderProps) {
     const { colors } = useTheme();
+    const [uploading, setUploading] = useState(false);
 
-    const pickImage = async (source: 'camera' | 'library') => {
+    const pickAndUpload = async (source: 'camera' | 'library') => {
         if (images.length >= maxImages) {
             Alert.alert('Maximum erreicht', `Du kannst maximal ${maxImages} Bilder hinzufügen.`);
             return;
         }
 
-        const { status } = source === 'camera'
-            ? await ImagePicker.requestCameraPermissionsAsync()
-            : await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (Platform.OS !== 'web') {
+            const { status } = source === 'camera'
+                ? await ImagePicker.requestCameraPermissionsAsync()
+                : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-        if (status !== 'granted') {
-            Alert.alert(
-                'Berechtigung erforderlich',
-                `Bitte erlaube Zugriff auf ${source === 'camera' ? 'die Kamera' : 'die Galerie'}.`
-            );
-            return;
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Berechtigung erforderlich',
+                    `Bitte erlaube Zugriff auf ${source === 'camera' ? 'die Kamera' : 'die Galerie'}.`
+                );
+                return;
+            }
         }
 
         const result = source === 'camera'
@@ -50,7 +54,16 @@ export default function ImageGalleryUploader({
             });
 
         if (!result.canceled && result.assets[0]) {
-            onChange([...images, result.assets[0].uri]);
+            try {
+                setUploading(true);
+                const publicUrl = await uploadEventImage(result.assets[0].uri);
+                onChange([...images, publicUrl]);
+            } catch (e) {
+                console.error('Gallery image upload failed:', e);
+                Alert.alert('Upload fehlgeschlagen', 'Bitte versuche es erneut.');
+            } finally {
+                setUploading(false);
+            }
         }
     };
 
@@ -59,8 +72,8 @@ export default function ImageGalleryUploader({
             'Bild hinzufügen',
             'Woher möchtest du das Bild nehmen?',
             [
-                { text: 'Kamera', onPress: () => pickImage('camera') },
-                { text: 'Galerie', onPress: () => pickImage('library') },
+                { text: 'Kamera', onPress: () => pickAndUpload('camera') },
+                { text: 'Galerie', onPress: () => pickAndUpload('library') },
                 { text: 'Abbrechen', style: 'cancel' },
             ]
         );
@@ -97,25 +110,36 @@ export default function ImageGalleryUploader({
                             borderColor: colors.outlineVariant,
                         },
                     ]}
-                    disabled={images.length >= maxImages}
+                    disabled={images.length >= maxImages || uploading}
                 >
-                    <Ionicons
-                        name="add"
-                        size={32}
-                        color={images.length >= maxImages ? colors.outlineVariant : colors.primary}
-                    />
-                    <Text
-                        style={[
-                            styles.addButtonText,
-                            {
-                                color: images.length >= maxImages
-                                    ? colors.onSurfaceVariant
-                                    : colors.primary,
-                            },
-                        ]}
-                    >
-                        Hinzufügen
-                    </Text>
+                    {uploading ? (
+                        <>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                            <Text style={[styles.addButtonText, { color: colors.primary }]}>
+                                Lädt hoch...
+                            </Text>
+                        </>
+                    ) : (
+                        <>
+                            <Ionicons
+                                name="add"
+                                size={32}
+                                color={images.length >= maxImages ? colors.outlineVariant : colors.primary}
+                            />
+                            <Text
+                                style={[
+                                    styles.addButtonText,
+                                    {
+                                        color: images.length >= maxImages
+                                            ? colors.onSurfaceVariant
+                                            : colors.primary,
+                                    },
+                                ]}
+                            >
+                                Hinzufügen
+                            </Text>
+                        </>
+                    )}
                 </TouchableOpacity>
 
                 {/* Image Cards */}

@@ -111,4 +111,9 @@ export const api = {
             '/api/v1/users/me/stats',
             { headers: { Authorization: `Bearer ${token}` } }
         ),
+
+    searchStockImages: (query: string, perPage = 8) =>
+        request<{ url: string; thumbnail: string; photographer: string; unsplash_link: string }[]>(
+            `/api/v1/images/search?q=${encodeURIComponent(query)}&per_page=${perPage}`
+        ),
 };
