@@ -195,6 +195,22 @@ export default function EventListScreen() {
         return () => subscription?.remove();
     }, []);
 
+    // MOCK: Fake Event zum Testen der Card UI — entfernen wenn nicht mehr benötigt
+    const MOCK_TECHNO_EVENT: EventListItem = {
+        event_id: 'mock-techno-001',
+        title: 'Neon Pulse — Techno Lasershow',
+        starts_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+        is_public: true,
+        is_free: false,
+        status: 'published',
+        participant_count: 487,
+        max_capacity: 600,
+        category: 'Techno,Rave',
+        image_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80',
+        location: { location_id: 'mock', city: 'Berlin' },
+    };
+    const displayEvents = [MOCK_TECHNO_EVENT, ...events];
+
     const handleEventPress = (event: EventListItem) => {
         if (event.is_host) {
             router.push(`/event/${event.event_id}/manage`);
@@ -250,7 +266,7 @@ export default function EventListScreen() {
                     >
                         <Ionicons
                             name={isSaved(item.event_id) ? 'heart' : 'heart-outline'}
-                            size={24}
+                            size={20}
                             color={isSaved(item.event_id) ? colors.primary : '#ffffff'}
                         />
                     </TouchableOpacity>
@@ -260,27 +276,36 @@ export default function EventListScreen() {
                     <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2}>
                         {item.title}
                     </Text>
-                    <View style={styles.cardMeta}>
-                        <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
-                            {formatDateGerman(item.starts_at)}
-                        </Text>
-                        {item.location?.city && (
-                            <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
-                                {item.location.city}
-                            </Text>
-                        )}
-                    </View>
+
+                    <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
+                        {formatDateGerman(item.starts_at)}
+                        {item.location?.city ? ` · ${item.location.city}` : ''}
+                        {` · ${item.participant_count} Teilnehmer`}
+                    </Text>
+
                     <View style={styles.cardFooter}>
                         {item.category && (
-                            <View style={[styles.chip, { backgroundColor: colors.surfaceContainerHigh }]}>
-                                <Text style={[styles.chipText, { color: colors.primary }]}>
-                                    {item.category}
-                                </Text>
+                            <View style={styles.chipRow}>
+                                {item.category.split(',').slice(0, 2).map((cat, idx) => (
+                                    <View key={idx} style={[styles.chip, { backgroundColor: colors.surfaceContainerHigh }]}>
+                                        <Text style={[styles.chipText, { color: colors.primary }]}>
+                                            {cat.trim()}
+                                        </Text>
+                                    </View>
+                                ))}
                             </View>
                         )}
-                        <Text style={[styles.attendees, { color: colors.onSurfaceVariant }]}>
-                            {item.participant_count} Teilnehmer
-                        </Text>
+                        <View style={[
+                            styles.priceBadge,
+                            { backgroundColor: item.is_free ? `${'#16a34a'}18` : `${colors.primary}18` }
+                        ]}>
+                            <Text style={[
+                                styles.priceBadgeText,
+                                { color: item.is_free ? '#16a34a' : colors.primary }
+                            ]}>
+                                {item.is_free ? 'Kostenlos' : 'Tickets'}
+                            </Text>
+                        </View>
                     </View>
                 </View>
             </TouchableOpacity>
@@ -331,11 +356,11 @@ export default function EventListScreen() {
                 />
             }
         >
-            {events.length === 0 ? (
+            {displayEvents.length === 0 ? (
                 renderEmpty()
             ) : (
                 <View style={[styles.gridContainer, { maxWidth: CONTAINER_MAX_WIDTH, alignSelf: 'center', width: '100%' }]}>
-                    {events.map((item, index) => (
+                    {displayEvents.map((item, index) => (
                         <View
                             key={String(item.event_id)}
                             style={[
@@ -358,7 +383,7 @@ export default function EventListScreen() {
 
     const renderMobileList = () => (
         <FlatList
-            data={events}
+            data={displayEvents}
             keyExtractor={(item) => String(item.event_id)}
             renderItem={renderCard}
             ListEmptyComponent={renderEmpty}
@@ -404,7 +429,7 @@ export default function EventListScreen() {
                         style={[styles.savedButton, { backgroundColor: colors.surfaceContainerHigh }]}
                         onPress={() => router.push('/saved-events')}
                     >
-                        <Ionicons name="bookmarks-outline" size={22} color={colors.onSurface} />
+                        <Ionicons name="heart-outline" size={22} color={colors.onSurface} />
                     </TouchableOpacity>
                 </View>
 
@@ -505,6 +530,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         paddingHorizontal: GRID_PADDING,
+        alignItems: 'stretch',
     },
     gridItem: {},
     listContent: {
@@ -525,6 +551,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         overflow: 'hidden',
         width: '100%',
+        flex: 1,
     },
     cardImage: {
         width: '100%',
@@ -555,8 +582,10 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 12,
         right: 12,
-        width: 40,
-        height: 40,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(0,0,0,0.35)',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -568,18 +597,21 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         marginBottom: 8,
     },
-    cardMeta: {
-        flexDirection: 'row',
-        gap: 16,
-        marginBottom: 12,
-    },
     cardMetaText: {
         fontSize: 13,
+        marginBottom: 12,
     },
     cardFooter: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 8,
+    },
+    chipRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        flex: 1,
     },
     chip: {
         paddingHorizontal: 10,
@@ -587,11 +619,19 @@ const styles = StyleSheet.create({
         borderRadius: 8,
     },
     chipText: {
-        fontSize: 12,
-        fontWeight: '600',
+        fontSize: 11,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
     },
-    attendees: {
-        fontSize: 12,
+    priceBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    priceBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
     },
     emptyContainer: {
         paddingVertical: 64,

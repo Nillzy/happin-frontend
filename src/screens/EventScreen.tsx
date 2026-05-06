@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,8 @@ import {
     ActivityIndicator,
     Dimensions,
     Platform,
+    Animated,
+    Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
@@ -25,6 +27,14 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.75; // 3:4 aspect ratio
 
 const GRADIENT_FALLBACK = ['#b32053', '#6645c7'];
+
+// Mock-Ticketoptionen als Fallback wenn event.ticket_options leer ist
+const MOCK_TICKET_OPTIONS = [
+    { name: 'Early Bird', price: 15.00, sort_order: 0, quantity_limit: 50 },
+    { name: 'Standard', price: 29.90, sort_order: 1, quantity_limit: 200 },
+    { name: 'VIP', price: 59.00, sort_order: 2, quantity_limit: 30, description: 'Eigener Bereich mit Lounge-Zugang, Willkommensdrink & Priority-Einlass' },
+    { name: 'Gruppenticket (4 Pers.)', price: 99.00, sort_order: 3, quantity_limit: 20 },
+];
 
 function formatDateGerman(isoDate: string): string {
     const d = new Date(isoDate);
@@ -48,7 +58,7 @@ function formatDateGerman(isoDate: string): string {
  * Border Radius: 12-20px (DESIGN.md card_radius)
  */
 export default function EventScreen() {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
     const router = useRouter();
     const params = useLocalSearchParams<{ id?: string; eventId?: string }>();
     const id = params.id || params.eventId; // Support both /event/[id] and /event/[eventId]
@@ -57,9 +67,64 @@ export default function EventScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [selectedTicketIdx, setSelectedTicketIdx] = useState(0);
+    const [ticketCount, setTicketCount] = useState(1);
+    const drawerAnim = useRef(new Animated.Value(0)).current;
+
+    const openDrawer = () => {
+        setDrawerOpen(true);
+        Animated.spring(drawerAnim, { toValue: 1, useNativeDriver: true, tension: 65, friction: 11 }).start();
+    };
+    const closeDrawer = () => {
+        Animated.timing(drawerAnim, { toValue: 0, useNativeDriver: true, duration: 250 }).start(() => {
+            setDrawerOpen(false);
+            setTicketCount(1);
+        });
+    };
+
     useEffect(() => {
         loadEvent();
     }, [id]);
+
+    // MOCK: Fake Event-Detail für die Techno-Party — entfernen wenn nicht mehr benötigt
+    const MOCK_TECHNO_DETAIL: EventDetailResponse = {
+        event_id: 'mock-techno-001',
+        title: 'Neon Pulse — Techno Lasershow',
+        starts_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+        ends_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000 + 6 * 60 * 60 * 1000).toISOString(),
+        is_public: true,
+        is_free: false,
+        status: 'published',
+        participant_count: 487,
+        max_capacity: 600,
+        category: 'Techno,Rave,Electronic',
+        image_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=80',
+        description: 'Tauche ein in eine Nacht voller pulsierender Beats und atemberaubender Lasereffekte. '
+            + 'Neon Pulse bringt drei internationale DJs auf die Bühne eines umgebauten Industrielagers in Berlin-Kreuzberg. '
+            + 'Erwartet euch ein 360°-Lasersystem, Nebel-Maschinen und ein Soundsystem, das keine Wünsche offen lässt.\n\n'
+            + 'Line-Up:\n• Amelie Lens\n• I Hate Models\n• VTSS\n\n'
+            + 'Doors open: 23:00\nLast Entry: 03:00\nEnde: 07:00',
+        host_name: 'Neon Collective',
+        location: {
+            location_id: 'mock',
+            city: 'Berlin',
+            street: 'Revaler Str.',
+            house_number: '99',
+            postal_code: '10245',
+            country: 'Deutschland',
+        },
+        media_urls: [
+            'https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?w=800&q=80',
+            'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=80',
+            'https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?w=800&q=80',
+        ],
+        ticket_options: [
+            { name: 'Early Bird', price: 25, sort_order: 0, quantity_limit: 100 },
+            { name: 'Regular', price: 35, sort_order: 1, quantity_limit: 400 },
+            { name: 'VIP Lounge', price: 75, sort_order: 2, quantity_limit: 50, description: 'Eigener Bereich mit Lounge-Zugang, Willkommensdrink & Priority-Einlass' },
+        ] as any,
+    };
 
     const loadEvent = async () => {
         try {
@@ -70,13 +135,13 @@ export default function EventScreen() {
                 throw new Error('Event-ID fehlt');
             }
 
-            console.log('[EventScreen] Loading event with ID:', id);
+            if (id === 'mock-techno-001') {
+                setEvent(MOCK_TECHNO_DETAIL);
+                return;
+            }
+
             const token = await getSession();
-            console.log('[EventScreen] Token available:', !!token);
             const data = await api.getEventById(id, token || undefined);
-            console.log('[EventScreen] Event loaded:', data.title);
-            console.log('[EventScreen] Category:', data.category);
-            console.log('[EventScreen] Media URLs:', data.media_urls);
             setEvent(data);
         } catch (e) {
             console.error('[EventScreen] Load error:', e);
@@ -133,9 +198,44 @@ export default function EventScreen() {
     console.log('[EventScreen] Parsed categories:', categories);
     console.log('[EventScreen] Media URLs count:', event.media_urls?.length || 0);
 
+    const isWeb = Platform.OS === 'web';
+    const glassCard = [
+        styles.glassCard,
+        isWeb
+            ? { backgroundColor: isDark ? 'rgba(18,19,26,0.55)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
+            : { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)' },
+    ];
+    const glassActionBtn = [
+        styles.actionButton,
+        {
+            borderWidth: 1,
+            borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+        },
+        isWeb
+            ? { backgroundColor: isDark ? 'rgba(30,31,38,0.6)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any
+            : { backgroundColor: isDark ? 'rgba(30,31,38,0.85)' : 'rgba(255,255,255,0.85)' },
+    ];
+
     return (
         <ScreenWithNav showBottomNav={false}>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
+                {/* Blurred background image */}
+                {event.image_url ? (
+                    <Image
+                        source={{ uri: event.image_url }}
+                        style={[styles.bgImage, isWeb ? { filter: 'blur(60px) saturate(1.8) brightness(0.7)' } as any : {}]}
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <LinearGradient
+                        colors={GRADIENT_FALLBACK as [string, string]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.bgImage}
+                    />
+                )}
+                <View style={[styles.bgOverlay, { backgroundColor: isDark ? 'rgba(12,13,20,0.35)' : 'rgba(248,249,250,0.25)' }]} />
+
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {/* Hero Image with Title Overlay */}
                     <View style={styles.heroContainer}>
@@ -156,7 +256,10 @@ export default function EventScreen() {
 
                         {/* Back Button */}
                         <TouchableOpacity
-                            style={[styles.backButton, { backgroundColor: colors.surfaceContainerHigh }]}
+                            style={[styles.backButton, isWeb
+                                ? { backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' } as any
+                                : { backgroundColor: colors.surfaceContainerHigh }
+                            ]}
                             onPress={() => {
                                 if (router.canGoBack()) {
                                     router.back();
@@ -165,10 +268,10 @@ export default function EventScreen() {
                                 }
                             }}
                         >
-                            <Ionicons name="arrow-back" size={24} color={colors.onSurface} />
+                            <Ionicons name="arrow-back" size={24} color="#ffffff" />
                         </TouchableOpacity>
 
-                        {/* Title Overlay (Luma-style) */}
+                        {/* Title Overlay */}
                         <View style={styles.titleOverlay}>
                             <LinearGradient
                                 colors={['transparent', 'rgba(0,0,0,0.85)']}
@@ -182,8 +285,8 @@ export default function EventScreen() {
 
                     {/* Content Container */}
                     <View style={styles.content}>
-                        {/* Host Card (Luma-style "invited you") */}
-                        <View style={[styles.hostCard, { backgroundColor: colors.surfaceContainer }]}>
+                        {/* Host Card */}
+                        <View style={[...glassCard, styles.hostCard]}>
                             <View style={styles.hostInfo}>
                                 <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
                                     <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>
@@ -204,41 +307,23 @@ export default function EventScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Action Buttons Row (Luma-style) */}
+                        {/* Action Buttons Row */}
                         <View style={styles.actionButtons}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.actionButton,
-                                    {
-                                        backgroundColor: colors.surfaceContainerLowest,
-                                        borderColor: colors.outline,
-                                        borderWidth: 1,
-                                    },
-                                ]}
-                                onPress={handleRegister}
-                            >
-                                <Ionicons name="calendar" size={20} color={colors.onSurface} />
+                            <TouchableOpacity style={glassActionBtn} onPress={handleRegister}>
+                                <Ionicons name="calendar" size={24} color={colors.onSurface} />
                                 <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Register</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.actionButton, { backgroundColor: colors.surfaceContainer }]}
-                                onPress={handleContact}
-                            >
-                                <Ionicons name="mail-outline" size={20} color={colors.onSurfaceVariant} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurfaceVariant }]}>Contact</Text>
+                            <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
+                                <Ionicons name="mail-outline" size={24} color={colors.onSurface} />
+                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Contact</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.actionButton, { backgroundColor: colors.surfaceContainer }]}
-                                onPress={handleShare}
-                            >
-                                <Ionicons name="share-outline" size={20} color={colors.onSurfaceVariant} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurfaceVariant }]}>Share</Text>
+                            <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
+                                <Ionicons name="share-outline" size={24} color={colors.onSurface} />
+                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Share</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.actionButton, { backgroundColor: colors.surfaceContainer }]}
-                            >
-                                <Ionicons name="ellipsis-horizontal" size={20} color={colors.onSurfaceVariant} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurfaceVariant }]}>More</Text>
+                            <TouchableOpacity style={glassActionBtn}>
+                                <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurface} />
+                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>More</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -251,7 +336,7 @@ export default function EventScreen() {
 
                         {/* About Event Section */}
                         {event.description && (
-                            <View style={styles.section}>
+                            <View style={[...glassCard, styles.section, { padding: 20 }]}>
                                 <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>About Event</Text>
                                 <Text style={[styles.description, { color: colors.onSurface }]}>
                                     {event.description}
@@ -263,7 +348,7 @@ export default function EventScreen() {
                         {event.location && (
                             <View style={styles.section}>
                                 <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Location</Text>
-                                <View style={[styles.locationCard, { backgroundColor: colors.surfaceContainer }]}>
+                                <View style={[...glassCard, styles.locationCard]}>
                                     <View style={styles.locationHeader}>
                                         <View style={styles.locationTextContainer}>
                                             <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
@@ -282,8 +367,7 @@ export default function EventScreen() {
                                             <Text style={[styles.weatherText, { color: colors.onSurfaceVariant }]}>18°C</Text>
                                         </View>
                                     </View>
-                                    {/* Map Placeholder */}
-                                    <View style={[styles.mapPlaceholder, { backgroundColor: colors.surfaceContainerHigh }]}>
+                                    <View style={[styles.mapPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
                                         <Ionicons name="map-outline" size={48} color={colors.onSurfaceVariant} />
                                         <Text style={[styles.mapPlaceholderText, { color: colors.onSurfaceVariant }]}>
                                             Kartenansicht
@@ -320,21 +404,214 @@ export default function EventScreen() {
                             </View>
                         </View>
 
-                        {/* Accept Invite CTA Button (Luma-style) */}
-                        <TouchableOpacity
-                            style={[styles.primaryButton, { backgroundColor: colors.primary }]}
-                            onPress={handleRegister}
-                        >
-                            <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>
-                                Accept Invite
-                            </Text>
-                        </TouchableOpacity>
-
-                        {/* Bottom Spacing */}
-                        <View style={{ height: 48 }} />
+                        <View style={{ height: 100 }} />
                     </View>
                 </ScrollView>
             </View>
+
+            {/* Sticky Bottom Bar */}
+            {(() => {
+                const tickets = event.ticket_options?.length ? event.ticket_options : MOCK_TICKET_OPTIONS;
+                const cheapest = Math.min(...tickets.map(t => t.price));
+                return (
+                    <View style={[
+                        styles.stickyBar,
+                        { borderTopColor: colors.outlineVariant },
+                        isWeb
+                            ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
+                            : { backgroundColor: colors.surface },
+                    ]}>
+                        <View style={styles.stickyBarInfo}>
+                            <Text style={[styles.stickyBarPrice, { color: colors.onSurface }]}>
+                                {cheapest === 0 ? 'Kostenlos' : `ab ${cheapest.toFixed(2)} €`}
+                            </Text>
+                            <Text style={[styles.stickyBarHint, { color: colors.onSurfaceVariant }]}>
+                                {tickets.length} Ticketoptionen
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.stickyBarButton, { backgroundColor: colors.primary }]}
+                            onPress={openDrawer}
+                        >
+                            <Text style={[styles.stickyBarButtonText, { color: colors.onPrimary }]}>
+                                Tickets wählen
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                );
+            })()}
+
+            {/* Ticket-Drawer Bottom Sheet */}
+            {drawerOpen && event && (() => {
+                const tickets = event.ticket_options?.length
+                    ? event.ticket_options
+                    : MOCK_TICKET_OPTIONS;
+                const selected = tickets[selectedTicketIdx];
+                const total = (selected?.price ?? 0) * ticketCount;
+
+                const drawerTranslateY = drawerAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [600, 0],
+                });
+
+                return (
+                    <>
+                        {/* Backdrop */}
+                        <Pressable
+                            style={StyleSheet.absoluteFill}
+                            onPress={closeDrawer}
+                        >
+                            <Animated.View style={[
+                                StyleSheet.absoluteFill,
+                                { backgroundColor: 'rgba(0,0,0,0.5)', opacity: drawerAnim },
+                            ]} />
+                        </Pressable>
+
+                        {/* Drawer */}
+                        <Animated.View style={[
+                            styles.drawer,
+                            {
+                                backgroundColor: colors.surface,
+                                transform: [{ translateY: drawerTranslateY }],
+                            },
+                            isWeb
+                                ? { backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', backgroundColor: isDark ? 'rgba(24,25,32,0.92)' : 'rgba(255,255,255,0.92)' } as any
+                                : {},
+                        ]}>
+                            {/* Drag Handle */}
+                            <View style={styles.drawerHandle}>
+                                <View style={[styles.drawerHandleBar, { backgroundColor: colors.outlineVariant }]} />
+                            </View>
+
+                            {/* Header */}
+                            <View style={styles.drawerHeader}>
+                                <Text style={[styles.drawerTitle, { color: colors.onSurface }]}>
+                                    Tickets wählen
+                                </Text>
+                                <TouchableOpacity onPress={closeDrawer} hitSlop={12}>
+                                    <Ionicons name="close" size={24} color={colors.onSurfaceVariant} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Ticket Options */}
+                            <ScrollView style={styles.ticketList} showsVerticalScrollIndicator={false}>
+                                {tickets.map((ticket, idx) => {
+                                    const isSelected = idx === selectedTicketIdx;
+                                    const isSoldOut = ticket.quantity_limit === 0;
+                                    return (
+                                        <TouchableOpacity
+                                            key={idx}
+                                            activeOpacity={isSoldOut ? 1 : 0.7}
+                                            onPress={() => !isSoldOut && setSelectedTicketIdx(idx)}
+                                            style={[
+                                                styles.ticketOption,
+                                                {
+                                                    borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                                                    borderWidth: isSelected ? 2 : 1,
+                                                    backgroundColor: isSoldOut
+                                                        ? (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)')
+                                                        : isSelected
+                                                            ? (isDark ? 'rgba(187,134,252,0.08)' : 'rgba(103,80,164,0.06)')
+                                                            : 'transparent',
+                                                    opacity: isSoldOut ? 0.5 : 1,
+                                                },
+                                            ]}
+                                        >
+                                            {/* Radio Circle */}
+                                            <View style={[
+                                                styles.ticketRadio,
+                                                {
+                                                    borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                                                    borderWidth: isSelected ? 2 : 1.5,
+                                                },
+                                            ]}>
+                                                {isSelected && (
+                                                    <View style={[styles.ticketRadioDot, { backgroundColor: colors.primary }]} />
+                                                )}
+                                            </View>
+
+                                            {/* Ticket Info */}
+                                            <View style={styles.ticketInfo}>
+                                                <Text style={[styles.ticketName, { color: isSoldOut ? colors.onSurfaceVariant : colors.onSurface }]}>
+                                                    {ticket.name}
+                                                </Text>
+                                                {(ticket as any).description && (
+                                                    <Text
+                                                        style={[styles.ticketDescription, { color: colors.onSurfaceVariant }]}
+                                                        numberOfLines={isSelected ? undefined : 1}
+                                                    >
+                                                        {(ticket as any).description}
+                                                    </Text>
+                                                )}
+                                                {isSoldOut ? (
+                                                    <Text style={[styles.ticketMeta, { color: colors.error }]}>Ausverkauft</Text>
+                                                ) : (
+                                                    ticket.quantity_limit != null && (
+                                                        <Text style={[styles.ticketMeta, { color: colors.onSurfaceVariant }]}>
+                                                            {ticket.quantity_limit} verfügbar
+                                                        </Text>
+                                                    )
+                                                )}
+                                            </View>
+
+                                            {/* Price */}
+                                            <Text style={[styles.ticketPrice, { color: isSoldOut ? colors.onSurfaceVariant : colors.onSurface }]}>
+                                                {ticket.price === 0 ? 'Kostenlos' : `${ticket.price.toFixed(2)} €`}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+
+                            {/* Quantity Selector */}
+                            <View style={[styles.quantityRow, { borderTopColor: colors.outlineVariant }]}>
+                                <Text style={[styles.quantityLabel, { color: colors.onSurface }]}>Anzahl</Text>
+                                <View style={styles.quantityStepper}>
+                                    <TouchableOpacity
+                                        style={[styles.stepperBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                                        onPress={() => setTicketCount(c => Math.max(1, c - 1))}
+                                    >
+                                        <Ionicons name="remove" size={20} color={colors.onSurface} />
+                                    </TouchableOpacity>
+                                    <Text style={[styles.quantityValue, { color: colors.onSurface }]}>{ticketCount}</Text>
+                                    <TouchableOpacity
+                                        style={[styles.stepperBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                                        onPress={() => setTicketCount(c => Math.min(10, c + 1))}
+                                    >
+                                        <Ionicons name="add" size={20} color={colors.onSurface} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Summary + Checkout Button */}
+                            <View style={styles.checkoutSection}>
+                                <View style={styles.checkoutSummary}>
+                                    <Text style={[styles.checkoutTotal, { color: colors.onSurfaceVariant }]}>
+                                        {ticketCount}× {selected?.name}
+                                    </Text>
+                                    <Text style={[styles.checkoutPrice, { color: colors.onSurface }]}>
+                                        {total === 0 ? 'Kostenlos' : `${total.toFixed(2)} €`}
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={[styles.checkoutButton, { backgroundColor: colors.primary }]}
+                                    onPress={() => {
+                                        // TODO: Checkout-Logik implementieren
+                                        console.log('Checkout:', { ticket: selected?.name, count: ticketCount, total });
+                                        closeDrawer();
+                                    }}
+                                >
+                                    <Ionicons name="cart-outline" size={20} color={colors.onPrimary} style={{ marginRight: 8 }} />
+                                    <Text style={[styles.checkoutButtonText, { color: colors.onPrimary }]}>
+                                        {total === 0 ? 'Kostenlos buchen' : 'Zur Kasse'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </Animated.View>
+                    </>
+                );
+            })()}
+
         </ScreenWithNav>
     );
 }
@@ -342,6 +619,28 @@ export default function EventScreen() {
 const styles = StyleSheet.create({
     root: {
         flex: 1,
+    },
+    bgImage: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100%',
+        height: '100%',
+    },
+    bgOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    glassCard: {
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+        overflow: 'hidden',
     },
     loadingContainer: {
         flex: 1,
@@ -425,13 +724,11 @@ const styles = StyleSheet.create({
         paddingTop: 24,
     },
 
-    // Host Card (Luma-style)
     hostCard: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: 16,
-        borderRadius: 16,
         marginBottom: 16,
     },
     hostInfo: {
@@ -505,10 +802,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    // Location Card
     locationCard: {
-        borderRadius: 16, // card_radius_large from DESIGN.md
-        overflow: 'hidden',
         padding: 16,
     },
     locationHeader: {
@@ -566,22 +860,183 @@ const styles = StyleSheet.create({
         lineHeight: 24,
     },
 
-    // Primary CTA Button
-    primaryButton: {
-        paddingVertical: 16,
-        borderRadius: 12,
+    // Sticky Bottom Bar
+    stickyBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: Platform.OS === 'ios' ? 32 : 12,
+        borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    stickyBarInfo: {
+        flex: 1,
+        marginRight: 16,
+    },
+    stickyBarPrice: {
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    stickyBarHint: {
+        fontSize: 13,
+        marginTop: 2,
+    },
+    stickyBarButton: {
+        paddingHorizontal: 28,
+        paddingVertical: 18,
+        borderRadius: 14,
+        minHeight: 56,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 16,
-        minHeight: 56,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
     },
-    primaryButtonText: {
+    stickyBarButtonText: {
         fontSize: 16,
+        fontWeight: '700',
+    },
+
+    // Ticket Drawer (Bottom Sheet)
+    drawer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        maxHeight: '85%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 16,
+        elevation: 24,
+    },
+    drawerHandle: {
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    drawerHandleBar: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+    },
+    drawerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingBottom: 16,
+    },
+    drawerTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+    },
+    ticketList: {
+        paddingHorizontal: 24,
+        maxHeight: 280,
+    },
+    ticketOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 10,
+    },
+    ticketRadio: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 14,
+    },
+    ticketRadioDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+    },
+    ticketInfo: {
+        flex: 1,
+    },
+    ticketName: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    ticketDescription: {
+        fontSize: 13,
+        lineHeight: 18,
+        marginTop: 3,
+    },
+    ticketMeta: {
+        fontSize: 13,
+        marginTop: 2,
+    },
+    ticketPrice: {
+        fontSize: 16,
+        fontWeight: '700',
+        marginLeft: 12,
+    },
+    quantityRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 24,
+        paddingVertical: 16,
+        borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    quantityLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    quantityStepper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+    },
+    stepperBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    quantityValue: {
+        fontSize: 18,
+        fontWeight: '700',
+        minWidth: 24,
+        textAlign: 'center',
+    },
+    checkoutSection: {
+        paddingHorizontal: 24,
+        paddingTop: 8,
+    },
+    checkoutSummary: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    checkoutTotal: {
+        fontSize: 14,
+    },
+    checkoutPrice: {
+        fontSize: 20,
+        fontWeight: '800',
+    },
+    checkoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: 14,
+        minHeight: 56,
+    },
+    checkoutButtonText: {
+        fontSize: 17,
         fontWeight: '700',
     },
 });
