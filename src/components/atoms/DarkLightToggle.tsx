@@ -80,11 +80,11 @@ export default function DarkLightToggle() {
         </Animated.View>
 
         <Animated.View style={[styles.iconRight, moonOpacity]}>
-          <MoonIcon color="#cdbdff" />
+          <MoonIcon color="#E0A8F8" />
         </Animated.View>
 
         <Animated.View style={[styles.thumb, thumbStyle]}>
-          {isDark ? <MoonIcon color="#6645c7" /> : <SunIcon color="#b32053" />}
+          {isDark ? <MoonIcon color="#8B3DC8" /> : <SunIcon color="#D4006B" />}
         </Animated.View>
       </Animated.View>
     </Pressable>

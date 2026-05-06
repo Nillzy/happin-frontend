@@ -2,6 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import HappinLogo from './HappinLogo';
+import DarkLightToggle from './DarkLightToggle';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -10,6 +11,8 @@ interface NavbarProps {
     showBack?: boolean;
     onBackPress?: () => void;
     showNavItems?: boolean;
+    /** Wenn true: immer rendern (auch auf Mobile/schmalem Viewport), nur Logo + CTA + Toggle */
+    landingPage?: boolean;
 }
 
 interface NavTab {
@@ -27,14 +30,14 @@ const NAV_TABS: NavTab[] = [
     { name: 'account', route: '/account', icon: 'person-outline', activeIcon: 'person', label: 'Konto' },
 ];
 
-export default function Navbar({ showCta = true, showBack = false, onBackPress, showNavItems = true }: NavbarProps) {
+export default function Navbar({ showCta = true, showBack = false, onBackPress, showNavItems = true, landingPage = false }: NavbarProps) {
     const { colors, isDark } = useTheme();
     const router = useRouter();
     const pathname = usePathname();
     const { width } = useWindowDimensions();
     const isDesktop = Platform.OS === 'web' && width >= 768;
 
-    if (Platform.OS !== 'web' || width < 768) return null;
+    if (!landingPage && (Platform.OS !== 'web' || width < 768)) return null;
 
     const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
 
@@ -64,7 +67,7 @@ export default function Navbar({ showCta = true, showBack = false, onBackPress, 
             )}
 
             <View style={styles.right}>
-                {isDesktop && !showBack && showNavItems ? (
+                {!landingPage && isDesktop && !showBack && showNavItems ? (
                     <>
                         {NAV_TABS.map((tab) => {
                             const isActive = activeTab?.name === tab.name;
@@ -96,7 +99,7 @@ export default function Navbar({ showCta = true, showBack = false, onBackPress, 
                         </TouchableOpacity>
                     </>
                 ) : (
-                    showCta && !showBack && (
+                    showCta && !showBack && Platform.OS === 'web' && width < 768 && (
                         <TouchableOpacity
                             style={[styles.cta, { borderColor: colors.primary }]}
                             activeOpacity={0.8}
@@ -105,6 +108,7 @@ export default function Navbar({ showCta = true, showBack = false, onBackPress, 
                         </TouchableOpacity>
                     )
                 )}
+                {landingPage && <DarkLightToggle />}
             </View>
         </View>
     );
@@ -117,8 +121,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 24,
         paddingVertical: 0,
-        paddingTop: Platform.OS === 'ios' ? 54 : 0,
-        height: Platform.OS === 'ios' ? 54 + 52 : 52,
+        paddingTop: Platform.OS === 'ios' ? 44 : Platform.OS === 'android' ? 16 : 0,
+        height: Platform.OS === 'ios' ? 44 + 52 : Platform.OS === 'android' ? 16 + 52 : 52,
         borderBottomWidth: 1,
     },
     backBtn: {
@@ -131,7 +135,7 @@ const styles = StyleSheet.create({
     right: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 12,
     },
     navItem: {
         flexDirection: 'row',

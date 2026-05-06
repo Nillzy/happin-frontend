@@ -4,7 +4,6 @@ import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import HappinLogo from './HappinLogo';
 
 /**
  * BottomNavBar - Mobile Bottom Navigation
@@ -126,13 +125,6 @@ export default function BottomNavBar() {
                 if (isCreateButton) {
                     return (
                         <View key={tab.name} style={styles.createButtonWrapper}>
-                            {/* Äußerer Kreis (Hintergrund) */}
-                            <View
-                                style={[
-                                    styles.createButtonOuter,
-                                    { backgroundColor: colors.surfaceContainerLowest },
-                                ]}
-                            />
                             {/* Innerer Button */}
                             <TouchableOpacity
                                 style={[
@@ -151,9 +143,6 @@ export default function BottomNavBar() {
                                     color={colors.onPrimary}
                                 />
                             </TouchableOpacity>
-                            <View style={styles.logoWrapper}>
-                                <HappinLogo size="sm" />
-                            </View>
                         </View>
                     );
                 }
@@ -218,13 +207,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         position: 'relative',
     },
-    createButtonOuter: {
-        position: 'absolute',
-        width: 68,
-        height: 68,
-        borderRadius: 34,
-        top: -34,
-    },
     createButton: {
         width: 56,
         height: 56,
@@ -250,10 +232,5 @@ const styles = StyleSheet.create({
         fontSize: 11,
         letterSpacing: 0.2,
         marginTop: 2,
-    },
-    logoWrapper: {
-        marginTop: 4,
-        opacity: 0.8,
-        transform: [{ scale: 0.7 }],
     },
 });

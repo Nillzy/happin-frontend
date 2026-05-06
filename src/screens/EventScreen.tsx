@@ -28,7 +28,7 @@ import type { EventDetailResponse, RsvpStatus } from '../types/events';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.75; // 3:4 aspect ratio
 
-const GRADIENT_FALLBACK = ['#b32053', '#6645c7'];
+const GRADIENT_FALLBACK = ['#D4006B', '#8B3DC8'];
 
 // Mock-Ticketoptionen als Fallback wenn event.ticket_options leer ist
 const MOCK_TICKET_OPTIONS = [
