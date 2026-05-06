@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Image,
+    Platform,
     RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -323,7 +324,7 @@ export default function MyEventsScreen() {
         return (
             <ScreenWithNav>
                 <View style={[styles.container, { backgroundColor: colors.background }]}>
-                    <Navbar showCta={false} />
+                    {Platform.OS === 'web' && <Navbar showCta={false} />}
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={colors.primary} />
                     </View>
@@ -336,7 +337,7 @@ export default function MyEventsScreen() {
         return (
             <ScreenWithNav>
                 <View style={[styles.container, { backgroundColor: colors.background }]}>
-                    <Navbar showCta={false} />
+                    {Platform.OS === 'web' && <Navbar showCta={false} />}
                     <View style={styles.errorContainer}>
                         <Text style={[styles.errorText, { color: colors.error }]}>
                             ⚠️ {error}
@@ -390,7 +391,7 @@ export default function MyEventsScreen() {
                     )}
 
                     {renderSection(
-                        'Events als Host',
+                        'Von dir organisiert',
                         upcomingHosting.length,
                         upcomingHosting,
                         'Du hostest aktuell keine Events',
@@ -412,7 +413,7 @@ export default function MyEventsScreen() {
                     )}
 
                     {renderSection(
-                        'Vergangene Events als Host',
+                        'Bisher von dir organisiert',
                         pastHosting.length,
                         pastHosting,
                         'Keine vergangenen Events',

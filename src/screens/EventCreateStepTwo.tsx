@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -140,6 +141,12 @@ export default function EventCreateStepTwo() {
         <ScreenWithNav>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 <Navbar showCta={false} showBack onBackPress={handleBack} />
+                {Platform.OS !== 'web' && (
+                    <TouchableOpacity onPress={handleBack} style={styles.mobileBack} activeOpacity={0.7}>
+                        <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+                        <Text style={[styles.mobileBackText, { color: colors.onSurface }]}>Zurück</Text>
+                    </TouchableOpacity>
+                )}
 
                 <KeyboardAvoidingView
                     style={styles.flex}
@@ -539,5 +546,17 @@ const styles = StyleSheet.create({
     },
     bottomSpacer: {
         height: 24,
+    },
+    mobileBack: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'ios' ? 54 : 16,
+        paddingBottom: 8,
+    },
+    mobileBackText: {
+        fontSize: 15,
+        fontWeight: '500',
     },
 });

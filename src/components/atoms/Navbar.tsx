@@ -1,23 +1,51 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import HappinLogo from './HappinLogo';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 interface NavbarProps {
-    /** Show the "App laden" CTA button (default: true) */
     showCta?: boolean;
-    /** Show the back-navigation arrow instead of CTA (default: false) */
     showBack?: boolean;
-    /** Custom back handler (default: router.back()) */
     onBackPress?: () => void;
+    showNavItems?: boolean;
 }
 
-export default function Navbar({ showCta = true, showBack = false, onBackPress }: NavbarProps) {
+interface NavTab {
+    name: string;
+    route: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    activeIcon: keyof typeof Ionicons.glyphMap;
+    label: string;
+}
+
+const NAV_TABS: NavTab[] = [
+    { name: 'explore', route: '/events', icon: 'compass-outline', activeIcon: 'compass', label: 'Explore' },
+    { name: 'map', route: '/map', icon: 'map-outline', activeIcon: 'map', label: 'Karte' },
+    { name: 'my-events', route: '/my-events', icon: 'calendar-outline', activeIcon: 'calendar', label: 'Events' },
+    { name: 'account', route: '/account', icon: 'person-outline', activeIcon: 'person', label: 'Konto' },
+];
+
+export default function Navbar({ showCta = true, showBack = false, onBackPress, showNavItems = true }: NavbarProps) {
     const { colors, isDark } = useTheme();
     const router = useRouter();
+    const pathname = usePathname();
+    const { width } = useWindowDimensions();
+    const isDesktop = Platform.OS === 'web' && width >= 768;
+
+    if (Platform.OS !== 'web' || width < 768) return null;
 
     const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+
+    const activeTab = NAV_TABS.find((tab) => {
+        if (tab.route === pathname) return true;
+        if (pathname.startsWith(tab.route + '/')) {
+            if (tab.route === '/events' && pathname.startsWith('/events/create')) return false;
+            return true;
+        }
+        return false;
+    });
 
     return (
         <View style={[styles.nav, { borderBottomColor: borderColor, backgroundColor: colors.background }]}>
@@ -36,13 +64,46 @@ export default function Navbar({ showCta = true, showBack = false, onBackPress }
             )}
 
             <View style={styles.right}>
-                {showCta && !showBack && (
-                    <TouchableOpacity
-                        style={[styles.cta, { borderColor: colors.primary }]}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={[styles.ctaText, { color: colors.primary }]}>App laden</Text>
-                    </TouchableOpacity>
+                {isDesktop && !showBack && showNavItems ? (
+                    <>
+                        {NAV_TABS.map((tab) => {
+                            const isActive = activeTab?.name === tab.name;
+                            const iconColor = isActive ? colors.primary : colors.onSurfaceVariant;
+                            const iconName = isActive ? tab.activeIcon : tab.icon;
+                            return (
+                                <TouchableOpacity
+                                    key={tab.name}
+                                    style={[
+                                        styles.navItem,
+                                        isActive && { backgroundColor: isDark ? `${colors.primary}18` : `${colors.primary}12` },
+                                    ]}
+                                    onPress={() => router.push(tab.route as any)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name={iconName} size={18} color={iconColor} />
+                                    <Text style={[styles.navItemText, { color: iconColor, fontWeight: '600' }]}>
+                                        {tab.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                        <TouchableOpacity
+                            style={[styles.createBtn, { borderColor: colors.primary }]}
+                            onPress={() => router.push('/events/create' as any)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[styles.createBtnText, { color: colors.primary }]}>Event erstellen</Text>
+                        </TouchableOpacity>
+                    </>
+                ) : (
+                    showCta && !showBack && (
+                        <TouchableOpacity
+                            style={[styles.cta, { borderColor: colors.primary }]}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[styles.ctaText, { color: colors.primary }]}>App laden</Text>
+                        </TouchableOpacity>
+                    )
                 )}
             </View>
         </View>
@@ -55,8 +116,9 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 24,
-        paddingVertical: 14,
-        paddingTop: Platform.OS === 'ios' ? 54 : 14,
+        paddingVertical: 0,
+        paddingTop: Platform.OS === 'ios' ? 54 : 0,
+        height: Platform.OS === 'ios' ? 54 + 52 : 52,
         borderBottomWidth: 1,
     },
     backBtn: {
@@ -69,7 +131,29 @@ const styles = StyleSheet.create({
     right: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 4,
+    },
+    navItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 8,
+    },
+    navItemText: {
+        fontSize: 14,
+    },
+    createBtn: {
+        marginLeft: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 7,
+        borderRadius: 9999,
+        borderWidth: 1,
+    },
+    createBtnText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     cta: {
         paddingHorizontal: 14,
