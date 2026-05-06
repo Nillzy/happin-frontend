@@ -8,6 +8,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     TouchableOpacity,
+    ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
@@ -17,6 +18,8 @@ import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import DatePicker from '../components/atoms/DatePicker';
 import TimePicker from '../components/atoms/TimePicker';
 import SegmentedControl from '../components/atoms/SegmentedControl';
+import { api } from '../services/api';
+import { getSession } from '../services/supabase';
 
 export default function EventCreateStepOneNew() {
     const { colors } = useTheme();
@@ -26,6 +29,8 @@ export default function EventCreateStepOneNew() {
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
     const [visibility, setVisibility] = useState('public');
+    const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [errors, setErrors] = useState<{ title?: string; date?: string; time?: string }>({});
 
     const validate = (): boolean => {
@@ -46,18 +51,45 @@ export default function EventCreateStepOneNew() {
         return Object.keys(e).length === 0;
     };
 
-    const handleNext = () => {
-        if (!validate()) return;
+    const localIso = (d: string, t: string): string => {
+        const dt = new Date(`${d}T${t}:00`);
+        const tzOffset = -dt.getTimezoneOffset();
+        const sign = tzOffset >= 0 ? '+' : '-';
+        const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
+        return `${d}T${t}:00${sign}${pad(Math.floor(Math.abs(tzOffset) / 60))}:${pad(Math.abs(tzOffset) % 60)}`;
+    };
 
-        router.push({
-            pathname: '/events/create/step-2',
-            params: {
+    const handleNext = async () => {
+        if (!validate()) return;
+        setSubmitting(true);
+        setSubmitError(null);
+
+        try {
+            const token = await getSession();
+            if (!token) {
+                router.push('/login');
+                setSubmitting(false);
+                return;
+            }
+
+            // TODO Backend: status 'draft' muss unterstuetzt werden.
+            // Entwuerfe duerfen mit minimalen Pflichtfeldern erstellt werden.
+            // Location ist fuer Entwuerfe optional (Backend muss null/leer akzeptieren).
+            const draft = await api.createEvent({
                 title: title.trim(),
-                date: date.trim(),
-                time: time.trim(),
-                isPublic: visibility === 'public' ? 'true' : 'false',
-            },
-        });
+                starts_at: localIso(date.trim(), time.trim()),
+                is_public: visibility === 'public',
+                status: 'draft',
+                location: { city: '' },
+            }, token);
+
+            router.replace(`/event/${draft.event_id}/edit`);
+        } catch (e) {
+            console.error('Draft creation failed:', e);
+            setSubmitError('Fehler beim Erstellen. Bitte versuche es erneut.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const isFormValid = title.trim() && date && time;
@@ -176,26 +208,50 @@ export default function EventCreateStepOneNew() {
                                 value={visibility}
                                 onChange={setVisibility}
                             />
-                            <Text style={[styles.hint, { color: colors.onSurfaceVariant }]}>
-                                {visibility === 'public'
-                                    ? 'Jeder kann dein Event finden'
-                                    : 'Nur mit Einladungslink sichtbar'}
-                            </Text>
+                            <View style={styles.visibilityInfo}>
+                                <Ionicons
+                                    name={visibility === 'public' ? 'globe-outline' : 'lock-closed-outline'}
+                                    size={18}
+                                    color={colors.primary}
+                                    style={{ marginRight: 10, marginTop: 1 }}
+                                />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.visibilityTitle, { color: colors.onSurface }]}>
+                                        {visibility === 'public' ? 'Für alle sichtbar' : 'Nur auf Einladung'}
+                                    </Text>
+                                    <Text style={[styles.visibilityDesc, { color: colors.onSurfaceVariant }]}>
+                                        {visibility === 'public'
+                                            ? 'Dein Event erscheint in der öffentlichen Suche und kann von jedem gefunden und besucht werden.'
+                                            : 'Dein Event ist nur über einen Einladungslink erreichbar. Ideal für private Feiern oder geschlossene Gruppen.'}
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
+
+                        {/* Error */}
+                        {submitError && (
+                            <View style={{ marginHorizontal: 16, marginBottom: 8 }}>
+                                <Text style={{ color: colors.error, fontSize: 14, textAlign: 'center' }}>{submitError}</Text>
+                            </View>
+                        )}
 
                         {/* Weiter Button */}
                         <TouchableOpacity
                             activeOpacity={0.85}
                             onPress={handleNext}
-                            disabled={!isFormValid}
+                            disabled={!isFormValid || submitting}
                             style={[
                                 styles.button,
-                                { backgroundColor: !isFormValid ? colors.surfaceContainer : colors.primary }
+                                { backgroundColor: (!isFormValid || submitting) ? colors.surfaceContainer : colors.primary }
                             ]}
                         >
-                            <Text style={[styles.buttonText, { color: !isFormValid ? colors.onSurfaceVariant : colors.onPrimary }]}>
-                                Weiter
-                            </Text>
+                            {submitting ? (
+                                <ActivityIndicator size="small" color={colors.onPrimary} />
+                            ) : (
+                                <Text style={[styles.buttonText, { color: (!isFormValid || submitting) ? colors.onSurfaceVariant : colors.onPrimary }]}>
+                                    Weiter
+                                </Text>
+                            )}
                         </TouchableOpacity>
 
                         <View style={styles.bottomSpacer} />
@@ -264,6 +320,23 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 8,
         lineHeight: 16,
+    },
+    visibilityInfo: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginTop: 14,
+        paddingTop: 14,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(128,128,128,0.15)',
+    },
+    visibilityTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 3,
+    },
+    visibilityDesc: {
+        fontSize: 13,
+        lineHeight: 18,
     },
     errorText: {
         fontSize: 12,

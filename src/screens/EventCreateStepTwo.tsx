@@ -9,6 +9,7 @@ import {
     Platform,
     TouchableOpacity,
     ActivityIndicator,
+    Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -97,6 +98,8 @@ export default function EventCreateStepTwo() {
             category: categories.length > 0 ? categories.join(',') : undefined,
             max_capacity: maxCapacity ? Number(maxCapacity) : undefined,
             is_public: params.isPublic === 'true',
+            image_url: imageUri || undefined,
+            gradient_id: selectedGradientId ?? undefined,
             location: {
                 city: city.trim(),
                 street: street.trim() || undefined,
@@ -115,13 +118,6 @@ export default function EventCreateStepTwo() {
             }
 
             const result = await api.createEvent(payload, token);
-
-            // TODO: Upload image after event creation
-            // if (imageUri) {
-            //     await api.uploadEventImage(result.event_id, imageUri, token);
-            // }
-
-            // Navigate to Event Detail Screen (not /manage)
             router.replace(`/event/${result.event_id}`);
         } catch (e) {
             console.error('Event creation failed:', e);
@@ -183,7 +179,13 @@ export default function EventCreateStepTwo() {
                                 onPress={() => setShowImageModal(true)}
                                 activeOpacity={0.7}
                             >
-                                {selectedGradientId !== undefined ? (
+                                {imageUri ? (
+                                    <Image
+                                        source={{ uri: imageUri }}
+                                        style={styles.imagePreview}
+                                        resizeMode="cover"
+                                    />
+                                ) : selectedGradientId !== undefined ? (
                                     <LinearGradient
                                         colors={getGradient(selectedGradientId) as [string, string]}
                                         start={{ x: 0, y: 0 }}
@@ -206,9 +208,15 @@ export default function EventCreateStepTwo() {
                             onClose={() => setShowImageModal(false)}
                             onSelectGradient={(id) => {
                                 setSelectedGradientId(id);
-                                setImageUri(''); // Clear uploaded image wenn Gradient gewählt wird
+                                setImageUri('');
+                            }}
+                            onSelectStockImage={(url) => {
+                                setImageUri(url);
+                                setSelectedGradientId(undefined);
                             }}
                             selectedGradientId={selectedGradientId}
+                            selectedImageUrl={imageUri}
+                            eventTitle={params.title}
                         />
 
                         {/* Beschreibung */}
@@ -374,7 +382,7 @@ export default function EventCreateStepTwo() {
                             <ImageGalleryUploader
                                 images={galleryImages}
                                 onChange={setGalleryImages}
-                                maxImages={6}
+                                maxImages={10}
                             />
                         </View>
 

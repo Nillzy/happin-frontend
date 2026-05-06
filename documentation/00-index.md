@@ -31,6 +31,9 @@ This is the central index for all project documentation in the `documentation/` 
 | [23-gradient-selection.md](./23-gradient-selection.md) | **Gradient-Auswahl für Event-Titelbilder**: 4 vordefinierte Gradients, ImageSelectionModal (Bottom Sheet), Integration in EventCreateStepTwo, Backend-Integration (gradient_id), Display-Logik. |
 | [24-event-host-redesign-guest-navigation.md](./24-event-host-redesign-guest-navigation.md) | **Event Host Screen Redesign**: Tab-Navigation entfernt, Gästelisten als separate Seiten (/event/[id]/guests?status=...), EventGuestsScreen, "Zur Gast-Ansicht" Button, Statistik-Cards anklickbar. |
 | [25-web-input-styling.md](./25-web-input-styling.md) | **Web Input Styling**: `outlineStyle: 'none'` auf allen TextInputs — entfernt den blauen Browser-Fokusrahmen, eigener Fokus-State via `borderColor`. |
+| [26-event-edit-screen-redesign.md](./26-event-edit-screen-redesign.md) | **Event Edit Screen Redesign**: Draft-basierter Erstellungsflow (Step 1 → Entwurf → EventEditScreen), generische Edit-Seite mit Live-Vorschau + Edit-Drawers, Ticket-Konfiguration, Backend-Anforderungen. |
+| [27-stock-image-suggestions.md](./27-stock-image-suggestions.md) | **Stockbild-Vorschläge**: Thematische Unsplash-Bilder im Titelbild-Modal basierend auf Eventtitel, Keyword-Extraktion, Fallback-Modus, Backend-Proxy-TODOs. |
+| [CLAUDE_PROMPT_BACKEND_INTEGRATION.md](./CLAUDE_PROMPT_BACKEND_INTEGRATION.md) | **Claude-Prompt für Backend-Integration**: Priorisierte TODO-Liste aller offenen Backend-Aufgaben (Draft-Flow, Bild-Upload, Unsplash-Proxy, Permissions, MyEvents-Daten). |
 | [CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md](./CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md) | Vollständiger Claude-Prompt für Event-Creation UI Redesign & Feature-Implementierung (Phasen 1-3). |
 | [EVENT_CREATION_UX_ANALYSIS.md](./EVENT_CREATION_UX_ANALYSIS.md) | UX-Analyse des bestehenden Event-Creation Flows mit identifizierten Problemen und Verbesserungsvorschlägen. |
 | [EVENT_CREATION_PHASE_1_IMPLEMENTATION.md](./EVENT_CREATION_PHASE_1_IMPLEMENTATION.md) | Phase 1 Implementation (P0): Titelbild-Upload, Location-Validation, Category-Chips mit Multi-Select. |
@@ -43,6 +46,7 @@ This is the central index for all project documentation in the `documentation/` 
 - ✅ **Saved Events** System mit Like-Funktionalität (Heart-Icon)
 - ✅ **Saved Events Grid**: Responsives Grid-Layout (1–5 Spalten) identisch zu Explore; Herz-Button (gefüllt) entfernt Event aus Liste
 - ✅ **Gradient-Auswahl** für Event-Titelbilder (4 Vorlagen)
+- ✅ **Stockbild-Vorschläge** im Titelbild-Modal: Unsplash-Suche basierend auf Eventtitel
 - ✅ **Dark-Mode-Toggle** von Navbar zu Account-Screen verschoben
 - ✅ **Explore Screen** ohne Überschriften, mit Suchleiste + Filter/Saved Buttons
 - ✅ **Footer entfernt** in Explore & Saved Events
