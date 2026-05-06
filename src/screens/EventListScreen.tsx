@@ -24,45 +24,22 @@ import { authorize, getSession } from '../services/supabase';
 import { useSavedEvents } from '../contexts/SavedEventsContext';
 import type { EventListItem, EventListResponse } from '../types/events';
 
-/**
- * EventListScreen - Responsive Event Overview
- *
- * Displays all public events in a platform-adaptive layout:
- * - Web: Flexbox grid with 1-5 columns based on viewport width
- * - Mobile/Tablet: FlatList with virtualization for performance
- *
- * Breakpoints (Web):
- * - < 768px: 1 column
- * - 768-1199px: 2 columns
- * - 1200-1919px: 3 columns
- * - 1920-2559px: 4 columns (2K/QHD)
- * - ≥ 2560px: 5 columns (Ultrawide 21:9, 4K)
- *
- * Design compliance: DESIGN.md spacing tokens (grid_margin: 24px, grid_gutter: 16px)
- */
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
 const CARD_MARGIN_H = 24;
 const CARD_WIDTH = isWeb ? Math.min(SCREEN_WIDTH - CARD_MARGIN_H * 2, 600) : SCREEN_WIDTH - CARD_MARGIN_H * 2;
 
-// Grid layout configuration for Web (from DESIGN.md)
-const CONTAINER_MAX_WIDTH = 2560;  // Support up to 4K/Ultrawide
-const GRID_PADDING = 24;  // grid_margin
-const GRID_GAP_H = 20;    // gutter horizontal
-const GRID_GAP_V = 16;    // grid_gutter vertical
+const CONTAINER_MAX_WIDTH = 2560;
+const GRID_PADDING = 24;
+const GRID_GAP_H = 20;
+const GRID_GAP_V = 16;
 
-/**
- * Returns number of columns based on viewport width
- * Used for responsive grid layout on Web
- * Supports up to 5 columns for Ultrawide (21:9) and 4K displays
- */
 function getNumColumns(width: number): number {
-    if (width >= 2560) return 5; // 4K / Ultrawide 21:9 (3440x1440)
-    if (width >= 1920) return 4; // 2K / QHD
-    if (width >= 1200) return 3; // Desktop
-    if (width >= 768) return 2;  // Tablet Landscape
-    return 1;                     // Mobile / Tablet Portrait
+    if (width >= 2560) return 5;
+    if (width >= 1920) return 4;
+    if (width >= 1200) return 3;
+    if (width >= 768) return 2;
+    return 1;
 }
 
 const GRADIENT_PAIRS = [
@@ -83,8 +60,11 @@ function formatDateGerman(isoDate: string): string {
     }).format(d);
 }
 
-// Pagination configuration
 const EVENTS_PER_PAGE = 12;
+
+// Modul-Level Cache — überlebt Tab-Wechsel
+let cachedEvents: EventListItem[] = [];
+let cachedHasMore = false;
 
 export default function EventListScreen() {
     const { colors } = useTheme();
@@ -95,65 +75,79 @@ export default function EventListScreen() {
 
     const { toggleSaveEvent, isSaved } = useSavedEvents();
 
-    const [events, setEvents] = useState<EventListItem[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [events, setEvents] = useState<EventListItem[]>(cachedEvents);
+    const [loading, setLoading] = useState(cachedEvents.length === 0);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(cachedHasMore);
     const [error, setError] = useState<string | null>(null);
     const [dimensions, setDimensions] = useState(Dimensions.get('window'));
-    const [hasMore, setHasMore] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [refreshing, setRefreshing] = useState(false);
 
-    const loadMore = useCallback(async () => {
-        if (loadingMore || !hasMore) return;
-
-        setLoadingMore(true);
-        setError(null);
-
-        try {
-            const token = await getSession();
-            const offset = events.length;
-            let data: EventListResponse;
-
-            if (isOrganizerView) {
-                if (!token) { router.replace('/login'); return; }
-                data = await api.getUserEvents(token, eventPeriod, EVENTS_PER_PAGE, offset);
-            } else {
-                data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token || undefined);
-            }
-
-            setEvents(prev => [...prev, ...data.events]);
-            setHasMore(events.length + data.events.length < data.count);
-        } catch (e) {
-            setError('Fehler beim Laden der Events');
-        } finally {
-            setLoadingMore(false);
-        }
-    }, [events.length, hasMore, loadingMore, isOrganizerView, eventPeriod]);
+    const loadingMoreRef = React.useRef(false);
+    const hasMoreRef = React.useRef(cachedHasMore);
+    const eventsRef = React.useRef<EventListItem[]>(cachedEvents);
+    const isOrganizerViewRef = React.useRef(isOrganizerView);
+    const eventPeriodRef = React.useRef(eventPeriod);
+    isOrganizerViewRef.current = isOrganizerView;
+    eventPeriodRef.current = eventPeriod;
 
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
         setError(null);
-
         try {
             const token = await getSession();
             let data: EventListResponse;
-
-            if (isOrganizerView) {
+            if (isOrganizerViewRef.current) {
                 if (!token) { router.replace('/login'); return; }
-                data = await api.getUserEvents(token, eventPeriod, EVENTS_PER_PAGE, 0);
+                data = await api.getUserEvents(token, eventPeriodRef.current, EVENTS_PER_PAGE, 0);
             } else {
                 data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined);
             }
-
+            const more = data.events.length === EVENTS_PER_PAGE;
+            cachedEvents = data.events;
+            cachedHasMore = more;
+            eventsRef.current = data.events;
+            hasMoreRef.current = more;
             setEvents(data.events);
-            setHasMore(data.events.length < data.count);
+            setHasMore(more);
         } catch (e) {
             setError('Fehler beim Laden der Events');
         } finally {
             setRefreshing(false);
         }
-    }, [isOrganizerView, eventPeriod]);
+    }, []);
+
+    const loadMore = useCallback(async () => {
+        if (loadingMoreRef.current) return;
+        if (!hasMoreRef.current) return;
+        loadingMoreRef.current = true;
+        setLoadingMore(true);
+        try {
+            const token = await getSession();
+            const offset = eventsRef.current.length;
+            let data: EventListResponse;
+            if (isOrganizerViewRef.current) {
+                if (!token) { router.replace('/login'); return; }
+                data = await api.getUserEvents(token, eventPeriodRef.current, EVENTS_PER_PAGE, offset);
+            } else {
+                data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token || undefined);
+            }
+            const next = [...eventsRef.current, ...data.events];
+            const more = data.events.length === EVENTS_PER_PAGE;
+            cachedEvents = next;
+            cachedHasMore = more;
+            eventsRef.current = next;
+            hasMoreRef.current = more;
+            setEvents(next);
+            setHasMore(more);
+        } catch (e) {
+            setError('Fehler beim Laden der Events');
+        } finally {
+            loadingMoreRef.current = false;
+            setLoadingMore(false);
+        }
+    }, []);
 
     useEffect(() => {
         authorize().then((isAuthorized) => {
@@ -162,41 +156,42 @@ export default function EventListScreen() {
     }, []);
 
     useEffect(() => {
+        // Cache vorhanden — kein erneuter Load nötig
+        if (cachedEvents.length > 0) return;
+
         const loadInitial = async () => {
             setLoading(true);
             setError(null);
-
             try {
                 const token = await getSession();
                 let data: EventListResponse;
-
                 if (isOrganizerView) {
                     if (!token) { router.replace('/login'); return; }
                     data = await api.getUserEvents(token, eventPeriod, EVENTS_PER_PAGE, 0);
                 } else {
                     data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined);
                 }
-
+                const more = data.events.length === EVENTS_PER_PAGE;
+                cachedEvents = data.events;
+                cachedHasMore = more;
+                eventsRef.current = data.events;
+                hasMoreRef.current = more;
                 setEvents(data.events);
-                setHasMore(data.events.length < data.count);
+                setHasMore(more);
             } catch (e) {
                 setError('Fehler beim Laden der Events');
             } finally {
                 setLoading(false);
             }
         };
-
         void loadInitial();
     }, []);
 
-    // Listen to window resize for responsive grid on Web
     useEffect(() => {
         if (!isWeb) return;
-
         const subscription = Dimensions.addEventListener('change', ({ window }) => {
             setDimensions(window);
         });
-
         return () => subscription?.remove();
     }, []);
 
@@ -209,15 +204,12 @@ export default function EventListScreen() {
     };
 
     const handleToggleSave = (event: EventListItem, e?: any) => {
-        if (e) {
-            e.stopPropagation();
-        }
+        if (e) e.stopPropagation();
         toggleSaveEvent(event);
     };
 
     const renderCard = ({ item, index }: { item: EventListItem; index: number }) => {
         const gradient = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
-
         return (
             <TouchableOpacity
                 activeOpacity={0.85}
@@ -251,7 +243,6 @@ export default function EventListScreen() {
                             <Text style={[styles.hostBadgeText, { color: colors.onPrimary }]}>Dein Event</Text>
                         </View>
                     )}
-                    {/* Like Button */}
                     <TouchableOpacity
                         style={styles.likeButton}
                         onPress={(e) => handleToggleSave(item, e)}
@@ -269,7 +260,6 @@ export default function EventListScreen() {
                     <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2}>
                         {item.title}
                     </Text>
-
                     <View style={styles.cardMeta}>
                         <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
                             {formatDateGerman(item.starts_at)}
@@ -280,7 +270,6 @@ export default function EventListScreen() {
                             </Text>
                         )}
                     </View>
-
                     <View style={styles.cardFooter}>
                         {item.category && (
                             <View style={[styles.chip, { backgroundColor: colors.surfaceContainerHigh }]}>
@@ -310,7 +299,7 @@ export default function EventListScreen() {
     };
 
     const renderFooter = () => {
-        if (!loadingMore) return null;
+        if (!hasMore && !loadingMore) return null;
         return (
             <View style={styles.footerLoader}>
                 <ActivityIndicator size="small" color={colors.primary} />
@@ -319,30 +308,21 @@ export default function EventListScreen() {
     };
 
     const numColumns = getNumColumns(dimensions.width);
-
-    // Calculate grid container width
     const containerWidth = Math.min(dimensions.width, CONTAINER_MAX_WIDTH);
     const availableWidth = containerWidth - GRID_PADDING * 2;
     const cardWidth = (availableWidth - GRID_GAP_H * (numColumns - 1)) / numColumns;
 
-    const handleScroll = (event: any) => {
-        if (!isWeb) return;
-
-        const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-        const paddingToBottom = 20;
-        const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
-
-        if (isCloseToBottom && hasMore && !loadingMore) {
-            void loadMore();
-        }
-    };
-
     const renderWebGrid = () => (
         <ScrollView
-            showsVerticalScrollIndicator={false}
+            style={styles.webScroll}
             contentContainerStyle={styles.scrollContent}
-            onScroll={handleScroll}
-            scrollEventThrottle={400}
+            showsVerticalScrollIndicator={false}
+            onScroll={({ nativeEvent: { layoutMeasurement, contentOffset, contentSize } }) => {
+                if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 100) {
+                    void loadMore();
+                }
+            }}
+            scrollEventThrottle={300}
             refreshControl={
                 <RefreshControl
                     refreshing={refreshing}
@@ -372,7 +352,6 @@ export default function EventListScreen() {
                     ))}
                 </View>
             )}
-
             {renderFooter()}
         </ScrollView>
     );
@@ -384,12 +363,8 @@ export default function EventListScreen() {
             renderItem={renderCard}
             ListEmptyComponent={renderEmpty}
             ListFooterComponent={renderFooter}
-            onEndReached={() => {
-                if (hasMore && !loadingMore) {
-                    void loadMore();
-                }
-            }}
-            onEndReachedThreshold={0.5}
+            onEndReached={() => void loadMore()}
+            onEndReachedThreshold={0.3}
             refreshControl={
                 <RefreshControl
                     refreshing={refreshing}
@@ -407,7 +382,6 @@ export default function EventListScreen() {
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 {isWeb && <Navbar showCta={false} />}
 
-                {/* Search Bar with Filter and Saved */}
                 <View style={[styles.searchContainer, { backgroundColor: colors.background, borderBottomColor: colors.outlineVariant }]}>
                     <View style={[styles.searchBar, { backgroundColor: colors.surfaceContainerHigh }]}>
                         <Ionicons name="search" size={20} color={colors.onSurfaceVariant} />
@@ -420,10 +394,7 @@ export default function EventListScreen() {
                         />
                         <TouchableOpacity
                             style={styles.filterButton}
-                            onPress={() => {
-                                // TODO: Filter Modal öffnen
-                                console.log('Filter öffnen');
-                            }}
+                            onPress={() => console.log('Filter öffnen')}
                         >
                             <Ionicons name="options-outline" size={22} color={colors.onSurface} />
                         </TouchableOpacity>
@@ -431,9 +402,7 @@ export default function EventListScreen() {
 
                     <TouchableOpacity
                         style={[styles.savedButton, { backgroundColor: colors.surfaceContainerHigh }]}
-                        onPress={() => {
-                            router.push('/saved-events');
-                        }}
+                        onPress={() => router.push('/saved-events')}
                     >
                         <Ionicons name="bookmarks-outline" size={22} color={colors.onSurface} />
                     </TouchableOpacity>
@@ -465,6 +434,10 @@ export default function EventListScreen() {
 
 const styles = StyleSheet.create({
     root: {
+        flex: 1,
+        ...(Platform.OS === 'web' ? { overflow: 'hidden' } as any : {}),
+    },
+    webScroll: {
         flex: 1,
     },
     searchContainer: {
@@ -526,40 +499,17 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingTop: 16,
-        paddingBottom: 0,
+        paddingBottom: 24,
     },
     gridContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         paddingHorizontal: GRID_PADDING,
     },
-    gridItem: {
-        // Width and margins are set dynamically
-    },
+    gridItem: {},
     listContent: {
         paddingTop: 16,
-        paddingBottom: 0,
-    },
-    header: {
-        paddingHorizontal: 24,
-        paddingTop: 32,
         paddingBottom: 24,
-    },
-    headerLabel: {
-        fontSize: 13,
-        fontWeight: '700',
-        letterSpacing: 1.2,
-        textTransform: 'uppercase',
-        marginBottom: 8,
-    },
-    headerTitle: {
-        fontSize: 28,
-        fontWeight: '700',
-        marginBottom: 8,
-    },
-    headerSub: {
-        fontSize: 15,
-        lineHeight: 22,
     },
     card: {
         marginHorizontal: CARD_MARGIN_H,
@@ -651,7 +601,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     footerLoader: {
-        paddingVertical: 20,
+        paddingVertical: 24,
         alignItems: 'center',
     },
 });
