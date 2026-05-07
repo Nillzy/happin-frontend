@@ -43,7 +43,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
     getPublicEvents: (limit = 50, offset = 0, token?: string) =>
-        request<EventListResponse>(`api/v1/events/?limit=${limit}&offset=${offset}`, {
+        request<EventListResponse>(`/api/v1/events/?limit=${limit}&offset=${offset}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
         }),
 
