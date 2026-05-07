@@ -9,6 +9,7 @@ export interface Participant {
     participation_id: string;
     person: PersonInfo;
     status: 'Accepted' | 'Declined' | 'Pending';
+    ticket_count?: number;
     created_at?: string;
 }
 
@@ -29,4 +30,13 @@ export interface RemoveParticipantsRequest {
 
 export interface RemoveParticipantsResponse {
     removed_count: number;
+}
+
+export interface ScanTicketResponse {
+    valid: boolean;
+    reason?: 'already_used' | 'not_found';
+    guest_name?: string;
+    used_at?: string;
+    ticket_number?: number;
+    option_name?: string;
 }

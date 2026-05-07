@@ -75,8 +75,8 @@ export default function EventHostScreen() {
     };
 
     const copyInvitationLink = async () => {
-        if (!event?.invitation_link) return;
-        const fullLink = `https://happin.fun/e/${event.invitation_link}`;
+        if (!event?.event_id) return;
+        const fullLink = `https://happin.fun/event/${event.event_id}`;
         const success = await copyToClipboard(fullLink);
         if (success) {
             Alert.alert('Kopiert', 'Einladungslink wurde in die Zwischenablage kopiert.');
@@ -86,8 +86,8 @@ export default function EventHostScreen() {
     };
 
     const shareInvitationLink = async () => {
-        if (!event?.invitation_link) return;
-        const fullLink = `https://happin.fun/e/${event.invitation_link}`;
+        if (!event?.event_id) return;
+        const fullLink = `https://happin.fun/event/${event.event_id}`;
         try {
             await Share.share({
                 message: `Komm zu ${event.title}!\n${fullLink}`,
@@ -163,7 +163,6 @@ export default function EventHostScreen() {
                 <OverviewTab
                     counts={counts}
                     maxCapacity={event.max_capacity}
-                    invitationLink={event.invitation_link}
                     onCopyLink={copyInvitationLink}
                     onShareLink={shareInvitationLink}
                     colors={colors}
@@ -179,7 +178,6 @@ export default function EventHostScreen() {
 function OverviewTab({
     counts,
     maxCapacity,
-    invitationLink,
     onCopyLink,
     onShareLink,
     colors,
@@ -187,7 +185,6 @@ function OverviewTab({
 }: {
     counts: ParticipantCounts;
     maxCapacity?: number;
-    invitationLink?: string;
     onCopyLink: () => void;
     onShareLink: () => void;
     colors: ReturnType<typeof useTheme>['colors'];
@@ -257,17 +254,27 @@ function OverviewTab({
                 </View>
             )}
 
+            {/* Scan Button */}
+            <TouchableOpacity
+                style={[styles.scanButton, { backgroundColor: colors.primary }]}
+                onPress={() => router.push(`/event/${eventId}/scan`)}
+            >
+                <Text style={[styles.scanButtonText, { color: colors.onPrimary }]}>
+                    Tickets scannen
+                </Text>
+            </TouchableOpacity>
+
             {/* Invitation Link */}
-            {invitationLink && (
+            {eventId && (
                 <View style={[styles.linkCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
                     <Text style={[styles.linkLabel, { color: colors.outline }]}>Einladungslink</Text>
                     <View style={styles.linkRow}>
                         <TouchableOpacity
                             style={[styles.linkInput, { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant }]}
-                            onPress={() => Linking.openURL(`https://happin.fun/e/${invitationLink}`)}
+                            onPress={() => Linking.openURL(`https://happin.fun/event/${eventId}`)}
                         >
                             <Text style={[styles.linkText, { color: colors.primary }]} numberOfLines={1}>
-                                happin.fun/e/{invitationLink.slice(0, 10)}...
+                                happin.fun/event/{eventId.slice(0, 8)}...
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -350,6 +357,14 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         backgroundColor: '#FFB3CE',
     },
+
+    scanButton: {
+        paddingVertical: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    scanButtonText: { fontSize: 16, fontWeight: '700' },
 
     linkCard: {
         padding: 16,
