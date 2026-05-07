@@ -84,6 +84,134 @@ export async function searchCities(query: string): Promise<CitySuggestion[]> {
     }
 }
 
+export async function geocodeAddress(
+    street: string | null | undefined,
+    city: string | null | undefined,
+    postalCode: string | null | undefined,
+    country: string | null | undefined,
+): Promise<{ lat: number; lng: number } | null> {
+    const key = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+    if (!key) return null;
+
+    const parts: string[] = [];
+    if (street) parts.push(street);
+    if (postalCode && city) parts.push(`${postalCode} ${city}`);
+    else if (city) parts.push(city);
+    if (country) parts.push(country);
+
+    if (parts.length === 0) return null;
+
+    try {
+        const q = encodeURIComponent(parts.join(', '));
+        const res = await fetch(
+            `https://api.maptiler.com/geocoding/${q}.json?key=${key}&limit=5&types=address,place&language=de`,
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        const features: any[] = data?.features ?? [];
+        const match = features.find((f: any) => f.place_type?.includes('address')) ?? features[0];
+        const coords = match?.geometry?.coordinates;
+        if (!coords) return null;
+        return { lat: coords[1], lng: coords[0] };
+    } catch {
+        return null;
+    }
+}
+
+export interface AddressSuggestion {
+    street: string;
+    houseNumber: string | null;
+    postalCode: string | null;
+    city: string;
+    country: string;
+    displayLabel: string;
+    lat: number;
+    lng: number;
+}
+
+export async function searchAddresses(query: string): Promise<AddressSuggestion[]> {
+    const key = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+    if (!key || query.trim().length < 2) return [];
+
+    try {
+        const q = encodeURIComponent(query.trim());
+        const res = await fetch(
+            `https://api.maptiler.com/geocoding/${q}.json?key=${key}&limit=5&types=address&language=de&country=${EUROPE_COUNTRIES}`,
+        );
+        if (!res.ok) return [];
+        const data = await res.json();
+        const features: any[] = data?.features ?? [];
+
+        return features.map((f) => {
+            const context: any[] = f.context ?? [];
+            const streetName: string = f.text ?? '';
+            const houseNumber: string | null = f.address ?? null;
+            const postalEntry = context.find((c: any) => c.id?.startsWith('postal_code.'));
+            const countryEntry = context.find((c: any) => c.id?.startsWith('country.'));
+
+            const postalCode: string | null = postalEntry?.text ?? null;
+            const country: string = countryEntry?.text ?? 'Deutschland';
+
+            let city = '';
+            const placeName: string = f.place_name ?? '';
+            const placeNameParts = placeName.split(',').map((s: string) => s.trim());
+            if (placeNameParts.length >= 2) {
+                const citySegment = placeNameParts[1];
+                const cityMatch = citySegment.match(/^\d+\s+(.+)$/);
+                city = cityMatch ? cityMatch[1] : citySegment;
+            }
+
+            const streetFull = houseNumber ? `${streetName} ${houseNumber}` : streetName;
+            const parts = [streetFull];
+            if (postalCode && city) parts.push(`${postalCode} ${city}`);
+            else if (city) parts.push(city);
+
+            const coords = f.geometry?.coordinates ?? [0, 0];
+
+            return {
+                street: streetName,
+                houseNumber,
+                postalCode,
+                city,
+                country,
+                displayLabel: parts.join(', '),
+                lat: coords[1],
+                lng: coords[0],
+            };
+        });
+    } catch {
+        return [];
+    }
+}
+
+// Prüft via Reverse-Geocoding ob an den gegebenen Koordinaten tatsächlich
+// die erwartete Hausnummer existiert. Gibt false zurück wenn nicht.
+export async function verifyAddressExists(address: AddressSuggestion): Promise<boolean> {
+    const key = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+    if (!key || !address.houseNumber) return false;
+
+    try {
+        const res = await fetch(
+            `https://api.maptiler.com/geocoding/${address.lng},${address.lat}.json?key=${key}&language=de`,
+        );
+        if (!res.ok) return false;
+        const data = await res.json();
+        const features: any[] = data?.features ?? [];
+
+        const addressFeature = features.find((f: any) =>
+            f.place_type?.includes('address') && f.address
+        );
+        if (!addressFeature) return false;
+
+        const returnedHouseNumber: string = (addressFeature.address ?? '').trim().toLowerCase();
+        const expectedHouseNumber: string = address.houseNumber.trim().toLowerCase();
+
+        return returnedHouseNumber === expectedHouseNumber;
+    } catch {
+        return false;
+    }
+}
+
 export async function geocodeCity(
     city: string,
 ): Promise<{ lat: number; lng: number }> {

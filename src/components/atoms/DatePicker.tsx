@@ -214,6 +214,8 @@ export default function DatePicker({
                 setViewMonth(Number(value.slice(5, 7)) - 1);
             }
             setOpen(true);
+        } else {
+            inputRef.current?.focus();
         }
     };
 

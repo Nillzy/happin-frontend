@@ -26,7 +26,9 @@ function getBackendUrl(): string {
 const BASE_URL = getBackendUrl();
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-    const url = `${BASE_URL}${path}`;
+    const base = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
+    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    const url = `${base}/${cleanPath}`;
     const response = await fetch(url, {
         ...options,
         headers: {

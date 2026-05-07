@@ -30,6 +30,7 @@ import {
 } from '../services/supabase';
 import { useUserCity } from '@/hooks/use-user-city';
 import CityAutocomplete from '../components/atoms/CityAutocomplete';
+import { searchCities } from '../services/geocoding';
 import { api } from '../services/api';
 
 // ── Profilbild-Platzhalter ────────────────────────────────────────────────────
@@ -271,21 +272,60 @@ export default function AccountScreen() {
     const handleLocateMe = async () => {
         setLocating(true);
         try {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Kein Zugriff', 'Standortzugriff wurde nicht erlaubt.');
-                return;
+            let latitude: number;
+            let longitude: number;
+
+            if (Platform.OS === 'web') {
+                // Web: native Browser Geolocation API
+                const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+                );
+                latitude = pos.coords.latitude;
+                longitude = pos.coords.longitude;
+            } else {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                if (status !== 'granted') {
+                    Alert.alert('Kein Zugriff', 'Standortzugriff wurde nicht erlaubt.');
+                    return;
+                }
+                const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                latitude = pos.coords.latitude;
+                longitude = pos.coords.longitude;
             }
-            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-            const [result] = await Location.reverseGeocodeAsync({
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-            });
-            if (result) {
-                const name = result.city ?? result.subregion ?? result.region ?? '';
-                const parts = [name, result.region, result.country].filter(Boolean);
-                const label = parts.join(', ');
-                await saveCity(name, label);
+
+            const apiKey = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
+            const res = await fetch(
+                `https://api.maptiler.com/geocoding/${longitude},${latitude}.json?key=${apiKey}&language=de`
+            );
+            const data = await res.json();
+            const cityFeature = data.features?.find((f: any) =>
+                f.place_type?.some((t: string) => ['municipality', 'place', 'city'].includes(t))
+            );
+
+            let rawName = '';
+            if (cityFeature) {
+                rawName = cityFeature.text ?? '';
+            } else {
+                const firstFeature = data.features?.[0];
+                const context: any[] = firstFeature?.context ?? [];
+                const cityCtx = context.find((c: any) => c.id?.startsWith('county.'))
+                    ?? context.find((c: any) => c.id?.startsWith('subregion.'))
+                    ?? context.find((c: any) => c.id?.startsWith('municipality.'))
+                    ?? context.find((c: any) => c.id?.startsWith('place.'))
+                    ?? context.find((c: any) => c.id?.startsWith('locality.'));
+                rawName = cityCtx?.text ?? '';
+            }
+
+            if (!rawName) return;
+            const suggestions = await searchCities(rawName);
+            const best = suggestions[0];
+            if (best) {
+                setCityInput(best.name);
+                setEditingCity(true);
+                await handleSaveCity(best.name, best.displayLabel);
+            } else {
+                setCityInput(rawName);
+                setEditingCity(true);
             }
         } catch {
             Alert.alert('Fehler', 'Standort konnte nicht ermittelt werden.');

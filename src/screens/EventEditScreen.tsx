@@ -24,10 +24,14 @@ import CategorySelector from '../components/atoms/CategorySelector';
 import DatePicker from '../components/atoms/DatePicker';
 import TimePicker from '../components/atoms/TimePicker';
 import ImageGalleryUploader from '../components/atoms/ImageGalleryUploader';
+import AddressAutocomplete from '../components/atoms/AddressAutocomplete';
+import MapView from '../components/MapView';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
 import { getGradient, type GradientId } from '../constants/gradients';
+import { geocodeAddress } from '../services/geocoding';
 import type { EventDetailResponse, TicketOption } from '../types/events';
+import type { AddressSuggestion } from '../services/geocoding';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.75;
@@ -68,16 +72,13 @@ export default function EventEditScreen() {
     // Draft fields
     const [draftDescription, setDraftDescription] = useState('');
     const [draftCategories, setDraftCategories] = useState<string[]>([]);
-    const [draftCity, setDraftCity] = useState('');
-    const [draftStreet, setDraftStreet] = useState('');
-    const [draftHouseNumber, setDraftHouseNumber] = useState('');
-    const [draftPostalCode, setDraftPostalCode] = useState('');
-    const [draftCountry, setDraftCountry] = useState('Deutschland');
+    const [draftAddress, setDraftAddress] = useState<AddressSuggestion | null>(null);
     const [draftMaxCapacity, setDraftMaxCapacity] = useState('');
     const [draftEndDate, setDraftEndDate] = useState('');
     const [draftEndTime, setDraftEndTime] = useState('');
     const [draftGalleryImages, setDraftGalleryImages] = useState<string[]>([]);
     const [draftTickets, setDraftTickets] = useState<TicketOption[]>([]);
+    const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
 
     const isWeb = Platform.OS === 'web';
     const isDraft = event?.status === 'draft';
@@ -89,6 +90,17 @@ export default function EventEditScreen() {
             const token = await getSession();
             const data = await api.getEventById(eventId, token || undefined);
             setEvent(data);
+            const loc = data.location;
+            if (loc) {
+                if (loc.latitude != null && loc.longitude != null) {
+                    setMapCoords({ lat: loc.latitude, lng: loc.longitude });
+                } else if (loc.city) {
+                    geocodeAddress(
+                        loc.house_number ? `${loc.street} ${loc.house_number}` : loc.street,
+                        loc.city, loc.postal_code ?? null, loc.country ?? null,
+                    ).then((c) => { if (c) setMapCoords(c); });
+                }
+            }
         } catch (e) {
             setError('Event konnte nicht geladen werden');
             console.error(e);
@@ -153,13 +165,37 @@ export default function EventEditScreen() {
             case 'categories':
                 setDraftCategories(event.category ? event.category.split(',').map(c => c.trim()) : []);
                 break;
-            case 'location':
-                setDraftCity(event.location?.city || '');
-                setDraftStreet(event.location?.street || '');
-                setDraftHouseNumber(event.location?.house_number || '');
-                setDraftPostalCode(event.location?.postal_code || '');
-                setDraftCountry(event.location?.country || 'Deutschland');
+            case 'location': {
+                const loc = event.location;
+                if (loc?.street && loc?.city) {
+                    const addr: AddressSuggestion = {
+                        street: loc.street,
+                        houseNumber: loc.house_number ?? null,
+                        postalCode: loc.postal_code ?? null,
+                        city: loc.city,
+                        country: loc.country ?? 'Deutschland',
+                        displayLabel: [
+                            loc.house_number ? `${loc.street} ${loc.house_number}` : loc.street,
+                            [loc.postal_code, loc.city].filter(Boolean).join(' '),
+                        ].filter(Boolean).join(', '),
+                        lat: 0,
+                        lng: 0,
+                    };
+                    setDraftAddress(addr);
+                    // Koordinaten nachladen damit die Karte korrekt zentriert ist
+                    geocodeAddress(
+                        loc.house_number ? `${loc.street} ${loc.house_number}` : loc.street,
+                        loc.city,
+                        loc.postal_code ?? null,
+                        loc.country ?? null,
+                    ).then((coords) => {
+                        if (coords) setDraftAddress(prev => prev ? { ...prev, lat: coords.lat, lng: coords.lng } : prev);
+                    });
+                } else {
+                    setDraftAddress(null);
+                }
                 break;
+            }
             case 'details':
                 setDraftMaxCapacity(event.max_capacity ? String(event.max_capacity) : '');
                 if (event.ends_at) {
@@ -198,14 +234,17 @@ export default function EventEditScreen() {
                 break;
             }
             case 'location':
-                await saveField({
-                    location: {
-                        city: draftCity, street: draftStreet || undefined,
-                        house_number: draftHouseNumber || undefined,
-                        postal_code: draftPostalCode || undefined,
-                        country: draftCountry || undefined,
-                    },
-                });
+                if (draftAddress) {
+                    await saveField({
+                        location: {
+                            city: draftAddress.city,
+                            street: draftAddress.street || undefined,
+                            house_number: draftAddress.houseNumber || undefined,
+                            postal_code: draftAddress.postalCode || undefined,
+                            country: draftAddress.country || undefined,
+                        },
+                    });
+                }
                 break;
             case 'details': {
                 const patch: Record<string, any> = {};
@@ -429,7 +468,10 @@ export default function EventEditScreen() {
                         {event.location?.city ? (
                             <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('location')}>
                                 <View style={[styles.section, { position: 'relative' }]}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Location</Text>
+                                    <View style={styles.sectionTitleRow}>
+                                        <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Location</Text>
+                                        <Text style={[styles.sectionTitleRequired, { color: colors.error }]}>*</Text>
+                                    </View>
                                     <View style={[...glassCard, styles.locationCard]}>
                                         <View style={styles.locationHeader}>
                                             <View style={styles.locationTextContainer}>
@@ -445,9 +487,27 @@ export default function EventEditScreen() {
                                                 </Text>
                                             </View>
                                         </View>
-                                        <View style={[styles.mapPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
-                                            <Ionicons name="map-outline" size={48} color={colors.onSurfaceVariant} />
-                                            <Text style={[styles.mapPlaceholderText, { color: colors.onSurfaceVariant }]}>Kartenansicht</Text>
+                                        <View style={styles.mapPreview}>
+                                            {mapCoords ? (
+                                                <MapView
+                                                    markers={[{
+                                                        lat: mapCoords.lat,
+                                                        lng: mapCoords.lng,
+                                                        title: event.location?.city ?? '',
+                                                        eventId: '__preview__',
+                                                    }]}
+                                                    centerLat={mapCoords.lat}
+                                                    centerLng={mapCoords.lng}
+                                                    zoom={15}
+                                                    isDark={isDark}
+                                                    showPopups={false}
+                                                    interactive={false}
+                                                />
+                                            ) : (
+                                                <View style={[styles.mapPreview, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', alignItems: 'center', justifyContent: 'center' }]}>
+                                                    <Ionicons name="map-outline" size={48} color={colors.onSurfaceVariant} />
+                                                </View>
+                                            )}
                                         </View>
                                     </View>
                                     {renderEditOverlay(() => openDrawer('location'))}
@@ -455,7 +515,7 @@ export default function EventEditScreen() {
                             </TouchableOpacity>
                         ) : (
                             <View style={styles.section}>
-                                {renderPlaceholder('Ort hinzufügen', 'location-outline', () => openDrawer('location'))}
+                                {renderPlaceholder('Ort hinzufügen *', 'location-outline', () => openDrawer('location'))}
                             </View>
                         )}
 
@@ -620,28 +680,29 @@ export default function EventEditScreen() {
                 </EditDrawer>
 
                 <EditDrawer visible={activeDrawer === 'location'} onClose={closeDrawer} title="Ort bearbeiten">
-                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Stadt *</Text>
-                    <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftCity} onChangeText={setDraftCity} placeholder="Stadt" placeholderTextColor={colors.onSurfaceVariant} />
-                    <View style={styles.drawerRow}>
-                        <View style={{ flex: 2 }}>
-                            <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Straße</Text>
-                            <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftStreet} onChangeText={setDraftStreet} placeholder="Straße" placeholderTextColor={colors.onSurfaceVariant} />
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Adresse *</Text>
+                    <AddressAutocomplete
+                        initialSelected={draftAddress}
+                        onSelect={setDraftAddress}
+                        onClear={() => setDraftAddress(null)}
+                    />
+                    {draftAddress && draftAddress.lat !== 0 && draftAddress.lng !== 0 && (
+                        <View style={styles.drawerMap}>
+                            <MapView
+                                markers={[{
+                                    lat: draftAddress.lat,
+                                    lng: draftAddress.lng,
+                                    title: draftAddress.displayLabel,
+                                    eventId: '__preview__',
+                                }]}
+                                centerLat={draftAddress.lat}
+                                centerLng={draftAddress.lng}
+                                zoom={15}
+                                isDark={isDark}
+                                showPopups={false}
+                            />
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Nr.</Text>
-                            <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftHouseNumber} onChangeText={setDraftHouseNumber} placeholder="Nr." placeholderTextColor={colors.onSurfaceVariant} />
-                        </View>
-                    </View>
-                    <View style={styles.drawerRow}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>PLZ</Text>
-                            <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftPostalCode} onChangeText={setDraftPostalCode} placeholder="PLZ" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Land</Text>
-                            <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftCountry} onChangeText={setDraftCountry} placeholder="Land" placeholderTextColor={colors.onSurfaceVariant} />
-                        </View>
-                    </View>
+                    )}
                 </EditDrawer>
 
                 <EditDrawer visible={activeDrawer === 'tickets'} onClose={closeDrawer} title="Ticketoptionen">
@@ -755,6 +816,8 @@ const styles = StyleSheet.create({
     section: { marginBottom: 32 },
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     sectionTitle: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
+    sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 12 },
+    sectionTitleRequired: { fontSize: 13, fontWeight: '700', lineHeight: 18 },
 
     // Location (same as EventScreen)
     locationCard: { padding: 16 },
@@ -762,8 +825,7 @@ const styles = StyleSheet.create({
     locationTextContainer: { flex: 1 },
     locationAddress: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
     locationCity: { fontSize: 14 },
-    mapPlaceholder: { height: 200, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 8 },
-    mapPlaceholderText: { fontSize: 14, fontWeight: '600' },
+    mapPreview: { height: 200, borderRadius: 12, overflow: 'hidden' },
 
     // Host Row (same as EventScreen)
     hostRow: { flexDirection: 'row', alignItems: 'center' },
@@ -815,6 +877,7 @@ const styles = StyleSheet.create({
     },
     drawerLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6, letterSpacing: 0.2 },
     drawerRow: { flexDirection: 'row', gap: 12 },
+    drawerMap: { marginTop: 16, height: 200, borderRadius: 14, overflow: 'hidden' },
 
     // Ticket card in drawer
     ticketCard: { borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 14 },

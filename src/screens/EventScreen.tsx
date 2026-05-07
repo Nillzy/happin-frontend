@@ -13,6 +13,7 @@ import {
     Pressable,
     Modal,
     Alert,
+    useWindowDimensions,
     Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,8 +23,10 @@ import { Ionicons } from '@expo/vector-icons';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import EventCategories from '../components/event/EventCategories';
 import EventImageGallery from '../components/atoms/EventImageGallery';
+import MapView from '../components/MapView';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
+import { geocodeAddress } from '../services/geocoding';
 import type { EventDetailResponse, RsvpStatus } from '../types/events';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -56,25 +59,93 @@ function formatDateGerman(isoDate: string): string {
     }).format(d);
 }
 
-/**
- * EventScreen - Luma-inspired Event Detail View
- *
- * Layout inspired by Luma (Hero Image, Action Buttons, Location Card, Host Section)
- * Design System: Material Design 3 tokens from DESIGN.md
- * Color Palette: useTheme() hook (Happin Light / Neon Horizon)
- * Typography: Inter for body, Plus Jakarta Sans for headings
- * Spacing: 8px system (DESIGN.md)
- * Border Radius: 12-20px (DESIGN.md card_radius)
- */
+function DesktopStickyBar({ event, colors, isDark, rsvpStatus, rsvpLoading, onRsvp, onTickets }: {
+    event: EventDetailResponse;
+    colors: any;
+    isDark: boolean;
+    rsvpStatus: RsvpStatus | null;
+    rsvpLoading: boolean;
+    onRsvp: () => void;
+    onTickets: () => void;
+}) {
+    const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+    const bgColor = isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)';
+
+    if (event.is_free) {
+        const btnBg = (event.is_public && rsvpStatus === 'Accepted') ? 'transparent' : colors.primary;
+        const btnBorder = (event.is_public && rsvpStatus === 'Accepted') ? colors.outline : 'transparent';
+        const btnTextColor = (event.is_public && rsvpStatus === 'Accepted') ? colors.onSurface : colors.onPrimary;
+        return (
+            <View style={[deskBarStyles.bar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
+                <View style={deskBarStyles.info}>
+                    <Text style={[deskBarStyles.price, { color: colors.onSurface }]}>Kostenlos</Text>
+                    <Text style={[deskBarStyles.hint, { color: colors.onSurfaceVariant }]}>{event.participant_count} Teilnehmer</Text>
+                </View>
+                <TouchableOpacity
+                    style={[deskBarStyles.btn, { backgroundColor: btnBg, borderColor: btnBorder, borderWidth: btnBorder === 'transparent' ? 0 : 1.5 }]}
+                    onPress={onRsvp}
+                    disabled={rsvpLoading}
+                >
+                    <Text style={[deskBarStyles.btnText, { color: btnTextColor }]}>
+                        {rsvpLoading ? '...' : event.is_public ? (rsvpStatus === 'Accepted' ? 'Absagen' : 'Zusagen') : 'RSVP'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    const tickets = event.ticket_options?.length ? event.ticket_options : MOCK_TICKET_OPTIONS;
+    const cheapest = Math.min(...tickets.map(t => t.price));
+    return (
+        <View style={[deskBarStyles.bar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
+            <View style={deskBarStyles.info}>
+                <Text style={[deskBarStyles.price, { color: colors.onSurface }]}>{cheapest === 0 ? 'Kostenlos' : `ab ${cheapest.toFixed(2)} €`}</Text>
+                <Text style={[deskBarStyles.hint, { color: colors.onSurfaceVariant }]}>{tickets.length} Ticketoptionen</Text>
+            </View>
+            <TouchableOpacity style={[deskBarStyles.btn, { backgroundColor: colors.primary }]} onPress={onTickets}>
+                <Text style={[deskBarStyles.btnText, { color: colors.onPrimary }]}>Tickets wählen</Text>
+            </TouchableOpacity>
+        </View>
+    );
+}
+
+const deskBarStyles = StyleSheet.create({
+    bar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderTopWidth: StyleSheet.hairlineWidth,
+        paddingVertical: 16,
+        paddingHorizontal: 4,
+        marginTop: 24,
+        borderRadius: 12,
+    },
+    info: { flex: 1, marginRight: 16 },
+    price: { fontSize: 18, fontWeight: '800' },
+    hint: { fontSize: 13, marginTop: 2 },
+    btn: {
+        paddingHorizontal: 28,
+        paddingVertical: 14,
+        borderRadius: 14,
+        minHeight: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    btnText: { fontSize: 15, fontWeight: '700' },
+});
+
+
 export default function EventScreen() {
     const { colors, isDark } = useTheme();
     const router = useRouter();
     const params = useLocalSearchParams<{ id?: string; eventId?: string }>();
-    const id = params.id || params.eventId; // Support both /event/[id] and /event/[eventId]
+    const id = params.id || params.eventId;
+    const { width: windowWidth } = useWindowDimensions();
 
     const [event, setEvent] = useState<EventDetailResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
 
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [selectedTicketIdx, setSelectedTicketIdx] = useState(0);
@@ -84,6 +155,7 @@ export default function EventScreen() {
     const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus | null>(null);
     const [rsvpMenuVisible, setRsvpMenuVisible] = useState(false);
     const [rsvpLoading, setRsvpLoading] = useState(false);
+    const [sliderIndex, setSliderIndex] = useState(0);
 
     const openDrawer = () => {
         setDrawerOpen(true);
@@ -100,45 +172,6 @@ export default function EventScreen() {
         loadEvent();
     }, [id]);
 
-    // MOCK: Fake Event-Detail für die Techno-Party — entfernen wenn nicht mehr benötigt
-    const MOCK_TECHNO_DETAIL: EventDetailResponse = {
-        event_id: 'mock-techno-001',
-        title: 'Neon Pulse — Techno Lasershow',
-        starts_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
-        ends_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000 + 6 * 60 * 60 * 1000).toISOString(),
-        is_public: true,
-        is_free: false,
-        status: 'published',
-        participant_count: 487,
-        max_capacity: 600,
-        category: 'Techno,Rave,Electronic',
-        image_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&q=80',
-        description: 'Tauche ein in eine Nacht voller pulsierender Beats und atemberaubender Lasereffekte. '
-            + 'Neon Pulse bringt drei internationale DJs auf die Bühne eines umgebauten Industrielagers in Berlin-Kreuzberg. '
-            + 'Erwartet euch ein 360°-Lasersystem, Nebel-Maschinen und ein Soundsystem, das keine Wünsche offen lässt.\n\n'
-            + 'Line-Up:\n• Amelie Lens\n• I Hate Models\n• VTSS\n\n'
-            + 'Doors open: 23:00\nLast Entry: 03:00\nEnde: 07:00',
-        host_name: 'Neon Collective',
-        location: {
-            location_id: 'mock',
-            city: 'Berlin',
-            street: 'Revaler Str.',
-            house_number: '99',
-            postal_code: '10245',
-            country: 'Deutschland',
-        },
-        media_urls: [
-            'https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?w=800&q=80',
-            'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&q=80',
-            'https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?w=800&q=80',
-        ],
-        ticket_options: [
-            { name: 'Early Bird', price: 25, sort_order: 0, quantity_limit: 100 },
-            { name: 'Regular', price: 35, sort_order: 1, quantity_limit: 400 },
-            { name: 'VIP Lounge', price: 75, sort_order: 2, quantity_limit: 50, description: 'Eigener Bereich mit Lounge-Zugang, Willkommensdrink & Priority-Einlass' },
-        ] as any,
-    };
-
     const loadEvent = async () => {
         try {
             setLoading(true);
@@ -148,15 +181,18 @@ export default function EventScreen() {
                 throw new Error('Event-ID fehlt');
             }
 
-            if (id === 'mock-techno-001') {
-                setEvent(MOCK_TECHNO_DETAIL);
-                return;
-            }
 
             const token = await getSession();
             const data = await api.getEventById(id, token || undefined);
             setEvent(data);
             setRsvpStatus(data.my_rsvp_status ?? null);
+            const loc = data.location;
+            if (loc) {
+                geocodeAddress(
+                    loc.house_number ? `${loc.street} ${loc.house_number}` : loc.street,
+                    loc.city, loc.postal_code ?? null, loc.country ?? null,
+                ).then((c) => { if (c) setMapCoords(c); });
+            }
         } catch (e) {
             console.error('[EventScreen] Load error:', e);
             setError(e instanceof Error ? e.message : 'Event konnte nicht geladen werden');
@@ -259,10 +295,14 @@ export default function EventScreen() {
     const hostInitial = event.host_name?.charAt(0).toUpperCase() || 'H';
     const categories = event.category ? event.category.split(',').map(c => c.trim()) : [];
 
-    console.log('[EventScreen] Parsed categories:', categories);
-    console.log('[EventScreen] Media URLs count:', event.media_urls?.length || 0);
-
     const isWeb = Platform.OS === 'web';
+    const isDesktop = isWeb && windowWidth >= 900;
+
+    // Slider images: hero first, then gallery
+    const sliderImages: string[] = [];
+    if (event.image_url) sliderImages.push(event.image_url);
+    (event.media_urls ?? []).forEach((u) => { if (u !== event.image_url) sliderImages.push(u); });
+    const sliderCount = sliderImages.length;
     const glassCard = [
         styles.glassCard,
         isWeb
@@ -300,188 +340,351 @@ export default function EventScreen() {
                 )}
                 <View style={[styles.bgOverlay, { backgroundColor: isDark ? 'rgba(12,13,20,0.35)' : 'rgba(248,249,250,0.25)' }]} />
 
-                <ScrollView showsVerticalScrollIndicator={false}>
-                    {/* Hero Image with Title Overlay */}
-                    <View style={styles.heroContainer}>
-                        {event.image_url ? (
-                            <Image
-                                source={{ uri: event.image_url }}
-                                style={styles.heroImage}
-                                resizeMode="cover"
-                            />
-                        ) : (
-                            <LinearGradient
-                                colors={GRADIENT_FALLBACK as [string, string]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.heroImage}
-                            />
-                        )}
-
-                        {/* Back Button */}
-                        <TouchableOpacity
-                            style={[styles.backButton, isWeb
-                                ? { backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' } as any
-                                : { backgroundColor: colors.surfaceContainerHigh }
-                            ]}
-                            onPress={() => {
-                                if (router.canGoBack()) {
-                                    router.back();
-                                } else {
-                                    router.push('/events');
-                                }
-                            }}
-                        >
-                            <Ionicons name="arrow-back" size={24} color="#ffffff" />
-                        </TouchableOpacity>
-
-                        {/* Title Overlay */}
-                        <View style={styles.titleOverlay}>
-                            <LinearGradient
-                                colors={['transparent', 'rgba(0,0,0,0.85)']}
-                                style={styles.titleGradient}
+                {isDesktop ? (
+                    /* ── Desktop: split layout ── */
+                    <View style={styles.desktopLayout}>
+                        {/* Left pane: image slider */}
+                        <View style={styles.desktopLeft}>
+                            {/* Back button */}
+                            <TouchableOpacity
+                                style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' } as any]}
+                                onPress={() => router.canGoBack() ? router.back() : router.push('/events')}
                             >
-                                <Text style={styles.heroTitle}>{event.title}</Text>
-                                <Text style={styles.heroDate}>{formatDateGerman(event.starts_at)}</Text>
-                            </LinearGradient>
-                        </View>
-                    </View>
+                                <Ionicons name="arrow-back" size={24} color="#ffffff" />
+                            </TouchableOpacity>
 
-                    {/* Content Container */}
-                    <View style={styles.content}>
-                        {/* Host Card */}
-                        <View style={[...glassCard, styles.hostCard]}>
-                            <View style={styles.hostInfo}>
-                                <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
-                                    <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>
-                                        {hostInitial}
-                                    </Text>
-                                </View>
-                                <View style={styles.hostTextContainer}>
-                                    <Text style={[styles.hostName, { color: colors.onSurface }]}>
-                                        {event.host_name || 'Host'}
-                                    </Text>
-                                    <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>
-                                        invited you
-                                    </Text>
-                                </View>
-                            </View>
-                            <TouchableOpacity>
-                                <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurfaceVariant} />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Action Buttons Row */}
-                        <View style={styles.actionButtons}>
-                            <TouchableOpacity style={glassActionBtn} onPress={handleRegister}>
-                                <Ionicons name="calendar" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>RSVP</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
-                                <Ionicons name="mail-outline" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kontakt</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
-                                <Ionicons name="share-outline" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
-                            </TouchableOpacity>
-                            {rsvpStatus === 'Accepted' ? (
-                                <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/ticket/${id}`)}>
-                                    <Ionicons name="qr-code-outline" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Ticket</Text>
-                                </TouchableOpacity>
+                            {/* Current image */}
+                            {sliderImages.length > 0 ? (
+                                <Image
+                                    source={{ uri: sliderImages[sliderIndex] }}
+                                    style={styles.desktopSliderImage}
+                                    resizeMode="cover"
+                                />
                             ) : (
+                                <LinearGradient
+                                    colors={GRADIENT_FALLBACK as [string, string]}
+                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                    style={styles.desktopSliderImage}
+                                />
+                            )}
+
+                            {/* Prev / Next arrows */}
+                            {sliderCount > 1 && (
+                                <>
+                                    <TouchableOpacity
+                                        style={[styles.sliderArrow, styles.sliderArrowLeft]}
+                                        onPress={() => setSliderIndex((sliderIndex - 1 + sliderCount) % sliderCount)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="chevron-back" size={22} color="#fff" />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.sliderArrow, styles.sliderArrowRight]}
+                                        onPress={() => setSliderIndex((sliderIndex + 1) % sliderCount)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="chevron-forward" size={22} color="#fff" />
+                                    </TouchableOpacity>
+                                </>
+                            )}
+
+                            {/* Dot indicators */}
+                            {sliderCount > 1 && (
+                                <View style={styles.sliderDots}>
+                                    {sliderImages.map((_, i) => (
+                                        <TouchableOpacity key={i} onPress={() => setSliderIndex(i)} activeOpacity={0.7}>
+                                            <View style={[
+                                                styles.sliderDot,
+                                                i === sliderIndex
+                                                    ? { backgroundColor: '#fff', width: 20 }
+                                                    : { backgroundColor: 'rgba(255,255,255,0.45)', width: 8 },
+                                            ]} />
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+
+                            {/* Title overlay at bottom of left pane */}
+                            <View style={styles.desktopTitleOverlay}>
+                                <LinearGradient
+                                    colors={['transparent', 'rgba(0,0,0,0.85)']}
+                                    style={styles.desktopTitleGradient}
+                                >
+                                    <Text style={styles.heroTitle}>{event.title}</Text>
+                                    <Text style={styles.heroDate}>{formatDateGerman(event.starts_at)}</Text>
+                                </LinearGradient>
+                            </View>
+                        </View>
+
+                        {/* Right pane: scrollable content */}
+                        <ScrollView
+                            style={styles.desktopRight}
+                            contentContainerStyle={styles.desktopRightContent}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {/* Host Card */}
+                            <View style={[...glassCard, styles.hostCard]}>
+                                <View style={styles.hostInfo}>
+                                    <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
+                                        <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>{hostInitial}</Text>
+                                    </View>
+                                    <View style={styles.hostTextContainer}>
+                                        <Text style={[styles.hostName, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
+                                        <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>invited you</Text>
+                                    </View>
+                                </View>
+                                <TouchableOpacity>
+                                    <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurfaceVariant} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Action Buttons */}
+                            <View style={styles.actionButtons}>
+                                <TouchableOpacity style={glassActionBtn} onPress={handleRegister}>
+                                    <Ionicons name="calendar" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Register</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
+                                    <Ionicons name="mail-outline" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Contact</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
+                                    <Ionicons name="share-outline" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Share</Text>
+                                </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn}>
                                     <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>More</Text>
                                 </TouchableOpacity>
+                            </View>
+
+                            {/* Categories */}
+                            {categories.length > 0 && (
+                                <View style={styles.section}>
+                                    <EventCategories categories={categories} editMode={false} />
+                                </View>
                             )}
-                        </View>
 
-                        {/* Kategorien Section */}
-                        {categories.length > 0 && (
-                            <View style={styles.section}>
-                                <EventCategories categories={categories} editMode={false} />
-                            </View>
-                        )}
+                            {/* About */}
+                            {event.description && (
+                                <View style={[...glassCard, styles.section, { padding: 20 }]}>
+                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>About Event</Text>
+                                    <Text style={[styles.description, { color: colors.onSurface }]}>{event.description}</Text>
+                                </View>
+                            )}
 
-                        {/* About Event Section */}
-                        {event.description && (
-                            <View style={[...glassCard, styles.section, { padding: 20 }]}>
-                                <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>About Event</Text>
-                                <Text style={[styles.description, { color: colors.onSurface }]}>
-                                    {event.description}
-                                </Text>
-                            </View>
-                        )}
-
-                        {/* Location Section */}
-                        {event.location && (
-                            <View style={styles.section}>
-                                <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Location</Text>
-                                <View style={[...glassCard, styles.locationCard]}>
-                                    <View style={styles.locationHeader}>
-                                        <View style={styles.locationTextContainer}>
-                                            <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
-                                                {event.location.street && event.location.house_number
-                                                    ? `${event.location.street} ${event.location.house_number}`
-                                                    : event.location.city || 'Adresse nicht verfügbar'}
-                                            </Text>
-                                            <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
-                                                {event.location.city && event.location.country
-                                                    ? `${event.location.city}, ${event.location.country}`
-                                                    : event.location.city || ''}
-                                            </Text>
+                            {/* Location */}
+                            {event.location && (
+                                <View style={styles.section}>
+                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Location</Text>
+                                    <View style={[...glassCard, styles.locationCard]}>
+                                        <View style={styles.locationHeader}>
+                                            <View style={styles.locationTextContainer}>
+                                                <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
+                                                    {event.location.street && event.location.house_number
+                                                        ? `${event.location.street} ${event.location.house_number}`
+                                                        : event.location.city || 'Adresse nicht verfügbar'}
+                                                </Text>
+                                                <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
+                                                    {event.location.city && event.location.country
+                                                        ? `${event.location.city}, ${event.location.country}`
+                                                        : event.location.city || ''}
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <View style={styles.weatherContainer}>
-                                            <Ionicons name="partly-sunny-outline" size={20} color={colors.onSurfaceVariant} />
-                                            <Text style={[styles.weatherText, { color: colors.onSurfaceVariant }]}>18°C</Text>
+                                        <View style={styles.mapPreview}>
+                                            {mapCoords ? (
+                                                <MapView
+                                                    markers={[{ lat: mapCoords.lat, lng: mapCoords.lng, title: event.location?.city ?? '', eventId: '__preview__' }]}
+                                                    centerLat={mapCoords.lat}
+                                                    centerLng={mapCoords.lng}
+                                                    zoom={15}
+                                                    isDark={isDark}
+                                                    showPopups={false}
+                                                    interactive={false}
+                                                />
+                                            ) : (
+                                                <View style={[styles.mapPreview, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', alignItems: 'center', justifyContent: 'center' }]}>
+                                                    <Ionicons name="map-outline" size={48} color={colors.onSurfaceVariant} />
+                                                </View>
+                                            )}
                                         </View>
-                                    </View>
-                                    <View style={[styles.mapPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
-                                        <Ionicons name="map-outline" size={48} color={colors.onSurfaceVariant} />
-                                        <Text style={[styles.mapPlaceholderText, { color: colors.onSurfaceVariant }]}>
-                                            Kartenansicht
-                                        </Text>
                                     </View>
                                 </View>
-                            </View>
-                        )}
+                            )}
 
-                        {/* Galerie Section */}
-                        {event.media_urls && event.media_urls.length > 0 && (
+                            {/* Host */}
                             <View style={styles.section}>
-                                <EventImageGallery images={event.media_urls} />
+                                <View style={styles.sectionHeader}>
+                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Host</Text>
+                                    <TouchableOpacity onPress={handleContact}>
+                                        <Text style={[styles.contactLink, { color: colors.primary }]}>Contact</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={styles.hostRow}>
+                                    <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
+                                        <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>{hostInitial}</Text>
+                                    </View>
+                                    <Text style={[styles.hostNameLarge, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
+                                </View>
                             </View>
-                        )}
 
-                        {/* Host Section */}
-                        <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Host</Text>
-                                <TouchableOpacity onPress={handleContact}>
-                                    <Text style={[styles.contactLink, { color: colors.primary }]}>Contact</Text>
+                            {/* Desktop sticky bar inline at bottom of scroll */}
+                            <DesktopStickyBar
+                                event={event}
+                                colors={colors}
+                                isDark={isDark}
+                                rsvpStatus={rsvpStatus}
+                                rsvpLoading={rsvpLoading}
+                                onRsvp={handleStickyBarPress}
+                                onTickets={openDrawer}
+                            />
+
+                            <View style={{ height: 32 }} />
+                        </ScrollView>
+                    </View>
+                ) : (
+                    /* ── Mobile: original layout ── */
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                        {/* Hero Image with Title Overlay */}
+                        <View style={styles.heroContainer}>
+                            {event.image_url ? (
+                                <Image source={{ uri: event.image_url }} style={styles.heroImage} resizeMode="cover" />
+                            ) : (
+                                <LinearGradient colors={GRADIENT_FALLBACK as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroImage} />
+                            )}
+
+                            <TouchableOpacity
+                                style={[styles.backButton, { backgroundColor: colors.surfaceContainerHigh }]}
+                                onPress={() => router.canGoBack() ? router.back() : router.push('/events')}
+                            >
+                                <Ionicons name="arrow-back" size={24} color="#ffffff" />
+                            </TouchableOpacity>
+
+                            <View style={styles.titleOverlay}>
+                                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.titleGradient}>
+                                    <Text style={styles.heroTitle}>{event.title}</Text>
+                                    <Text style={styles.heroDate}>{formatDateGerman(event.starts_at)}</Text>
+                                </LinearGradient>
+                            </View>
+                        </View>
+
+                        <View style={styles.content}>
+                            <View style={[...glassCard, styles.hostCard]}>
+                                <View style={styles.hostInfo}>
+                                    <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
+                                        <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>{hostInitial}</Text>
+                                    </View>
+                                    <View style={styles.hostTextContainer}>
+                                        <Text style={[styles.hostName, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
+                                        <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>invited you</Text>
+                                    </View>
+                                </View>
+                                <TouchableOpacity>
+                                    <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurfaceVariant} />
                                 </TouchableOpacity>
                             </View>
-                            <View style={styles.hostRow}>
-                                <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
-                                    <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>
-                                        {hostInitial}
-                                    </Text>
-                                </View>
-                                <Text style={[styles.hostNameLarge, { color: colors.onSurface }]}>
-                                    {event.host_name || 'Host'}
-                                </Text>
-                            </View>
-                        </View>
 
-                        <View style={{ height: 100 }} />
-                    </View>
-                </ScrollView>
+                            <View style={styles.actionButtons}>
+                                <TouchableOpacity style={glassActionBtn} onPress={handleRegister}>
+                                    <Ionicons name="calendar" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Register</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
+                                    <Ionicons name="mail-outline" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Contact</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
+                                    <Ionicons name="share-outline" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Share</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={glassActionBtn}>
+                                    <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>More</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {categories.length > 0 && (
+                                <View style={styles.section}>
+                                    <EventCategories categories={categories} editMode={false} />
+                                </View>
+                            )}
+
+                            {event.description && (
+                                <View style={[...glassCard, styles.section, { padding: 20 }]}>
+                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>About Event</Text>
+                                    <Text style={[styles.description, { color: colors.onSurface }]}>{event.description}</Text>
+                                </View>
+                            )}
+
+                            {event.location && (
+                                <View style={styles.section}>
+                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Location</Text>
+                                    <View style={[...glassCard, styles.locationCard]}>
+                                        <View style={styles.locationHeader}>
+                                            <View style={styles.locationTextContainer}>
+                                                <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
+                                                    {event.location.street && event.location.house_number
+                                                        ? `${event.location.street} ${event.location.house_number}`
+                                                        : event.location.city || 'Adresse nicht verfügbar'}
+                                                </Text>
+                                                <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
+                                                    {event.location.city && event.location.country
+                                                        ? `${event.location.city}, ${event.location.country}`
+                                                        : event.location.city || ''}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <View style={styles.mapPreview}>
+                                            {mapCoords ? (
+                                                <MapView
+                                                    markers={[{ lat: mapCoords.lat, lng: mapCoords.lng, title: event.location?.city ?? '', eventId: '__preview__' }]}
+                                                    centerLat={mapCoords.lat}
+                                                    centerLng={mapCoords.lng}
+                                                    zoom={15}
+                                                    isDark={isDark}
+                                                    showPopups={false}
+                                                    interactive={false}
+                                                />
+                                            ) : (
+                                                <View style={[styles.mapPreview, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', alignItems: 'center', justifyContent: 'center' }]}>
+                                                    <Ionicons name="map-outline" size={48} color={colors.onSurfaceVariant} />
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
+
+                            {event.media_urls && event.media_urls.length > 0 && (
+                                <View style={styles.section}>
+                                    <EventImageGallery images={event.media_urls} />
+                                </View>
+                            )}
+
+                            <View style={styles.section}>
+                                <View style={styles.sectionHeader}>
+                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Host</Text>
+                                    <TouchableOpacity onPress={handleContact}>
+                                        <Text style={[styles.contactLink, { color: colors.primary }]}>Contact</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <View style={styles.hostRow}>
+                                    <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
+                                        <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>{hostInitial}</Text>
+                                    </View>
+                                    <Text style={[styles.hostNameLarge, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
+                                </View>
+                            </View>
+
+                            <View style={{ height: 100 }} />
+                        </View>
+                    </ScrollView>
+                )}
             </View>
 
-            {/* Sticky Bottom Bar */}
-            {(() => {
+            {/* Sticky Bottom Bar — mobile only */}
+            {!isDesktop && (() => {
                 if (event.is_free) {
                     const statusHint = rsvpStatus === 'Accepted' ? 'Du hast zugesagt'
                         : rsvpStatus === 'Declined' ? 'Du hast abgesagt'
@@ -795,6 +998,75 @@ const styles = StyleSheet.create({
     root: {
         flex: 1,
     },
+
+    // ── Desktop split layout ──────────────────────────────────────────────────
+    desktopLayout: {
+        flex: 1,
+        flexDirection: 'row',
+    },
+    desktopLeft: {
+        width: '40%',
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    desktopSliderImage: {
+        width: '100%',
+        height: '100%',
+    },
+    sliderArrow: {
+        position: 'absolute',
+        top: '50%',
+        marginTop: -22,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+    },
+    sliderArrowLeft: {
+        left: 14,
+    },
+    sliderArrowRight: {
+        right: 14,
+    },
+    sliderDots: {
+        position: 'absolute',
+        bottom: 80,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 6,
+        zIndex: 10,
+    },
+    sliderDot: {
+        height: 8,
+        borderRadius: 4,
+    },
+    desktopTitleOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 160,
+    },
+    desktopTitleGradient: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        paddingHorizontal: 28,
+        paddingBottom: 28,
+    },
+    desktopRight: {
+        flex: 1,
+    },
+    desktopRightContent: {
+        paddingHorizontal: 32,
+        paddingTop: 28,
+        paddingBottom: 0,
+    },
     bgImage: {
         position: 'absolute',
         top: 0,
@@ -998,24 +1270,15 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     weatherContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
+        display: 'none',
     },
     weatherText: {
-        fontSize: 14,
-        fontWeight: '600',
+        display: 'none',
     },
-    mapPlaceholder: {
+    mapPreview: {
         height: 200,
         borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-    },
-    mapPlaceholderText: {
-        fontSize: 14,
-        fontWeight: '600',
+        overflow: 'hidden',
     },
 
     // Host Row

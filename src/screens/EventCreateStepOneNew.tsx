@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     TouchableOpacity,
+    Pressable,
     ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,7 @@ export default function EventCreateStepOneNew() {
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [errors, setErrors] = useState<{ title?: string; date?: string; time?: string }>({});
+    const titleInputRef = useRef<TextInput>(null);
 
     const validate = (): boolean => {
         const e: typeof errors = {};
@@ -130,11 +132,12 @@ export default function EventCreateStepOneNew() {
                         </View>
 
                         {/* Titel Card */}
-                        <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
+                        <Pressable onPress={() => titleInputRef.current?.focus()} style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
                             <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>
                                 Titel
                             </Text>
                             <TextInput
+                                ref={titleInputRef}
                                 style={[
                                     styles.input,
                                     {
@@ -156,7 +159,7 @@ export default function EventCreateStepOneNew() {
                                     {errors.title}
                                 </Text>
                             )}
-                        </View>
+                        </Pressable>
 
                         {/* Datum & Uhrzeit Card */}
                         <View style={[styles.card, { backgroundColor: colors.surfaceContainer, zIndex: 100 }, Platform.OS === 'web' ? { overflow: 'visible' } as any : null]}>
