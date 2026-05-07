@@ -13,6 +13,7 @@ import {
     Pressable,
     Modal,
     Alert,
+    Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
@@ -218,9 +219,15 @@ export default function EventScreen() {
         console.log('Contact host');
     };
 
-    const handleShare = () => {
-        // TODO: Share event
-        console.log('Share event');
+    const handleShare = async () => {
+        const link = `https://happin.fun/event/${id}`;
+        try {
+            await Share.share({
+                message: link,
+            });
+        } catch {
+            // User cancelled share dialog
+        }
     };
 
     if (loading) {
@@ -368,20 +375,27 @@ export default function EventScreen() {
                         <View style={styles.actionButtons}>
                             <TouchableOpacity style={glassActionBtn} onPress={handleRegister}>
                                 <Ionicons name="calendar" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Register</Text>
+                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>RSVP</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
                                 <Ionicons name="mail-outline" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Contact</Text>
+                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kontakt</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
                                 <Ionicons name="share-outline" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Share</Text>
+                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={glassActionBtn}>
-                                <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>More</Text>
-                            </TouchableOpacity>
+                            {rsvpStatus === 'Accepted' ? (
+                                <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/ticket/${id}`)}>
+                                    <Ionicons name="qr-code-outline" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Ticket</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity style={glassActionBtn}>
+                                    <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
 
                         {/* Kategorien Section */}

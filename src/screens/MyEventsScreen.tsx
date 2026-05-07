@@ -18,7 +18,7 @@ import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
-import { EventListItem } from '../types/events';
+import { EventListItem, UserTicket } from '../types/events';
 import QRCode from 'react-native-qrcode-svg';
 
 const CONTAINER_MAX_WIDTH = 900;
@@ -86,6 +86,7 @@ export default function MyEventsScreen() {
     const [organizedEvents, setOrganizedEvents] = useState<EventListItem[]>([]);
     const [attendingEvents, setAttendingEvents] = useState<EventListItem[]>([]);
     const [pastEvents, setPastEvents] = useState<EventListItem[]>([]);
+    const [ticketMap, setTicketMap] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -124,6 +125,15 @@ export default function MyEventsScreen() {
             setOrganizedEvents(organizedData.events);
             setAttendingEvents(attendingData.events);
             setPastEvents(pastData.events);
+
+            // Tickets asynchron nachladen — blockiert nicht das initiale Rendern
+            api.getUserTickets(token).then(ticketData => {
+                const map: Record<string, string> = {};
+                for (const t of ticketData.tickets) {
+                    map[t.event_id] = t.qr_token;
+                }
+                setTicketMap(map);
+            }).catch(() => {});
         } catch (err) {
             console.error('Failed to load events:', err);
             setError('Events konnten nicht geladen werden');
@@ -381,7 +391,7 @@ export default function MyEventsScreen() {
                 {showQR && (
                     <View style={styles.qrContainerSmall}>
                         <QRCode
-                            value={`happin://ticket/${event.event_id}`}
+                            value={ticketMap[event.event_id] || `happin://ticket/${event.event_id}`}
                             size={76}
                             backgroundColor="#FFFFFF"
                         />
