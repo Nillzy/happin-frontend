@@ -100,3 +100,23 @@ export interface EventUpdateRequest {
     image_url?: string;
     gradient_id?: number | null;
 }
+
+export interface UserTicket {
+    ticket_id: string;
+    qr_token: string;
+    event_id: string;
+    event_title: string;
+    starts_at?: string;
+    city?: string;
+    ticket_option_name: string;
+    price: number;
+    currency: string;
+    status: 'active' | 'used' | 'expired';
+    created_at?: string;
+    used_at?: string;
+}
+
+export interface UserTicketListResponse {
+    tickets: UserTicket[];
+    total: number;
+}

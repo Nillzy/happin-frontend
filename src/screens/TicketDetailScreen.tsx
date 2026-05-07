@@ -16,7 +16,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
-import type { EventDetailResponse } from '../types/events';
+import type { EventDetailResponse, UserTicket } from '../types/events';
+import QRCode from 'react-native-qrcode-svg';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -44,6 +45,7 @@ export default function TicketDetailScreen() {
     const { eventId } = useLocalSearchParams<{ eventId: string }>();
 
     const [event, setEvent] = useState<EventDetailResponse | null>(null);
+    const [ticket, setTicket] = useState<UserTicket | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -85,8 +87,16 @@ export default function TicketDetailScreen() {
                     return;
                 }
 
-                const data = await api.getEventById(eventId, token);
-                setEvent(data);
+                const eventData = await api.getEventById(eventId, token);
+                setEvent(eventData);
+
+                try {
+                    const ticketData = await api.getUserTickets(token);
+                    const matchingTicket = ticketData.tickets.find(t => t.event_id === eventId);
+                    setTicket(matchingTicket || null);
+                } catch {
+                    // Ticket-Laden fehlgeschlagen — QR bleibt leer
+                }
             } catch (err) {
                 console.error('Failed to load event:', err);
                 setError('Event konnte nicht geladen werden');
@@ -214,17 +224,17 @@ export default function TicketDetailScreen() {
                             {/* QR Code - Large */}
                             <View style={[styles.qrSection, { backgroundColor: colors.surface }]}>
                                 <View style={[styles.qrCode, { backgroundColor: '#FFFFFF' }]}>
-                                    <View style={styles.qrGrid}>
-                                        {[...Array(64)].map((_, i) => (
-                                            <View
-                                                key={i}
-                                                style={[
-                                                    styles.qrPixel,
-                                                    { backgroundColor: i % 3 !== 0 ? '#000000' : 'transparent' }
-                                                ]}
-                                            />
-                                        ))}
-                                    </View>
+                                    {ticket?.qr_token ? (
+                                        <QRCode
+                                            value={ticket.qr_token}
+                                            size={SCREEN_WIDTH - 176}
+                                            backgroundColor="#FFFFFF"
+                                        />
+                                    ) : (
+                                        <Text style={{ color: colors.onSurfaceVariant, textAlign: 'center' }}>
+                                            Kein Ticket vorhanden
+                                        </Text>
+                                    )}
                                 </View>
                             </View>
 
@@ -266,15 +276,29 @@ export default function TicketDetailScreen() {
                                 )}
                             </View>
 
-                            {/* Add to Wallet Button */}
+                            {/* Add to Google Wallet Button */}
                             <TouchableOpacity
                                 style={[styles.walletButton, { backgroundColor: colors.surface, borderColor: colors.outlineVariant }]}
                                 onPress={() => {
-                                    console.log('Add to Apple Wallet');
+                                    console.log('Add to Google Wallet');
                                 }}
                             >
                                 <Text style={[styles.walletButtonText, { color: colors.onSurface }]}>
-                                    Add to Apple Wallet
+                                    Zu Google Wallet hinzufügen
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* Veranstaltung ansehen Button */}
+                            <TouchableOpacity
+                                style={[styles.eventButton, { backgroundColor: colors.primary }]}
+                                onPress={() => {
+                                    handleClose();
+                                    setTimeout(() => router.push(`/event/${eventId}`), 350);
+                                }}
+                            >
+                                <Ionicons name="calendar-outline" size={20} color={colors.onPrimary} style={{ marginRight: 8 }} />
+                                <Text style={[styles.eventButtonText, { color: colors.onPrimary }]}>
+                                    Veranstaltung ansehen
                                 </Text>
                             </TouchableOpacity>
 
@@ -363,18 +387,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    qrGrid: {
-        width: '100%',
-        height: '100%',
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 2,
-    },
-    qrPixel: {
-        width: '11%',
-        height: '11%',
-        borderRadius: 1,
-    },
 
     // Info Section
     infoSection: {
@@ -414,6 +426,22 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     walletButtonText: {
+        fontSize: 17,
+        fontWeight: '600',
+    },
+
+    // Event Button
+    eventButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        borderRadius: 12,
+        marginBottom: 24,
+        minHeight: 48,
+    },
+    eventButtonText: {
         fontSize: 17,
         fontWeight: '600',
     },

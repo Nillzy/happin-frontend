@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse } from '@/src/types/events';
+import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicketListResponse } from '@/src/types/events';
 import type { ParticipantListResponse, RemoveParticipantsResponse } from '@/src/types/host';
 
 /**
@@ -101,7 +101,7 @@ export const api = {
     },
 
     getUserTickets: (token: string) =>
-        request<{ tickets: { ticket_id: string; event_title: string; ticket_option_name: string; status: string }[]; total: number }>(
+        request<UserTicketListResponse>(
             '/api/v1/users/me/tickets',
             { headers: { Authorization: `Bearer ${token}` } }
         ),

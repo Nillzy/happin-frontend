@@ -8,6 +8,8 @@ import {
     ActivityIndicator,
     Alert,
     Platform,
+    Share,
+    Linking,
 } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -74,12 +76,24 @@ export default function EventHostScreen() {
 
     const copyInvitationLink = async () => {
         if (!event?.invitation_link) return;
-        const fullLink = `https://happin.app/e/${event.invitation_link}`;
+        const fullLink = `https://happin.fun/e/${event.invitation_link}`;
         const success = await copyToClipboard(fullLink);
         if (success) {
             Alert.alert('Kopiert', 'Einladungslink wurde in die Zwischenablage kopiert.');
         } else {
             Alert.alert('Link', fullLink);
+        }
+    };
+
+    const shareInvitationLink = async () => {
+        if (!event?.invitation_link) return;
+        const fullLink = `https://happin.fun/e/${event.invitation_link}`;
+        try {
+            await Share.share({
+                message: `Komm zu ${event.title}!\n${fullLink}`,
+            });
+        } catch {
+            // User cancelled
         }
     };
 
@@ -151,6 +165,7 @@ export default function EventHostScreen() {
                     maxCapacity={event.max_capacity}
                     invitationLink={event.invitation_link}
                     onCopyLink={copyInvitationLink}
+                    onShareLink={shareInvitationLink}
                     colors={colors}
                     eventId={eventId!}
                 />
@@ -166,6 +181,7 @@ function OverviewTab({
     maxCapacity,
     invitationLink,
     onCopyLink,
+    onShareLink,
     colors,
     eventId,
 }: {
@@ -173,6 +189,7 @@ function OverviewTab({
     maxCapacity?: number;
     invitationLink?: string;
     onCopyLink: () => void;
+    onShareLink: () => void;
     colors: ReturnType<typeof useTheme>['colors'];
     eventId: string;
 }) {
@@ -245,16 +262,25 @@ function OverviewTab({
                 <View style={[styles.linkCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
                     <Text style={[styles.linkLabel, { color: colors.outline }]}>Einladungslink</Text>
                     <View style={styles.linkRow}>
-                        <View style={[styles.linkInput, { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant }]}>
-                            <Text style={[styles.linkText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-                                happin.app/e/{invitationLink.slice(0, 10)}...
+                        <TouchableOpacity
+                            style={[styles.linkInput, { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant }]}
+                            onPress={() => Linking.openURL(`https://happin.fun/e/${invitationLink}`)}
+                        >
+                            <Text style={[styles.linkText, { color: colors.primary }]} numberOfLines={1}>
+                                happin.fun/e/{invitationLink.slice(0, 10)}...
                             </Text>
-                        </View>
+                        </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.copyBtn, { backgroundColor: colors.primary }]}
                             onPress={onCopyLink}
                         >
                             <Text style={[styles.copyBtnText, { color: colors.onPrimary }]}>Kopieren</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.shareBtn, { backgroundColor: colors.tertiary }]}
+                            onPress={onShareLink}
+                        >
+                            <Text style={[styles.copyBtnText, { color: colors.onTertiary }]}>Teilen</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -341,6 +367,11 @@ const styles = StyleSheet.create({
     },
     linkText: { fontSize: 13 },
     copyBtn: {
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        borderRadius: 12,
+    },
+    shareBtn: {
         paddingHorizontal: 18,
         paddingVertical: 12,
         borderRadius: 12,
