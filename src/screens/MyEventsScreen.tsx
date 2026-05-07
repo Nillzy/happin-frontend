@@ -10,6 +10,7 @@ import {
     Platform,
     Dimensions,
     RefreshControl,
+    LayoutAnimation,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
@@ -87,7 +88,9 @@ export default function MyEventsScreen() {
     const [attendingEvents, setAttendingEvents] = useState<EventListItem[]>([]);
     const [pastEvents, setPastEvents] = useState<EventListItem[]>([]);
     const [ticketMap, setTicketMap] = useState<Record<string, { qr_token: string; count: number }>>({});
-    const [loading, setLoading] = useState(true);
+    const [organizedLoading, setOrganizedLoading] = useState(true);
+    const [attendingLoading, setAttendingLoading] = useState(true);
+    const [pastLoading, setPastLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -105,50 +108,65 @@ export default function MyEventsScreen() {
     const [attendingCollapsed, setAttendingCollapsed] = useState(false);
     const [pastCollapsed, setPastCollapsed] = useState(true);
 
-    const loadEvents = useCallback(async () => {
-        setLoading(true);
+    const loadEvents = useCallback(async (isRefresh = false) => {
         setError(null);
 
-        try {
-            const token = await getSession();
-            if (!token) {
-                router.replace('/login');
-                return;
+        const token = await getSession();
+        if (!token) {
+            router.replace('/login');
+            return;
+        }
+
+        if (!isRefresh) {
+            setOrganizedLoading(true);
+            setAttendingLoading(true);
+            setPastLoading(true);
+        }
+
+        const animateLayout = () => {
+            if (Platform.OS !== 'android') {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
             }
+        };
 
-            const [organizedData, attendingData, pastData] = await Promise.all([
-                api.getUserEvents(token, 'upcoming', 100, 0, 'organizer'),
-                api.getUserEvents(token, 'upcoming', 100, 0, 'attendee'),
-                api.getUserEvents(token, 'past', 100, 0),
-            ]);
+        let failures = 0;
 
-            setOrganizedEvents(organizedData.events);
-            setAttendingEvents(attendingData.events);
-            setPastEvents(pastData.events);
+        const organizedP = api.getUserEvents(token, 'upcoming', 100, 0, 'organizer')
+            .then(data => { animateLayout(); setOrganizedEvents(data.events); })
+            .catch(() => { failures++; })
+            .finally(() => setOrganizedLoading(false));
 
-            // Tickets asynchron nachladen — blockiert nicht das initiale Rendern
-            api.getUserTickets(token).then(ticketData => {
-                const map: Record<string, { qr_token: string; count: number }> = {};
-                for (const t of ticketData.tickets) {
-                    if (!map[t.event_id]) {
-                        map[t.event_id] = { qr_token: t.qr_token, count: 1 };
-                    } else {
-                        map[t.event_id].count += 1;
-                    }
+        const attendingP = api.getUserEvents(token, 'upcoming', 100, 0, 'attendee')
+            .then(data => { animateLayout(); setAttendingEvents(data.events); })
+            .catch(() => { failures++; })
+            .finally(() => setAttendingLoading(false));
+
+        const pastP = api.getUserEvents(token, 'past', 100, 0)
+            .then(data => { animateLayout(); setPastEvents(data.events); })
+            .catch(() => { failures++; })
+            .finally(() => setPastLoading(false));
+
+        api.getUserTickets(token).then(ticketData => {
+            const map: Record<string, { qr_token: string; count: number }> = {};
+            for (const t of ticketData.tickets) {
+                if (!map[t.event_id]) {
+                    map[t.event_id] = { qr_token: t.qr_token, count: 1 };
+                } else {
+                    map[t.event_id].count += 1;
                 }
-                setTicketMap(map);
-            }).catch(() => {});
-        } catch (err) {
-            console.error('Failed to load events:', err);
+            }
+            setTicketMap(map);
+        }).catch(() => {});
+
+        await Promise.all([organizedP, attendingP, pastP]);
+        if (failures === 3) {
             setError('Events konnten nicht geladen werden');
-        } finally {
-            setLoading(false);
         }
     }, [router]);
 
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
-        await loadEvents();
+        await loadEvents(true);
         setRefreshing(false);
     }, [loadEvents]);
 
@@ -463,11 +481,16 @@ export default function MyEventsScreen() {
         isCollapsed: boolean,
         onToggle: () => void,
         forceTicketStyle: boolean = false,
+        sectionLoading: boolean = false,
     ) => (
         <View style={styles.section}>
             {renderSectionHeader(title, events.length, true, isCollapsed, onToggle)}
             {!isCollapsed && (
-                events.length === 0 ? (
+                sectionLoading && events.length === 0 ? (
+                    <View style={styles.emptySection}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                    </View>
+                ) : events.length === 0 ? (
                     <View style={styles.emptySection}>
                         <Text style={[styles.emptySectionText, { color: colors.onSurfaceVariant }]}>
                             Noch keine Events in diesem Bereich
@@ -494,19 +517,6 @@ export default function MyEventsScreen() {
         </View>
     );
 
-    if (loading) {
-        return (
-            <ScreenWithNav>
-                <View style={[styles.container, { backgroundColor: colors.background }]}>
-                    {Platform.OS === 'web' && <Navbar showCta={false} />}
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={colors.primary} />
-                    </View>
-                </View>
-            </ScreenWithNav>
-        );
-    }
-
     if (error) {
         return (
             <ScreenWithNav>
@@ -518,7 +528,7 @@ export default function MyEventsScreen() {
                         </Text>
                         <TouchableOpacity
                             style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                            onPress={loadEvents}
+                            onPress={() => loadEvents()}
                         >
                             <Text style={[styles.retryText, { color: colors.onPrimary }]}>
                                 Erneut versuchen
@@ -561,22 +571,27 @@ export default function MyEventsScreen() {
                             'Von dir organisiert',
                             displayOrganized,
                             organizedCollapsed,
-                            () => setOrganizedCollapsed(!organizedCollapsed)
+                            () => setOrganizedCollapsed(!organizedCollapsed),
+                            false,
+                            organizedLoading,
                         )}
 
                         {renderSection(
                             'Deine Tickets',
                             displayAttending,
                             attendingCollapsed,
-                            () => setAttendingCollapsed(!attendingCollapsed)
+                            () => setAttendingCollapsed(!attendingCollapsed),
+                            false,
+                            attendingLoading,
                         )}
 
-                        {pastEvents.length > 0 && renderSection(
+                        {(pastEvents.length > 0 || pastLoading) && renderSection(
                             'Vergangene Events',
                             pastEvents,
                             pastCollapsed,
                             () => setPastCollapsed(!pastCollapsed),
-                            true
+                            true,
+                            pastLoading,
                         )}
                     </View>
                 </ScrollView>

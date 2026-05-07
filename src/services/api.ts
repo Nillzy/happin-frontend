@@ -25,6 +25,11 @@ function getBackendUrl(): string {
 
 const BASE_URL = getBackendUrl();
 
+let _ticketsCache: { data: UserTicketListResponse; ts: number } | null = null;
+const _eventCache = new Map<string, { data: EventDetailResponse; ts: number }>();
+const _userEventsCache = new Map<string, { data: EventListResponse; ts: number }>();
+const CACHE_TTL = 30_000;
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const base = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
     const cleanPath = path.startsWith('/') ? path.slice(1) : path;
@@ -49,10 +54,15 @@ export const api = {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
         }),
 
-    getEventById: (eventId: string, token?: string) =>
-        request<EventDetailResponse>(`/api/v1/events/${eventId}`, token ? {
+    getEventById: async (eventId: string, token?: string) => {
+        const cached = _eventCache.get(eventId);
+        if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+        const data = await request<EventDetailResponse>(`/api/v1/events/${eventId}`, token ? {
             headers: { Authorization: `Bearer ${token}` },
-        } : undefined),
+        } : undefined);
+        _eventCache.set(eventId, { data, ts: Date.now() });
+        return data;
+    },
 
     createEvent: (data: EventCreateRequest, token: string) =>
         request<EventDetailResponse>('/api/v1/events/', {
@@ -94,19 +104,28 @@ export const api = {
             body: JSON.stringify({ participation_ids: participationIds }),
         }),
 
-    getUserEvents: (token: string, period: 'upcoming' | 'past' = 'upcoming', limit = 50, offset = 0, role?: 'organizer' | 'attendee') => {
+    getUserEvents: async (token: string, period: 'upcoming' | 'past' = 'upcoming', limit = 50, offset = 0, role?: 'organizer' | 'attendee') => {
         const params = new URLSearchParams({ period, limit: String(limit), offset: String(offset) });
         if (role) params.set('role', role);
-        return request<EventListResponse>(`/api/v1/events/me?${params}`, {
+        const cacheKey = params.toString();
+        const cached = _userEventsCache.get(cacheKey);
+        if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+        const data = await request<EventListResponse>(`/api/v1/events/me?${params}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
+        _userEventsCache.set(cacheKey, { data, ts: Date.now() });
+        return data;
     },
 
-    getUserTickets: (token: string) =>
-        request<UserTicketListResponse>(
+    getUserTickets: async (token: string) => {
+        if (_ticketsCache && Date.now() - _ticketsCache.ts < CACHE_TTL) return _ticketsCache.data;
+        const data = await request<UserTicketListResponse>(
             '/api/v1/users/me/tickets',
             { headers: { Authorization: `Bearer ${token}` } }
-        ),
+        );
+        _ticketsCache = { data, ts: Date.now() };
+        return data;
+    },
 
     createTickets: (eventId: string, ticketOptionId: string | null, quantity: number, token: string) =>
         request<{ tickets: UserTicket[] }>(`/api/v1/events/${eventId}/tickets`, {

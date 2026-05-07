@@ -201,11 +201,6 @@ export default function EventScreen() {
         }
     };
 
-    const handleRegister = () => {
-        // TODO: RSVP Logic
-        console.log('Register for event');
-    };
-
     const handleRsvp = async (newStatus: RsvpStatus) => {
         if (!event) return;
         const token = await getSession();
@@ -440,9 +435,9 @@ export default function EventScreen() {
 
                             {/* Action Buttons */}
                             <View style={styles.actionButtons}>
-                                <TouchableOpacity style={glassActionBtn} onPress={handleRegister}>
-                                    <Ionicons name="calendar" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Register</Text>
+                                <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/ticket/${id}`)}>
+                                    <Ionicons name="qr-code-outline" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>QR-Code</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
                                     <Ionicons name="mail-outline" size={24} color={colors.onSurface} />
@@ -586,9 +581,9 @@ export default function EventScreen() {
                             </View>
 
                             <View style={styles.actionButtons}>
-                                <TouchableOpacity style={glassActionBtn} onPress={handleRegister}>
-                                    <Ionicons name="calendar" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Register</Text>
+                                <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/ticket/${id}`)}>
+                                    <Ionicons name="qr-code-outline" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>QR-Code</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
                                     <Ionicons name="mail-outline" size={24} color={colors.onSurface} />

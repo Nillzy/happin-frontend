@@ -8,9 +8,6 @@ import {
     ActivityIndicator,
     Dimensions,
     TouchableOpacity,
-    Modal,
-    Animated,
-    PanResponder,
 } from 'react-native';
 import type { ViewToken } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
@@ -21,7 +18,7 @@ import { api } from '../services/api';
 import type { EventDetailResponse, UserTicket } from '../types/events';
 import QRCode from 'react-native-qrcode-svg';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 function formatDateGerman(isoDate: string): string {
     const d = new Date(isoDate);
@@ -45,31 +42,6 @@ export default function TicketDetailScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => false,
-            onMoveShouldSetPanResponder: (_, gestureState) => {
-                return gestureState.dy > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-            },
-            onPanResponderMove: (_, gestureState) => {
-                if (gestureState.dy > 0) {
-                    translateY.setValue(gestureState.dy);
-                }
-            },
-            onPanResponderRelease: (_, gestureState) => {
-                if (gestureState.dy > 100) {
-                    handleClose();
-                } else {
-                    Animated.spring(translateY, {
-                        toValue: 0,
-                        useNativeDriver: true,
-                    }).start();
-                }
-            },
-        })
-    ).current;
-
     const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
         if (viewableItems.length > 0 && viewableItems[0].index != null) {
             setActiveIndex(viewableItems[0].index);
@@ -86,12 +58,17 @@ export default function TicketDetailScreen() {
 
     useEffect(() => {
         const loadData = async () => {
-            if (!eventId) return;
+            if (!eventId) {
+                setError('Keine Event-ID');
+                setLoading(false);
+                return;
+            }
 
             try {
                 const token = await getSession();
                 if (!token) {
                     router.replace('/login');
+                    setLoading(false);
                     return;
                 }
 
@@ -114,23 +91,14 @@ export default function TicketDetailScreen() {
         };
 
         void loadData();
-
-        Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 65,
-            friction: 11,
-        }).start();
     }, [eventId, router]);
 
     const handleClose = () => {
-        Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 300,
-            useNativeDriver: true,
-        }).start(() => {
+        if (router.canGoBack()) {
             router.back();
-        });
+        } else {
+            router.replace('/');
+        }
     };
 
     const renderQRCard = ({ item }: { item: UserTicket }) => (
@@ -149,204 +117,180 @@ export default function TicketDetailScreen() {
 
     if (loading) {
         return (
-            <Modal visible transparent animationType="none" onRequestClose={handleClose}>
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-                        <ActivityIndicator size="large" color={colors.primary} />
-                    </View>
+            <View style={[styles.modalOverlay, { backgroundColor: colors.background }]}>
+                <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
-            </Modal>
+            </View>
         );
     }
 
     if (error || !event) {
         return (
-            <Modal visible transparent animationType="none" onRequestClose={handleClose}>
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
-                        <Text style={[styles.errorText, { color: colors.error }]}>
-                            {error || 'Event nicht gefunden'}
-                        </Text>
-                        <TouchableOpacity
-                            style={[styles.button, { backgroundColor: colors.primary }]}
-                            onPress={handleClose}
-                        >
-                            <Text style={[styles.buttonText, { color: colors.onPrimary }]}>Zurück</Text>
-                        </TouchableOpacity>
-                    </View>
+            <View style={[styles.modalOverlay, { backgroundColor: colors.background }]}>
+                <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+                    <Text style={[styles.errorText, { color: colors.error }]}>
+                        {error || 'Event nicht gefunden'}
+                    </Text>
+                    <TouchableOpacity
+                        style={[styles.button, { backgroundColor: colors.primary }]}
+                        onPress={handleClose}
+                    >
+                        <Text style={[styles.buttonText, { color: colors.onPrimary }]}>Zurück</Text>
+                    </TouchableOpacity>
                 </View>
-            </Modal>
+            </View>
         );
     }
 
     const currentTicket = tickets[activeIndex];
 
     return (
-        <Modal visible transparent animationType="none" onRequestClose={handleClose}>
-            <View style={styles.modalOverlay}>
-                <Animated.View
-                    style={[
-                        styles.sheetContainer,
-                        {
-                            backgroundColor: colors.background,
-                            transform: [{ translateY }],
-                        },
-                    ]}
-                    {...panResponder.panHandlers}
-                >
-                    <View>
-                        {/* Drag Handle */}
-                        <View style={styles.dragHandle}>
-                            <View style={[styles.dragIndicator, { backgroundColor: colors.outlineVariant }]} />
-                        </View>
-
-                        {/* Close Button */}
-                        <View style={styles.header}>
-                            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                                <Ionicons name="close" size={28} color={colors.onSurface} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <ScrollView
-                            style={styles.scroll}
-                            contentContainerStyle={styles.scrollContent}
-                            showsVerticalScrollIndicator={false}
-                        >
-                            {/* Event Title */}
-                            <View style={styles.titleSection}>
-                                <Text style={[styles.eventTitle, { color: colors.onSurface }]}>
-                                    {event.title}
-                                </Text>
-                                <Text style={[styles.eventDate, { color: colors.onSurfaceVariant }]}>
-                                    {formatDateGerman(event.starts_at)}
-                                </Text>
-                            </View>
-
-                            {/* QR Cards — Swipeable */}
-                            {tickets.length > 0 ? (
-                                <View style={styles.carouselContainer}>
-                                    <FlatList
-                                        data={tickets}
-                                        renderItem={renderQRCard}
-                                        keyExtractor={item => item.ticket_id}
-                                        horizontal
-                                        pagingEnabled
-                                        showsHorizontalScrollIndicator={false}
-                                        onMomentumScrollEnd={handleScrollEnd}
-                                        onViewableItemsChanged={onViewableItemsChanged}
-                                        viewabilityConfig={viewabilityConfig}
-                                        getItemLayout={(_, index) => ({
-                                            length: SCREEN_WIDTH,
-                                            offset: SCREEN_WIDTH * index,
-                                            index,
-                                        })}
-                                    />
-
-                                    {/* Pagination — only when multiple tickets */}
-                                    {tickets.length > 1 && (
-                                        <View style={styles.pagination}>
-                                            <Text style={[styles.paginationText, { color: colors.onSurfaceVariant }]}>
-                                                Ticket {activeIndex + 1} von {tickets.length}
-                                            </Text>
-                                            <View style={styles.dots}>
-                                                {tickets.map((_, i) => (
-                                                    <View
-                                                        key={i}
-                                                        style={[
-                                                            styles.dot,
-                                                            {
-                                                                backgroundColor: i === activeIndex
-                                                                    ? colors.primary
-                                                                    : colors.outlineVariant,
-                                                            },
-                                                        ]}
-                                                    />
-                                                ))}
-                                            </View>
-                                        </View>
-                                    )}
-                                </View>
-                            ) : (
-                                <View style={[styles.qrCard, { backgroundColor: colors.surface }]}>
-                                    <Text style={{ color: colors.onSurfaceVariant, textAlign: 'center' }}>
-                                        Kein Ticket vorhanden
-                                    </Text>
-                                </View>
-                            )}
-
-                            {/* Ticket Info */}
-                            <View style={[styles.infoSection, { backgroundColor: colors.surfaceContainer }]}>
-                                <View style={styles.infoRow}>
-                                    <Text style={[styles.infoLabel, { color: colors.onSurfaceVariant }]}>
-                                        Ticket
-                                    </Text>
-                                    <Text style={[styles.infoValue, { color: colors.onSurface }]}>
-                                        {currentTicket?.ticket_option_name ?? 'Standard'}
-                                    </Text>
-                                </View>
-
-                                {event.location && (
-                                    <View style={styles.infoRow}>
-                                        <Text style={[styles.infoLabel, { color: colors.onSurfaceVariant }]}>
-                                            Ort
-                                        </Text>
-                                        <Text style={[styles.infoValue, { color: colors.onSurface }]}>
-                                            {[
-                                                event.location.street,
-                                                event.location.house_number,
-                                                event.location.city
-                                            ].filter(Boolean).join(' ')}
-                                        </Text>
-                                    </View>
-                                )}
-
-                                {event.host_name && (
-                                    <View style={styles.infoRow}>
-                                        <Text style={[styles.infoLabel, { color: colors.onSurfaceVariant }]}>
-                                            Veranstalter
-                                        </Text>
-                                        <Text style={[styles.infoValue, { color: colors.onSurface }]}>
-                                            {event.host_name}
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Add to Google Wallet Button */}
-                            <TouchableOpacity
-                                style={[styles.walletButton, { backgroundColor: colors.surface, borderColor: colors.outlineVariant }]}
-                                onPress={() => {
-                                    console.log('Add to Google Wallet');
-                                }}
-                            >
-                                <Text style={[styles.walletButtonText, { color: colors.onSurface }]}>
-                                    Zu Google Wallet hinzufügen
-                                </Text>
-                            </TouchableOpacity>
-
-                            {/* Veranstaltung ansehen Button */}
-                            <TouchableOpacity
-                                style={[styles.eventButton, { backgroundColor: colors.primary }]}
-                                onPress={() => {
-                                    handleClose();
-                                    setTimeout(() => router.push(`/event/${eventId}`), 350);
-                                }}
-                            >
-                                <Ionicons name="calendar-outline" size={20} color={colors.onPrimary} style={{ marginRight: 8 }} />
-                                <Text style={[styles.eventButtonText, { color: colors.onPrimary }]}>
-                                    Veranstaltung ansehen
-                                </Text>
-                            </TouchableOpacity>
-
-                            {/* Footer Info */}
-                            <Text style={[styles.footerText, { color: colors.onSurfaceVariant }]}>
-                                Zeige diesen QR-Code beim Einlass vor
-                            </Text>
-                        </ScrollView>
-                    </View>
-                </Animated.View>
+        <View style={[styles.sheetContainer, { flex: 1, backgroundColor: colors.background }]}>
+            {/* Close Button */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                    <Ionicons name="close" size={28} color={colors.onSurface} />
+                </TouchableOpacity>
             </View>
-        </Modal>
+
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Event Title */}
+                <View style={styles.titleSection}>
+                    <Text style={[styles.eventTitle, { color: colors.onSurface }]}>
+                        {event.title}
+                    </Text>
+                    <Text style={[styles.eventDate, { color: colors.onSurfaceVariant }]}>
+                        {formatDateGerman(event.starts_at)}
+                    </Text>
+                </View>
+
+                {/* QR Cards — Swipeable */}
+                {tickets.length > 0 ? (
+                    <View style={styles.carouselContainer}>
+                        <FlatList
+                            data={tickets}
+                            renderItem={renderQRCard}
+                            keyExtractor={item => item.ticket_id}
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            onMomentumScrollEnd={handleScrollEnd}
+                            onViewableItemsChanged={onViewableItemsChanged}
+                            viewabilityConfig={viewabilityConfig}
+                            getItemLayout={(_, index) => ({
+                                length: SCREEN_WIDTH,
+                                offset: SCREEN_WIDTH * index,
+                                index,
+                            })}
+                        />
+
+                        {/* Pagination — only when multiple tickets */}
+                        {tickets.length > 1 && (
+                            <View style={styles.pagination}>
+                                <Text style={[styles.paginationText, { color: colors.onSurfaceVariant }]}>
+                                    Ticket {activeIndex + 1} von {tickets.length}
+                                </Text>
+                                <View style={styles.dots}>
+                                    {tickets.map((_, i) => (
+                                        <View
+                                            key={i}
+                                            style={[
+                                                styles.dot,
+                                                {
+                                                    backgroundColor: i === activeIndex
+                                                        ? colors.primary
+                                                        : colors.outlineVariant,
+                                                },
+                                            ]}
+                                        />
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                ) : (
+                    <View style={[styles.qrCard, { backgroundColor: colors.surface }]}>
+                        <Text style={{ color: colors.onSurfaceVariant, textAlign: 'center' }}>
+                            Kein Ticket vorhanden
+                        </Text>
+                    </View>
+                )}
+
+                {/* Ticket Info */}
+                <View style={[styles.infoSection, { backgroundColor: colors.surfaceContainer }]}>
+                    <View style={styles.infoRow}>
+                        <Text style={[styles.infoLabel, { color: colors.onSurfaceVariant }]}>
+                            Ticket
+                        </Text>
+                        <Text style={[styles.infoValue, { color: colors.onSurface }]}>
+                            {currentTicket?.ticket_option_name ?? 'Standard'}
+                        </Text>
+                    </View>
+
+                    {event.location && (
+                        <View style={styles.infoRow}>
+                            <Text style={[styles.infoLabel, { color: colors.onSurfaceVariant }]}>
+                                Ort
+                            </Text>
+                            <Text style={[styles.infoValue, { color: colors.onSurface }]}>
+                                {[
+                                    event.location.street,
+                                    event.location.house_number,
+                                    event.location.city
+                                ].filter(Boolean).join(' ')}
+                            </Text>
+                        </View>
+                    )}
+
+                    {event.host_name && (
+                        <View style={styles.infoRow}>
+                            <Text style={[styles.infoLabel, { color: colors.onSurfaceVariant }]}>
+                                Veranstalter
+                            </Text>
+                            <Text style={[styles.infoValue, { color: colors.onSurface }]}>
+                                {event.host_name}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* Add to Google Wallet Button */}
+                <TouchableOpacity
+                    style={[styles.walletButton, { backgroundColor: colors.surface, borderColor: colors.outlineVariant }]}
+                    onPress={() => {
+                        console.log('Add to Google Wallet');
+                    }}
+                >
+                    <Text style={[styles.walletButtonText, { color: colors.onSurface }]}>
+                        Zu Google Wallet hinzufügen
+                    </Text>
+                </TouchableOpacity>
+
+                {/* Veranstaltung ansehen Button */}
+                <TouchableOpacity
+                    style={[styles.eventButton, { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                        router.back();
+                        setTimeout(() => router.push(`/event/${eventId}`), 350);
+                    }}
+                >
+                    <Ionicons name="calendar-outline" size={20} color={colors.onPrimary} style={{ marginRight: 8 }} />
+                    <Text style={[styles.eventButtonText, { color: colors.onPrimary }]}>
+                        Veranstaltung ansehen
+                    </Text>
+                </TouchableOpacity>
+
+                {/* Footer Info */}
+                <Text style={[styles.footerText, { color: colors.onSurfaceVariant }]}>
+                    Zeige diesen QR-Code beim Einlass vor
+                </Text>
+            </ScrollView>
+        </View>
     );
 }
 
@@ -357,20 +301,7 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     sheetContainer: {
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        maxHeight: SCREEN_HEIGHT * 0.92,
-        paddingBottom: 24,
-    },
-    dragHandle: {
-        alignItems: 'center',
-        paddingTop: 12,
-        paddingBottom: 8,
-    },
-    dragIndicator: {
-        width: 40,
-        height: 4,
-        borderRadius: 2,
+        paddingBottom: 0,
     },
     header: {
         paddingHorizontal: 24,
