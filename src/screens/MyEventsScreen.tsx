@@ -86,7 +86,7 @@ export default function MyEventsScreen() {
     const [organizedEvents, setOrganizedEvents] = useState<EventListItem[]>([]);
     const [attendingEvents, setAttendingEvents] = useState<EventListItem[]>([]);
     const [pastEvents, setPastEvents] = useState<EventListItem[]>([]);
-    const [ticketMap, setTicketMap] = useState<Record<string, string>>({});
+    const [ticketMap, setTicketMap] = useState<Record<string, { qr_token: string; count: number }>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -128,9 +128,13 @@ export default function MyEventsScreen() {
 
             // Tickets asynchron nachladen — blockiert nicht das initiale Rendern
             api.getUserTickets(token).then(ticketData => {
-                const map: Record<string, string> = {};
+                const map: Record<string, { qr_token: string; count: number }> = {};
                 for (const t of ticketData.tickets) {
-                    map[t.event_id] = t.qr_token;
+                    if (!map[t.event_id]) {
+                        map[t.event_id] = { qr_token: t.qr_token, count: 1 };
+                    } else {
+                        map[t.event_id].count += 1;
+                    }
                 }
                 setTicketMap(map);
             }).catch(() => {});
@@ -391,10 +395,17 @@ export default function MyEventsScreen() {
                 {showQR && (
                     <View style={styles.qrContainerSmall}>
                         <QRCode
-                            value={ticketMap[event.event_id] || `happin://ticket/${event.event_id}`}
+                            value={ticketMap[event.event_id]?.qr_token || `happin://ticket/${event.event_id}`}
                             size={76}
                             backgroundColor="#FFFFFF"
                         />
+                        {ticketMap[event.event_id]?.count > 1 && (
+                            <View style={[styles.ticketBadge, { backgroundColor: colors.primary }]}>
+                                <Text style={[styles.ticketBadgeText, { color: colors.onPrimary }]}>
+                                    {ticketMap[event.event_id].count}×
+                                </Text>
+                            </View>
+                        )}
                     </View>
                 )}
             </View>
@@ -758,6 +769,20 @@ const styles = StyleSheet.create({
         padding: 4,
         borderRadius: 12,
         backgroundColor: '#FFFFFF',
+    },
+    ticketBadge: {
+        position: 'absolute',
+        top: -6,
+        right: -6,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+        minWidth: 24,
+        alignItems: 'center',
+    },
+    ticketBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
     },
     cardTitle: {
         fontSize: 18,
