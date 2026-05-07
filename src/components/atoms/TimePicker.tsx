@@ -144,6 +144,8 @@ export default function TimePicker({
                 return;
             }
             setOpen(true);
+        } else {
+            inputRef.current?.focus();
         }
     };
 

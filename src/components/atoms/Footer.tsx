@@ -5,9 +5,9 @@ import HappinLogo from './HappinLogo';
 import { useRouter } from 'expo-router';
 
 const LINKS = [
-    { label: 'Datenschutz', key: 'privacy' },
-    { label: 'Impressum', key: 'imprint' },
-    { label: 'Kontakt', key: 'contact' },
+    { label: 'Datenschutz', route: '/privacy' },
+    { label: 'Impressum', route: '/imprint' },
+    { label: 'Kontakt', route: '/contact' },
 ];
 
 export default function Footer() {
@@ -15,6 +15,7 @@ export default function Footer() {
     const router = useRouter();
 
     const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const year = new Date().getFullYear();
 
     return (
         <View style={[styles.footer, { borderTopColor: borderColor, backgroundColor: colors.background }]}>
@@ -24,8 +25,8 @@ export default function Footer() {
 
             <View style={styles.links}>
                 {LINKS.map((link, i) => (
-                    <React.Fragment key={link.key}>
-                        <TouchableOpacity activeOpacity={0.7}>
+                    <React.Fragment key={link.route}>
+                        <TouchableOpacity activeOpacity={0.7} onPress={() => router.push(link.route as any)}>
                             <Text style={[styles.link, { color: colors.onSurfaceVariant }]}>
                                 {link.label}
                             </Text>
@@ -38,7 +39,7 @@ export default function Footer() {
             </View>
 
             <Text style={[styles.copy, { color: colors.onSurfaceVariant }]}>
-                © 2025 Happin. Alle Rechte vorbehalten.
+                © {year} Happin. Alle Rechte vorbehalten.
             </Text>
         </View>
     );

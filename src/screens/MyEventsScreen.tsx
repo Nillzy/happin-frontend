@@ -565,7 +565,7 @@ export default function MyEventsScreen() {
                         )}
 
                         {renderSection(
-                            'Deine Events',
+                            'Deine Ticketsbeim ',
                             displayAttending,
                             attendingCollapsed,
                             () => setAttendingCollapsed(!attendingCollapsed)
