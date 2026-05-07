@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse } from '@/src/types/events';
-import type { ParticipantListResponse, RemoveParticipantsResponse } from '@/src/types/host';
+import type { ParticipantListResponse, RemoveParticipantsResponse, ScanTicketResponse } from '@/src/types/host';
 
 /**
  * Get the appropriate backend URL based on platform and environment.
@@ -144,4 +144,11 @@ export const api = {
         request<{ url: string; thumbnail: string; photographer: string; unsplash_link: string }[]>(
             `/api/v1/images/search?q=${encodeURIComponent(query)}&per_page=${perPage}`
         ),
+
+    scanTicket: (eventId: string, qrToken: string, token: string) =>
+        request<ScanTicketResponse>(`/api/v1/events/${eventId}/tickets/scan`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ qr_token: qrToken }),
+        }),
 };

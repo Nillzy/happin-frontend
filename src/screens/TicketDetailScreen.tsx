@@ -77,7 +77,9 @@ export default function TicketDetailScreen() {
 
                 try {
                     const ticketData = await api.getUserTickets(token);
-                    const matchingTickets = ticketData.tickets.filter(t => t.event_id === eventId);
+                    const matchingTickets = ticketData.tickets
+                        .filter(t => t.event_id === eventId)
+                        .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''));
                     setTickets(matchingTickets);
                 } catch {
                     // Ticket-Laden fehlgeschlagen

@@ -234,6 +234,15 @@ export default function EventGuestsScreen() {
                                         </Text>
                                     )}
                                 </View>
+
+                                {/* Ticket Badge */}
+                                {(participant.ticket_count ?? 0) > 1 && (
+                                    <View style={[styles.ticketBadge, { backgroundColor: `${colors.tertiary}20` }]}>
+                                        <Text style={[styles.ticketBadgeText, { color: colors.tertiary }]}>
+                                            {participant.ticket_count} Tickets
+                                        </Text>
+                                    </View>
+                                )}
                             </TouchableOpacity>
                         );
                     })}
@@ -361,6 +370,12 @@ const styles = StyleSheet.create({
     guestInfo: { flex: 1 },
     guestName: { fontSize: 15, fontWeight: '600' },
     guestPhone: { fontSize: 12, marginTop: 2 },
+    ticketBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    ticketBadgeText: { fontSize: 12, fontWeight: '700' },
     emptyText: { fontSize: 14, textAlign: 'center', padding: 40 },
 });
 

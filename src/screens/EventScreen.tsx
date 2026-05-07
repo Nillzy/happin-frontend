@@ -435,9 +435,13 @@ export default function EventScreen() {
 
                             {/* Action Buttons */}
                             <View style={styles.actionButtons}>
-                                <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/ticket/${id}`)}>
-                                    <Ionicons name="qr-code-outline" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>QR-Code</Text>
+                                <TouchableOpacity
+                                    style={[glassActionBtn, rsvpStatus !== 'Accepted' && { opacity: 0.4, backgroundColor: isDark ? 'rgba(80,80,80,0.6)' : 'rgba(200,200,200,0.7)' }]}
+                                    onPress={rsvpStatus === 'Accepted' ? () => router.push(`/ticket/${id}`) : undefined}
+                                    disabled={rsvpStatus !== 'Accepted'}
+                                >
+                                    <Ionicons name="qr-code-outline" size={24} color={rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant} />
+                                    <Text style={[styles.actionButtonText, { color: rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
                                     <Ionicons name="mail-outline" size={24} color={colors.onSurface} />
@@ -581,9 +585,13 @@ export default function EventScreen() {
                             </View>
 
                             <View style={styles.actionButtons}>
-                                <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/ticket/${id}`)}>
-                                    <Ionicons name="qr-code-outline" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>QR-Code</Text>
+                                <TouchableOpacity
+                                    style={[glassActionBtn, rsvpStatus !== 'Accepted' && { opacity: 0.4, backgroundColor: isDark ? 'rgba(80,80,80,0.6)' : 'rgba(200,200,200,0.7)' }]}
+                                    onPress={rsvpStatus === 'Accepted' ? () => router.push(`/ticket/${id}`) : undefined}
+                                    disabled={rsvpStatus !== 'Accepted'}
+                                >
+                                    <Ionicons name="qr-code-outline" size={24} color={rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant} />
+                                    <Text style={[styles.actionButtonText, { color: rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
                                     <Ionicons name="mail-outline" size={24} color={colors.onSurface} />
