@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
     ScrollView,
+    FlatList,
     StyleSheet,
     ActivityIndicator,
     Dimensions,
@@ -11,6 +12,7 @@ import {
     Animated,
     PanResponder,
 } from 'react-native';
+import type { ViewToken } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,29 +34,23 @@ function formatDateGerman(isoDate: string): string {
     }).format(d);
 }
 
-/**
- * TicketDetailScreen
- *
- * Bottom Sheet mit Swipe-to-Dismiss
- * - Swipe down → Schließt Modal
- * - Transparenter Hintergrund (Background bleibt sichtbar)
- */
 export default function TicketDetailScreen() {
     const { colors } = useTheme();
     const router = useRouter();
     const { eventId } = useLocalSearchParams<{ eventId: string }>();
 
     const [event, setEvent] = useState<EventDetailResponse | null>(null);
-    const [ticket, setTicket] = useState<UserTicket | null>(null);
+    const [tickets, setTickets] = useState<UserTicket[]>([]);
+    const [activeIndex, setActiveIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
     const panResponder = useRef(
         PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
+            onStartShouldSetPanResponder: () => false,
             onMoveShouldSetPanResponder: (_, gestureState) => {
-                return Math.abs(gestureState.dy) > 5;
+                return gestureState.dy > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
             },
             onPanResponderMove: (_, gestureState) => {
                 if (gestureState.dy > 0) {
@@ -63,10 +59,8 @@ export default function TicketDetailScreen() {
             },
             onPanResponderRelease: (_, gestureState) => {
                 if (gestureState.dy > 100) {
-                    // Swipe down → Close
                     handleClose();
                 } else {
-                    // Snap back
                     Animated.spring(translateY, {
                         toValue: 0,
                         useNativeDriver: true,
@@ -76,8 +70,22 @@ export default function TicketDetailScreen() {
         })
     ).current;
 
+    const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+        if (viewableItems.length > 0 && viewableItems[0].index != null) {
+            setActiveIndex(viewableItems[0].index);
+        }
+    }, []);
+
+    const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
+
+    const handleScrollEnd = useCallback((e: any) => {
+        const offset = e.nativeEvent.contentOffset.x;
+        const index = Math.round(offset / SCREEN_WIDTH);
+        setActiveIndex(index);
+    }, []);
+
     useEffect(() => {
-        const loadEvent = async () => {
+        const loadData = async () => {
             if (!eventId) return;
 
             try {
@@ -92,10 +100,10 @@ export default function TicketDetailScreen() {
 
                 try {
                     const ticketData = await api.getUserTickets(token);
-                    const matchingTicket = ticketData.tickets.find(t => t.event_id === eventId);
-                    setTicket(matchingTicket || null);
+                    const matchingTickets = ticketData.tickets.filter(t => t.event_id === eventId);
+                    setTickets(matchingTickets);
                 } catch {
-                    // Ticket-Laden fehlgeschlagen — QR bleibt leer
+                    // Ticket-Laden fehlgeschlagen
                 }
             } catch (err) {
                 console.error('Failed to load event:', err);
@@ -105,9 +113,8 @@ export default function TicketDetailScreen() {
             }
         };
 
-        void loadEvent();
+        void loadData();
 
-        // Slide up animation
         Animated.spring(translateY, {
             toValue: 0,
             useNativeDriver: true,
@@ -126,14 +133,23 @@ export default function TicketDetailScreen() {
         });
     };
 
+    const renderQRCard = ({ item }: { item: UserTicket }) => (
+        <View style={styles.qrCardWrapper}>
+            <View style={[styles.qrCard, { backgroundColor: colors.surface }]}>
+                <View style={[styles.qrCode, { backgroundColor: '#FFFFFF' }]}>
+                    <QRCode
+                        value={item.qr_token}
+                        size={SCREEN_WIDTH - 176}
+                        backgroundColor="#FFFFFF"
+                    />
+                </View>
+            </View>
+        </View>
+    );
+
     if (loading) {
         return (
-            <Modal
-                visible={true}
-                transparent
-                animationType="none"
-                onRequestClose={handleClose}
-            >
+            <Modal visible transparent animationType="none" onRequestClose={handleClose}>
                 <View style={styles.modalOverlay}>
                     <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
                         <ActivityIndicator size="large" color={colors.primary} />
@@ -145,12 +161,7 @@ export default function TicketDetailScreen() {
 
     if (error || !event) {
         return (
-            <Modal
-                visible={true}
-                transparent
-                animationType="none"
-                onRequestClose={handleClose}
-            >
+            <Modal visible transparent animationType="none" onRequestClose={handleClose}>
                 <View style={styles.modalOverlay}>
                     <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
                         <Text style={[styles.errorText, { color: colors.error }]}>
@@ -160,9 +171,7 @@ export default function TicketDetailScreen() {
                             style={[styles.button, { backgroundColor: colors.primary }]}
                             onPress={handleClose}
                         >
-                            <Text style={[styles.buttonText, { color: colors.onPrimary }]}>
-                                Zurück
-                            </Text>
+                            <Text style={[styles.buttonText, { color: colors.onPrimary }]}>Zurück</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -170,16 +179,11 @@ export default function TicketDetailScreen() {
         );
     }
 
+    const currentTicket = tickets[activeIndex];
+
     return (
-        <Modal
-            visible={true}
-            transparent
-            animationType="none"
-            onRequestClose={handleClose}
-        >
-            {/* Semi-transparent Backdrop */}
+        <Modal visible transparent animationType="none" onRequestClose={handleClose}>
             <View style={styles.modalOverlay}>
-                {/* Bottom Sheet */}
                 <Animated.View
                     style={[
                         styles.sheetContainer,
@@ -198,10 +202,7 @@ export default function TicketDetailScreen() {
 
                         {/* Close Button */}
                         <View style={styles.header}>
-                            <TouchableOpacity
-                                onPress={handleClose}
-                                style={styles.closeButton}
-                            >
+                            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
                                 <Ionicons name="close" size={28} color={colors.onSurface} />
                             </TouchableOpacity>
                         </View>
@@ -221,22 +222,57 @@ export default function TicketDetailScreen() {
                                 </Text>
                             </View>
 
-                            {/* QR Code - Large */}
-                            <View style={[styles.qrSection, { backgroundColor: colors.surface }]}>
-                                <View style={[styles.qrCode, { backgroundColor: '#FFFFFF' }]}>
-                                    {ticket?.qr_token ? (
-                                        <QRCode
-                                            value={ticket.qr_token}
-                                            size={SCREEN_WIDTH - 176}
-                                            backgroundColor="#FFFFFF"
-                                        />
-                                    ) : (
-                                        <Text style={{ color: colors.onSurfaceVariant, textAlign: 'center' }}>
-                                            Kein Ticket vorhanden
-                                        </Text>
+                            {/* QR Cards — Swipeable */}
+                            {tickets.length > 0 ? (
+                                <View style={styles.carouselContainer}>
+                                    <FlatList
+                                        data={tickets}
+                                        renderItem={renderQRCard}
+                                        keyExtractor={item => item.ticket_id}
+                                        horizontal
+                                        pagingEnabled
+                                        showsHorizontalScrollIndicator={false}
+                                        onMomentumScrollEnd={handleScrollEnd}
+                                        onViewableItemsChanged={onViewableItemsChanged}
+                                        viewabilityConfig={viewabilityConfig}
+                                        getItemLayout={(_, index) => ({
+                                            length: SCREEN_WIDTH,
+                                            offset: SCREEN_WIDTH * index,
+                                            index,
+                                        })}
+                                    />
+
+                                    {/* Pagination — only when multiple tickets */}
+                                    {tickets.length > 1 && (
+                                        <View style={styles.pagination}>
+                                            <Text style={[styles.paginationText, { color: colors.onSurfaceVariant }]}>
+                                                Ticket {activeIndex + 1} von {tickets.length}
+                                            </Text>
+                                            <View style={styles.dots}>
+                                                {tickets.map((_, i) => (
+                                                    <View
+                                                        key={i}
+                                                        style={[
+                                                            styles.dot,
+                                                            {
+                                                                backgroundColor: i === activeIndex
+                                                                    ? colors.primary
+                                                                    : colors.outlineVariant,
+                                                            },
+                                                        ]}
+                                                    />
+                                                ))}
+                                            </View>
+                                        </View>
                                     )}
                                 </View>
-                            </View>
+                            ) : (
+                                <View style={[styles.qrCard, { backgroundColor: colors.surface }]}>
+                                    <Text style={{ color: colors.onSurfaceVariant, textAlign: 'center' }}>
+                                        Kein Ticket vorhanden
+                                    </Text>
+                                </View>
+                            )}
 
                             {/* Ticket Info */}
                             <View style={[styles.infoSection, { backgroundColor: colors.surfaceContainer }]}>
@@ -245,7 +281,7 @@ export default function TicketDetailScreen() {
                                         Ticket
                                     </Text>
                                     <Text style={[styles.infoValue, { color: colors.onSurface }]}>
-                                        1× Standard
+                                        {currentTicket?.ticket_option_name ?? 'Standard'}
                                     </Text>
                                 </View>
 
@@ -350,7 +386,6 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingHorizontal: 24,
         paddingBottom: 24,
     },
 
@@ -358,6 +393,7 @@ const styles = StyleSheet.create({
     titleSection: {
         marginBottom: 32,
         alignItems: 'center',
+        paddingHorizontal: 24,
     },
     eventTitle: {
         fontSize: 28,
@@ -372,9 +408,17 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    // QR Code Section
-    qrSection: {
+    // Carousel
+    carouselContainer: {
         marginBottom: 32,
+    },
+    qrCardWrapper: {
+        width: SCREEN_WIDTH,
+        alignItems: 'center',
+        paddingHorizontal: 24,
+    },
+    qrCard: {
+        width: '100%',
         borderRadius: 20,
         padding: 32,
         alignItems: 'center',
@@ -388,12 +432,33 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
 
+    // Pagination
+    pagination: {
+        alignItems: 'center',
+        marginTop: 16,
+        gap: 8,
+    },
+    paginationText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    dots: {
+        flexDirection: 'row',
+        gap: 6,
+    },
+    dot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+
     // Info Section
     infoSection: {
         borderRadius: 16,
         padding: 20,
         marginBottom: 24,
         gap: 16,
+        marginHorizontal: 24,
     },
     infoRow: {
         flexDirection: 'row',
@@ -424,6 +489,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         borderWidth: 2,
         marginBottom: 24,
+        marginHorizontal: 24,
     },
     walletButtonText: {
         fontSize: 17,
@@ -440,6 +506,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         marginBottom: 24,
         minHeight: 48,
+        marginHorizontal: 24,
     },
     eventButtonText: {
         fontSize: 17,
@@ -451,6 +518,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
         fontStyle: 'italic',
+        paddingHorizontal: 24,
     },
 
     // Loading/Error
