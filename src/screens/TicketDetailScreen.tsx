@@ -336,10 +336,7 @@ export default function TicketDetailScreen() {
                 {/* Veranstaltung ansehen Button */}
                 <TouchableOpacity
                     style={[styles.eventButton, { backgroundColor: colors.primary }]}
-                    onPress={() => {
-                        dismissSheet();
-                        setTimeout(() => router.push(`/event/${eventId}`), 350);
-                    }}
+                    onPress={() => router.replace(`/event/${eventId}`)}
                 >
                     <Ionicons name="calendar-outline" size={20} color={colors.onPrimary} style={{ marginRight: 8 }} />
                     <Text style={[styles.eventButtonText, { color: colors.onPrimary }]}>

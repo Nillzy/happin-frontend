@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -14,13 +14,13 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import EditDrawer from '../components/atoms/EditDrawer';
 import ImageSelectionModal from '../components/atoms/ImageSelectionModal';
 import EventCategories from '../components/event/EventCategories';
 import EventImageGallery from '../components/atoms/EventImageGallery';
-import CategorySelector from '../components/atoms/CategorySelector';
+import CategorySelector, { CATEGORIES } from '../components/atoms/CategorySelector';
 import DatePicker from '../components/atoms/DatePicker';
 import TimePicker from '../components/atoms/TimePicker';
 import ImageGalleryUploader from '../components/atoms/ImageGalleryUploader';
@@ -28,14 +28,13 @@ import AddressAutocomplete from '../components/atoms/AddressAutocomplete';
 import MapView from '../components/MapView';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
-import { getGradient, type GradientId } from '../constants/gradients';
+import { getGradientByIndex, type GradientId } from '../constants/gradients';
 import { geocodeAddress } from '../services/geocoding';
 import type { EventDetailResponse, TicketOption } from '../types/events';
 import type { AddressSuggestion } from '../services/geocoding';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.75;
-const GRADIENT_FALLBACK = ['#D4006B', '#8B3DC8'];
 
 function formatDateGerman(isoDate: string): string {
     const d = new Date(isoDate);
@@ -61,8 +60,7 @@ export default function EventEditScreen() {
 
     const [event, setEvent] = useState<EventDetailResponse | null>(null);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);    const [error, setError] = useState<string | null>(null);
     const [activeDrawer, setActiveDrawer] = useState<DrawerKey>(null);
     const [showImageModal, setShowImageModal] = useState(false);
     const [selectedGradientId, setSelectedGradientId] = useState<GradientId | undefined>(undefined);
@@ -79,14 +77,16 @@ export default function EventEditScreen() {
     const [draftGalleryImages, setDraftGalleryImages] = useState<string[]>([]);
     const [draftTickets, setDraftTickets] = useState<TicketOption[]>([]);
     const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
+    const pendingSavesRef = useRef(0);
+    const mountedRef = useRef(false);
 
     const isWeb = Platform.OS === 'web';
     const isDraft = event?.status === 'draft';
 
-    const loadEvent = useCallback(async () => {
+    const loadEvent = useCallback(async (silent = false) => {
         if (!eventId) return;
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             const token = await getSession();
             const data = await api.getEventById(eventId, token || undefined);
             setEvent(data);
@@ -105,11 +105,16 @@ export default function EventEditScreen() {
             setError('Event konnte nicht geladen werden');
             console.error(e);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [eventId]);
 
     useEffect(() => { loadEvent(); }, [loadEvent]);
+
+    useFocusEffect(useCallback(() => {
+        if (!mountedRef.current) { mountedRef.current = true; return; }
+        if (pendingSavesRef.current === 0) loadEvent(true);
+    }, [loadEvent]));
 
     useEffect(() => {
         if (event && !gradientInitialized) {
@@ -122,30 +127,71 @@ export default function EventEditScreen() {
 
     const saveField = async (patch: Record<string, any>) => {
         if (!event) return;
+        // Apply optimistic update immediately (including media_urls which backend may not support)
+        setEvent(prev => {
+            if (!prev) return prev;
+            const next = { ...prev };
+            for (const key of Object.keys(patch)) {
+                if (key === 'location') {
+                    next.location = { ...prev.location, ...patch.location } as any;
+                } else if (key === 'category') {
+                    (next as any).category = patch.category;
+                } else {
+                    (next as any)[key] = patch[key];
+                }
+            }
+            return next;
+        });
+
+        // Strip fields the backend doesn't support via PATCH
+        // Remove keys whose value is null unless they are explicitly nullable fields
+        const nullableFields = new Set(['description', 'category', 'ends_at', 'max_capacity', 'gradient_id', 'media_urls']);
+        const cleanPatch = Object.fromEntries(
+            Object.entries(patch).filter(([k, v]) => v !== null || nullableFields.has(k))
+        );
+        if (Object.keys(cleanPatch).length === 0) return;
+
+        pendingSavesRef.current += 1;
+        setSaving(true);
         try {
-            setSaving(true);
             const token = await getSession();
             if (!token) return;
-            await api.updateEvent(event.event_id, patch, token);
-            await loadEvent();
+            const updated = await api.updateEvent(event.event_id, cleanPatch, token);
+            setEvent(prev => {
+                if (!prev) return updated;
+                return {
+                    ...updated,
+                    ticket_options: updated.ticket_options ?? prev.ticket_options,
+                    media_urls: updated.media_urls ?? prev.media_urls ?? [],
+                };
+            });
         } catch (e) {
-            console.error('Save failed:', e);
+            console.error('[saveField] failed:', e);
+            // Keep optimistic state on failure to avoid losing user changes
         } finally {
+            pendingSavesRef.current -= 1;
             setSaving(false);
         }
     };
 
     const saveTickets = async (tickets: TicketOption[]) => {
         if (!event) return;
+        setEvent(prev => prev ? { ...prev, ticket_options: tickets } : prev);
+        pendingSavesRef.current += 1;
+        setSaving(true);
         try {
-            setSaving(true);
             const token = await getSession();
             if (!token) return;
-            await api.syncTicketOptions(event.event_id, tickets, token);
-            await loadEvent();
+            const saved = await api.syncTicketOptions(event.event_id, tickets, token);
+            console.log('[saveTickets] API response:', saved);
+            if (Array.isArray(saved)) {
+                setEvent(prev => prev ? { ...prev, ticket_options: saved } : prev);
+            }
         } catch (e) {
-            console.error('Ticket save failed:', e);
+            console.error('[saveTickets] failed:', e);
+            // Keep optimistic state instead of rolling back — server might just not support this endpoint yet
         } finally {
+            pendingSavesRef.current -= 1;
             setSaving(false);
         }
     };
@@ -162,9 +208,18 @@ export default function EventEditScreen() {
             case 'description':
                 setDraftDescription(event.description || '');
                 break;
-            case 'categories':
-                setDraftCategories(event.category ? event.category.split(',').map(c => c.trim()) : []);
+            case 'categories': {
+                const raw = event.category ? event.category.split(',').map(c => c.trim()).filter(Boolean) : [];
+                // Normalize: accept both IDs and labels (legacy data may store labels)
+                const normalized = raw.map(val => {
+                    const byId = CATEGORIES.find(c => c.id === val);
+                    if (byId) return byId.id;
+                    const byLabel = CATEGORIES.find(c => c.label.toLowerCase() === val.toLowerCase());
+                    return byLabel ? byLabel.id : null;
+                }).filter((id): id is string => id !== null);
+                setDraftCategories(normalized);
                 break;
+            }
             case 'location': {
                 const loc = event.location;
                 if (loc?.street && loc?.city) {
@@ -207,9 +262,13 @@ export default function EventEditScreen() {
                     setDraftEndTime('');
                 }
                 break;
-            case 'gallery':
-                setDraftGalleryImages(event.media_urls || []);
+            case 'gallery': {
+                // Exclude the cover image from the gallery editor
+                const cover = effectiveImageUrl;
+                const galleryOnly = (event.media_urls || []).filter(u => u !== cover);
+                setDraftGalleryImages(galleryOnly);
                 break;
+            }
             case 'tickets':
                 setDraftTickets(event.ticket_options?.length ? [...event.ticket_options] : []);
                 break;
@@ -220,22 +279,22 @@ export default function EventEditScreen() {
         setActiveDrawer(key);
     };
 
-    const closeDrawer = async () => {
+    const closeDrawer = () => {
         if (!event || !activeDrawer) { setActiveDrawer(null); return; }
         switch (activeDrawer) {
             case 'description':
                 if (draftDescription !== (event.description || ''))
-                    await saveField({ description: draftDescription || null });
+                    saveField({ description: draftDescription || null });
                 break;
             case 'categories': {
                 const newCat = draftCategories.join(',');
                 if (newCat !== (event.category || ''))
-                    await saveField({ category: newCat || null });
+                    saveField({ category: newCat || null });
                 break;
             }
             case 'location':
                 if (draftAddress) {
-                    await saveField({
+                    saveField({
                         location: {
                             city: draftAddress.city,
                             street: draftAddress.street || undefined,
@@ -250,14 +309,21 @@ export default function EventEditScreen() {
                 const patch: Record<string, any> = {};
                 patch.max_capacity = draftMaxCapacity ? Number(draftMaxCapacity) : null;
                 patch.ends_at = (draftEndDate && draftEndTime) ? localIso(draftEndDate, draftEndTime) : null;
-                await saveField(patch);
+                saveField(patch);
                 break;
             }
-            case 'gallery':
-                // TODO Backend: Galerie-Upload-Endpoint wird benoetigt
+            case 'gallery': {
+                // Prepend cover image so the backend's full-replace doesn't lose it
+                const coverUrl = effectiveImageUrl;
+                const allUrls = coverUrl
+                    ? [coverUrl, ...draftGalleryImages.filter(u => u !== coverUrl)]
+                    : draftGalleryImages;
+                if (JSON.stringify(allUrls) !== JSON.stringify(event.media_urls || []))
+                    saveField({ media_urls: allUrls });
                 break;
+            }
             case 'tickets':
-                await saveTickets(draftTickets);
+                saveTickets(draftTickets);
                 break;
         }
         setActiveDrawer(null);
@@ -289,8 +355,38 @@ export default function EventEditScreen() {
             <ScreenWithNav showBottomNav={false}>
                 <View style={[styles.center, { backgroundColor: colors.background }]}>
                     <Text style={[styles.errorText, { color: colors.error }]}>{error || 'Event nicht gefunden'}</Text>
-                    <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={loadEvent}>
+                    <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={() => loadEvent()}>
                         <Text style={[styles.retryText, { color: colors.onPrimary }]}>Erneut versuchen</Text>
+                    </TouchableOpacity>
+                </View>
+            </ScreenWithNav>
+        );
+    }
+
+    // An event is expired when ends_at (or starts_at as fallback) is in the past
+    const referenceDate = event.ends_at ? new Date(event.ends_at) : new Date(event.starts_at);
+    const isExpired = referenceDate < new Date();
+
+    if (isExpired) {
+        return (
+            <ScreenWithNav showBottomNav={false}>
+                <View style={[styles.center, { backgroundColor: colors.background }]}>
+                    <Ionicons name="time-outline" size={48} color={colors.onSurfaceVariant} style={{ marginBottom: 16 }} />
+                    <Text style={[styles.errorText, { color: colors.onSurface, fontWeight: '700', fontSize: 20 }]}>Event abgelaufen</Text>
+                    <Text style={[styles.errorText, { color: colors.onSurfaceVariant, marginTop: 8, fontSize: 15 }]}>
+                        Abgelaufene Events können nicht mehr bearbeitet werden.
+                    </Text>
+                    <TouchableOpacity
+                        style={[styles.retryButton, { backgroundColor: colors.surfaceContainer, marginTop: 24 }]}
+                        onPress={() => router.push(`/event/${event.event_id}`)}
+                    >
+                        <Text style={[styles.retryText, { color: colors.onSurface }]}>Event ansehen</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.retryButton, { backgroundColor: 'transparent', marginTop: 8 }]}
+                        onPress={() => router.canGoBack() ? router.back() : router.push('/my-events')}
+                    >
+                        <Text style={[styles.retryText, { color: colors.onSurfaceVariant }]}>Zurück</Text>
                     </TouchableOpacity>
                 </View>
             </ScreenWithNav>
@@ -300,7 +396,7 @@ export default function EventEditScreen() {
     // --- Derived ---
     const hostInitial = event.host_name?.charAt(0).toUpperCase() || 'H';
     const categories = event.category ? event.category.split(',').map(c => c.trim()) : [];
-    const heroGradient = selectedGradientId !== undefined ? getGradient(selectedGradientId) : GRADIENT_FALLBACK;
+    const heroGradient = selectedGradientId !== undefined ? getGradientByIndex(selectedGradientId) : getGradientByIndex(0);
     const effectiveImageUrl = localImageUrl ?? event.image_url;
     const showImage = effectiveImageUrl && selectedGradientId === undefined;
 
@@ -377,11 +473,17 @@ export default function EventEditScreen() {
                             <Ionicons name="arrow-back" size={24} color="#ffffff" />
                         </TouchableOpacity>
 
-                        {/* Edit Image Button (overlaid on hero) */}
-                        <TouchableOpacity style={styles.editImageBtn} onPress={() => openDrawer('image')}>
-                            <Ionicons name="camera-outline" size={18} color="#ffffff" />
-                            <Text style={styles.editImageText}>Ändern</Text>
-                        </TouchableOpacity>
+                        {/* Vorschau + Titelbild-Buttons (overlaid on hero, top right) */}
+                        <View style={styles.heroTopRight}>
+                            <TouchableOpacity style={styles.heroBtn} onPress={() => router.push(`/event/${event.event_id}?preview=1`)}>
+                                <Ionicons name="eye-outline" size={18} color="#ffffff" />
+                                <Text style={styles.editImageText}>Vorschau</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.heroBtn} onPress={() => openDrawer('image')}>
+                                <Ionicons name="camera-outline" size={18} color="#ffffff" />
+                                <Text style={styles.editImageText}>Ändern</Text>
+                            </TouchableOpacity>
+                        </View>
 
                         {/* Title Overlay */}
                         <View style={styles.titleOverlay}>
@@ -415,45 +517,25 @@ export default function EventEditScreen() {
                             </View>
                         </View>
 
-                        {/* Action Buttons Row (same as EventScreen, but edit-focused) */}
-                        <View style={styles.actionButtons}>
-                            <TouchableOpacity style={glassActionBtn} onPress={() => openDrawer('details')}>
-                                <Ionicons name="settings-outline" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Details</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={glassActionBtn} onPress={() => openDrawer('tickets')}>
-                                <Ionicons name="ticket-outline" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Tickets</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={glassActionBtn} onPress={() => openDrawer('gallery')}>
-                                <Ionicons name="images-outline" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Galerie</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={glassActionBtn} onPress={() => event && router.push(`/event/${event.event_id}`)}>
-                                <Ionicons name="eye-outline" size={24} color={colors.onSurface} />
-                                <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Vorschau</Text>
-                            </TouchableOpacity>
-                        </View>
-
                         {/* Kategorien Section (same as EventScreen) */}
-                        <View style={styles.section}>
-                            {categories.length > 0 ? (
-                                <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('categories')}>
-                                    <View style={{ position: 'relative' }}>
-                                        <EventCategories categories={categories} editMode={false} />
-                                        {renderEditOverlay(() => openDrawer('categories'))}
-                                    </View>
-                                </TouchableOpacity>
-                            ) : (
-                                renderPlaceholder('Kategorien hinzufügen', 'pricetags-outline', () => openDrawer('categories'))
-                            )}
-                        </View>
+                        {categories.length > 0 ? (
+                            <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('categories')}>
+                                <View style={{ position: 'relative' }}>
+                                    <EventCategories categories={categories} editMode={false} />
+                                    {renderEditOverlay(() => openDrawer('categories'))}
+                                </View>
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={styles.section}>
+                                {renderPlaceholder('Kategorien hinzufügen', 'pricetags-outline', () => openDrawer('categories'))}
+                            </View>
+                        )}
 
-                        {/* About Event Section (same as EventScreen) */}
+                        {/* Beschreibung Section (same as EventScreen) */}
                         {event.description ? (
                             <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('description')}>
                                 <View style={[...glassCard, styles.section, { padding: 20, position: 'relative' }]}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>About Event</Text>
+                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Beschreibung</Text>
                                     <Text style={[styles.description, { color: colors.onSurface }]}>{event.description}</Text>
                                     {renderEditOverlay(() => openDrawer('description'))}
                                 </View>
@@ -468,10 +550,6 @@ export default function EventEditScreen() {
                         {event.location?.city ? (
                             <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('location')}>
                                 <View style={[styles.section, { position: 'relative' }]}>
-                                    <View style={styles.sectionTitleRow}>
-                                        <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Location</Text>
-                                        <Text style={[styles.sectionTitleRequired, { color: colors.error }]}>*</Text>
-                                    </View>
                                     <View style={[...glassCard, styles.locationCard]}>
                                         <View style={styles.locationHeader}>
                                             <View style={styles.locationTextContainer}>
@@ -558,19 +636,6 @@ export default function EventEditScreen() {
                             </View>
                         )}
 
-                        {/* Host Section (same as EventScreen) */}
-                        <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Host</Text>
-                            </View>
-                            <View style={styles.hostRow}>
-                                <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
-                                    <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>{hostInitial}</Text>
-                                </View>
-                                <Text style={[styles.hostNameLarge, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
-                            </View>
-                        </View>
-
                         {/* Details Info (capacity, end date, visibility) */}
                         <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('details')}>
                             <View style={[...glassCard, styles.section, { padding: 20, position: 'relative' }]}>
@@ -581,16 +646,17 @@ export default function EventEditScreen() {
                                         {event.max_capacity ? `Max. ${event.max_capacity} Teilnehmer` : 'Keine Begrenzung'}
                                     </Text>
                                 </View>
-                                {event.ends_at && (
+                                {event.ends_at ? (
                                     <View style={styles.detailRow}>
                                         <Ionicons name="time-outline" size={18} color={colors.onSurfaceVariant} />
                                         <Text style={[styles.detailText, { color: colors.onSurface }]}>Endet: {formatDateGerman(event.ends_at)}</Text>
                                     </View>
+                                ) : (
+                                    <View style={styles.detailRow}>
+                                        <Ionicons name="time-outline" size={18} color={colors.onSurfaceVariant} />
+                                        <Text style={[styles.detailText, { color: colors.onSurface }]}>Endzeit: optional</Text>
+                                    </View>
                                 )}
-                                <View style={styles.detailRow}>
-                                    <Ionicons name={event.is_public ? 'globe-outline' : 'lock-closed-outline'} size={18} color={colors.onSurfaceVariant} />
-                                    <Text style={[styles.detailText, { color: colors.onSurface }]}>{event.is_public ? 'Öffentlich' : 'Privat'}</Text>
-                                </View>
                                 {renderEditOverlay(() => openDrawer('details'))}
                             </View>
                         </TouchableOpacity>
@@ -779,8 +845,11 @@ const styles = StyleSheet.create({
         width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
         elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4,
     },
-    editImageBtn: {
+    heroTopRight: {
         position: 'absolute', top: Platform.OS === 'ios' ? 52 : 18, right: 16,
+        flexDirection: 'row', gap: 8, alignItems: 'center',
+    },
+    heroBtn: {
         flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8,
         borderRadius: 20, gap: 6, backgroundColor: 'rgba(0,0,0,0.45)',
     },
@@ -816,8 +885,8 @@ const styles = StyleSheet.create({
     section: { marginBottom: 32 },
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     sectionTitle: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
-    sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 12 },
-    sectionTitleRequired: { fontSize: 13, fontWeight: '700', lineHeight: 18 },
+    sectionTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 3, marginBottom: 12 },
+    sectionTitleRequired: { fontSize: 13, fontWeight: '700', lineHeight: 13 },
 
     // Location (same as EventScreen)
     locationCard: { padding: 16 },

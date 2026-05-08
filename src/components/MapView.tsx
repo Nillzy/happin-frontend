@@ -371,6 +371,10 @@ export default function MapView({
             mapInstanceRef.current = map;
 
             map.on('load', () => {
+                // Force resize so the map fills its container correctly when
+                // mounted inside nested layouts (ScrollView, glassCard, etc.)
+                map.resize();
+
                 const container = mapContainerRef.current;
                 if (container) {
                     container.querySelectorAll('.maplibregl-ctrl-logo, [class*="maptiler"]').forEach((el: Element) => {

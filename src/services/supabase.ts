@@ -213,18 +213,54 @@ export function getSupabaseClient(): SupabaseClient {
     return getSupabase();
 }
 
-export async function uploadEventImage(imageUri: string): Promise<string> {
-    const response = await fetch(imageUri);
-    const blob = await response.blob();
+const MAX_PIXELS = 1920 * 1080; // ~2.07 MP
+const JPEG_QUALITY = 0.88;
 
-    const ext = imageUri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
-    const finalExt = ext === 'png' ? 'png' : 'jpg';
-    const mimeType = finalExt === 'png' ? 'image/png' : 'image/jpeg';
-    const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${finalExt}`;
+async function toJpegBlob(imageUri: string): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            let { width, height } = img;
+            const pixels = width * height;
+            if (pixels > MAX_PIXELS) {
+                const scale = Math.sqrt(MAX_PIXELS / pixels);
+                width = Math.round(width * scale);
+                height = Math.round(height * scale);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob(
+                (blob) => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')),
+                'image/jpeg',
+                JPEG_QUALITY,
+            );
+        };
+        img.onerror = () => reject(new Error('Image load failed'));
+        img.src = imageUri;
+    });
+}
+
+export async function uploadEventImage(imageUri: string): Promise<string> {
+    let blob: Blob;
+
+    if (typeof document !== 'undefined') {
+        // Web: convert to JPEG and resize via canvas
+        blob = await toJpegBlob(imageUri);
+    } else {
+        // Native: ImagePicker already handles quality/size — just fetch the blob
+        const response = await fetch(imageUri);
+        blob = await response.blob();
+    }
+
+    const path = `covers/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
 
     const { error } = await getSupabase().storage
         .from('event-images')
-        .upload(path, blob, { contentType: mimeType, upsert: true });
+        .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
 
     if (error) throw new Error(`Upload failed: ${error.message}`);
 

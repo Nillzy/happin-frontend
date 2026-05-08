@@ -27,12 +27,14 @@ import MapView from '../components/MapView';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
 import { geocodeAddress } from '../services/geocoding';
+import { getGradientByIndex } from '../constants/gradients';
 import type { EventDetailResponse, RsvpStatus } from '../types/events';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.75; // 3:4 aspect ratio
 
 const GRADIENT_FALLBACK = ['#D4006B', '#8B3DC8'];
+
 
 // Mock-Ticketoptionen als Fallback wenn event.ticket_options leer ist
 const MOCK_TICKET_OPTIONS = [
@@ -138,8 +140,9 @@ const deskBarStyles = StyleSheet.create({
 export default function EventScreen() {
     const { colors, isDark } = useTheme();
     const router = useRouter();
-    const params = useLocalSearchParams<{ id?: string; eventId?: string }>();
+    const params = useLocalSearchParams<{ id?: string; eventId?: string; preview?: string }>();
     const id = params.id || params.eventId;
+    const isPreview = params.preview === '1';
     const { width: windowWidth } = useWindowDimensions();
 
     const [event, setEvent] = useState<EventDetailResponse | null>(null);
@@ -327,7 +330,7 @@ export default function EventScreen() {
                     />
                 ) : (
                     <LinearGradient
-                        colors={GRADIENT_FALLBACK as [string, string]}
+                        colors={getGradientByIndex(event.gradient_id ?? 0)}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.bgImage}
@@ -342,11 +345,17 @@ export default function EventScreen() {
                         <View style={styles.desktopLeft}>
                             {/* Back button */}
                             <TouchableOpacity
-                                style={[styles.backButton, { backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' } as any]}
+                                style={styles.backButton}
                                 onPress={() => router.canGoBack() ? router.back() : router.push('/events')}
                             >
                                 <Ionicons name="arrow-back" size={24} color="#ffffff" />
                             </TouchableOpacity>
+
+                            {isPreview && (
+                                <View style={styles.previewBadge}>
+                                    <Text style={styles.previewBadgeText}>VORSCHAU</Text>
+                                </View>
+                            )}
 
                             {/* Current image */}
                             {sliderImages.length > 0 ? (
@@ -357,7 +366,7 @@ export default function EventScreen() {
                                 />
                             ) : (
                                 <LinearGradient
-                                    colors={GRADIENT_FALLBACK as [string, string]}
+                                    colors={getGradientByIndex(event.gradient_id ?? 0)}
                                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                                     style={styles.desktopSliderImage}
                                 />
@@ -425,7 +434,7 @@ export default function EventScreen() {
                                     </View>
                                     <View style={styles.hostTextContainer}>
                                         <Text style={[styles.hostName, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
-                                        <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>invited you</Text>
+                                        <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>hat dich eingeladen</Text>
                                     </View>
                                 </View>
                                 <TouchableOpacity>
@@ -434,40 +443,45 @@ export default function EventScreen() {
                             </View>
 
                             {/* Action Buttons */}
-                            <View style={styles.actionButtons}>
-                                <TouchableOpacity
-                                    style={[glassActionBtn, rsvpStatus !== 'Accepted' && { opacity: 0.4, backgroundColor: isDark ? 'rgba(80,80,80,0.6)' : 'rgba(200,200,200,0.7)' }]}
-                                    onPress={rsvpStatus === 'Accepted' ? () => router.push(`/ticket/${id}`) : undefined}
-                                    disabled={rsvpStatus !== 'Accepted'}
-                                >
-                                    <Ionicons name="qr-code-outline" size={24} color={rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant} />
-                                    <Text style={[styles.actionButtonText, { color: rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
-                                </TouchableOpacity>
+                            <View style={[styles.actionButtons, { marginBottom: 32 }]}>
+                                {(() => {
+                                    const hasAccess = event.is_free
+                                        ? rsvpStatus === 'Accepted'
+                                        : (event.ticket ?? []).length > 0;
+                                    return (
+                                        <TouchableOpacity
+                                            style={[glassActionBtn, !hasAccess && { opacity: 0.4 }]}
+                                            onPress={hasAccess ? () => router.push(`/ticket/${id}`) : undefined}
+                                            disabled={!hasAccess}
+                                        >
+                                            <Ionicons name="qr-code-outline" size={22} color={hasAccess ? colors.onSurface : colors.onSurfaceVariant} />
+                                            <Text style={[styles.actionButtonText, { color: hasAccess ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })()}
                                 <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
-                                    <Ionicons name="mail-outline" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Contact</Text>
+                                    <Ionicons name="mail-outline" size={22} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kontakt</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
-                                    <Ionicons name="share-outline" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Share</Text>
+                                    <Ionicons name="share-outline" size={22} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn}>
-                                    <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>More</Text>
+                                    <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
                                 </TouchableOpacity>
                             </View>
 
                             {/* Categories */}
                             {categories.length > 0 && (
-                                <View style={styles.section}>
-                                    <EventCategories categories={categories} editMode={false} />
-                                </View>
+                                <EventCategories categories={categories} editMode={false} />
                             )}
 
                             {/* About */}
                             {event.description && (
                                 <View style={[...glassCard, styles.section, { padding: 20 }]}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>About Event</Text>
+                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Beschreibung</Text>
                                     <Text style={[styles.description, { color: colors.onSurface }]}>{event.description}</Text>
                                 </View>
                             )}
@@ -475,7 +489,6 @@ export default function EventScreen() {
                             {/* Location */}
                             {event.location && (
                                 <View style={styles.section}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Location</Text>
                                     <View style={[...glassCard, styles.locationCard]}>
                                         <View style={styles.locationHeader}>
                                             <View style={styles.locationTextContainer}>
@@ -512,32 +525,18 @@ export default function EventScreen() {
                                 </View>
                             )}
 
-                            {/* Host */}
-                            <View style={styles.section}>
-                                <View style={styles.sectionHeader}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Host</Text>
-                                    <TouchableOpacity onPress={handleContact}>
-                                        <Text style={[styles.contactLink, { color: colors.primary }]}>Contact</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <View style={styles.hostRow}>
-                                    <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
-                                        <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>{hostInitial}</Text>
-                                    </View>
-                                    <Text style={[styles.hostNameLarge, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
-                                </View>
-                            </View>
-
                             {/* Desktop sticky bar inline at bottom of scroll */}
-                            <DesktopStickyBar
-                                event={event}
-                                colors={colors}
-                                isDark={isDark}
-                                rsvpStatus={rsvpStatus}
-                                rsvpLoading={rsvpLoading}
-                                onRsvp={handleStickyBarPress}
-                                onTickets={openDrawer}
-                            />
+                            <View style={isPreview ? { opacity: 0.4 } : undefined} pointerEvents={isPreview ? 'none' : 'auto'}>
+                                <DesktopStickyBar
+                                    event={event}
+                                    colors={colors}
+                                    isDark={isDark}
+                                    rsvpStatus={rsvpStatus}
+                                    rsvpLoading={rsvpLoading}
+                                    onRsvp={handleStickyBarPress}
+                                    onTickets={openDrawer}
+                                />
+                            </View>
 
                             <View style={{ height: 32 }} />
                         </ScrollView>
@@ -550,15 +549,21 @@ export default function EventScreen() {
                             {event.image_url ? (
                                 <Image source={{ uri: event.image_url }} style={styles.heroImage} resizeMode="cover" />
                             ) : (
-                                <LinearGradient colors={GRADIENT_FALLBACK as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroImage} />
+                                <LinearGradient colors={getGradientByIndex(event.gradient_id ?? 0)} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroImage} />
                             )}
 
                             <TouchableOpacity
-                                style={[styles.backButton, { backgroundColor: colors.surfaceContainerHigh }]}
+                                style={styles.backButton}
                                 onPress={() => router.canGoBack() ? router.back() : router.push('/events')}
                             >
                                 <Ionicons name="arrow-back" size={24} color="#ffffff" />
                             </TouchableOpacity>
+
+                            {isPreview && (
+                                <View style={styles.previewBadge}>
+                                    <Text style={styles.previewBadgeText}>VORSCHAU</Text>
+                                </View>
+                            )}
 
                             <View style={styles.titleOverlay}>
                                 <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.titleGradient}>
@@ -576,7 +581,7 @@ export default function EventScreen() {
                                     </View>
                                     <View style={styles.hostTextContainer}>
                                         <Text style={[styles.hostName, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
-                                        <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>invited you</Text>
+                                        <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>hat dich eingeladen</Text>
                                     </View>
                                 </View>
                                 <TouchableOpacity>
@@ -584,45 +589,50 @@ export default function EventScreen() {
                                 </TouchableOpacity>
                             </View>
 
-                            <View style={styles.actionButtons}>
-                                <TouchableOpacity
-                                    style={[glassActionBtn, rsvpStatus !== 'Accepted' && { opacity: 0.4, backgroundColor: isDark ? 'rgba(80,80,80,0.6)' : 'rgba(200,200,200,0.7)' }]}
-                                    onPress={rsvpStatus === 'Accepted' ? () => router.push(`/ticket/${id}`) : undefined}
-                                    disabled={rsvpStatus !== 'Accepted'}
-                                >
-                                    <Ionicons name="qr-code-outline" size={24} color={rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant} />
-                                    <Text style={[styles.actionButtonText, { color: rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
-                                </TouchableOpacity>
+                            {/* Action Buttons */}
+                            <View style={[styles.actionButtons, { marginBottom: 32 }]}>
+                                {(() => {
+                                    const hasAccess = event.is_free
+                                        ? rsvpStatus === 'Accepted'
+                                        : (event.ticket ?? []).length > 0;
+                                    return (
+                                        <TouchableOpacity
+                                            style={[glassActionBtn, !hasAccess && { opacity: 0.4 }]}
+                                            onPress={hasAccess ? () => router.push(`/ticket/${id}`) : undefined}
+                                            disabled={!hasAccess}
+                                        >
+                                            <Ionicons name="qr-code-outline" size={22} color={hasAccess ? colors.onSurface : colors.onSurfaceVariant} />
+                                            <Text style={[styles.actionButtonText, { color: hasAccess ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })()}
                                 <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
-                                    <Ionicons name="mail-outline" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Contact</Text>
+                                    <Ionicons name="mail-outline" size={22} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kontakt</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
-                                    <Ionicons name="share-outline" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Share</Text>
+                                    <Ionicons name="share-outline" size={22} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn}>
-                                    <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>More</Text>
+                                    <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
                                 </TouchableOpacity>
                             </View>
 
                             {categories.length > 0 && (
-                                <View style={styles.section}>
-                                    <EventCategories categories={categories} editMode={false} />
-                                </View>
+                                <EventCategories categories={categories} editMode={false} />
                             )}
 
                             {event.description && (
                                 <View style={[...glassCard, styles.section, { padding: 20 }]}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>About Event</Text>
+                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Beschreibung</Text>
                                     <Text style={[styles.description, { color: colors.onSurface }]}>{event.description}</Text>
                                 </View>
                             )}
 
                             {event.location && (
                                 <View style={styles.section}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Location</Text>
                                     <View style={[...glassCard, styles.locationCard]}>
                                         <View style={styles.locationHeader}>
                                             <View style={styles.locationTextContainer}>
@@ -665,21 +675,6 @@ export default function EventScreen() {
                                 </View>
                             )}
 
-                            <View style={styles.section}>
-                                <View style={styles.sectionHeader}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Host</Text>
-                                    <TouchableOpacity onPress={handleContact}>
-                                        <Text style={[styles.contactLink, { color: colors.primary }]}>Contact</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <View style={styles.hostRow}>
-                                    <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
-                                        <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>{hostInitial}</Text>
-                                    </View>
-                                    <Text style={[styles.hostNameLarge, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
-                                </View>
-                            </View>
-
                             <View style={{ height: 100 }} />
                         </View>
                     </ScrollView>
@@ -713,7 +708,8 @@ export default function EventScreen() {
                             isWeb
                                 ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
                                 : { backgroundColor: colors.surface },
-                        ]}>
+                            isPreview && { opacity: 0.4 },
+                        ]} pointerEvents={isPreview ? 'none' : 'auto'}>
                             <View style={styles.stickyBarInfo}>
                                 <Text style={[styles.stickyBarPrice, { color: colors.onSurface }]}>
                                     Kostenlos
@@ -744,7 +740,8 @@ export default function EventScreen() {
                         isWeb
                             ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
                             : { backgroundColor: colors.surface },
-                    ]}>
+                        isPreview && { opacity: 0.4 },
+                    ]} pointerEvents={isPreview ? 'none' : 'auto'}>
                         <View style={styles.stickyBarInfo}>
                             <Text style={[styles.stickyBarPrice, { color: colors.onSurface }]}>
                                 {cheapest === 0 ? 'Kostenlos' : `ab ${cheapest.toFixed(2)} €`}
@@ -1138,10 +1135,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        zIndex: 10,
+    },
+    previewBadge: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 56 : 22,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        pointerEvents: 'none' as any,
+    },
+    previewBadgeText: {
+        color: '#ffffff',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 2,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        paddingHorizontal: 14,
+        paddingVertical: 5,
+        borderRadius: 20,
+        overflow: 'hidden',
     },
     titleOverlay: {
         position: 'absolute',
