@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, TouchableOpacity, Image, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +18,29 @@ export default function ImageGalleryUploader({
 }: ImageGalleryUploaderProps) {
     const { colors } = useTheme();
     const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+    const uploadUri = async (uri: string) => {
+        try {
+            setUploading(true);
+            const publicUrl = await uploadEventImage(uri);
+            onChange([...images, publicUrl]);
+        } catch (e) {
+            console.error('Gallery image upload failed:', e);
+            if (Platform.OS !== 'web') Alert.alert('Upload fehlgeschlagen', 'Bitte versuche es erneut.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleWebFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        const objectUrl = URL.createObjectURL(file);
+        await uploadUri(objectUrl);
+        // Reset so the same file can be picked again
+        (e.target as HTMLInputElement).value = '';
+    };
 
     const pickAndUpload = async (source: 'camera' | 'library') => {
         if (images.length >= maxImages) {
@@ -44,39 +67,37 @@ export default function ImageGalleryUploader({
                 mediaTypes: ['images'],
                 allowsEditing: true,
                 aspect: [4, 3],
-                quality: 0.8,
+                quality: 0.85,
+                exif: false,
             })
             : await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
                 allowsEditing: true,
                 aspect: [4, 3],
-                quality: 0.8,
+                quality: 0.85,
+                exif: false,
             });
 
         if (!result.canceled && result.assets[0]) {
-            try {
-                setUploading(true);
-                const publicUrl = await uploadEventImage(result.assets[0].uri);
-                onChange([...images, publicUrl]);
-            } catch (e) {
-                console.error('Gallery image upload failed:', e);
-                Alert.alert('Upload fehlgeschlagen', 'Bitte versuche es erneut.');
-            } finally {
-                setUploading(false);
-            }
+            await uploadUri(result.assets[0].uri);
         }
     };
 
-    const showOptions = () => {
-        Alert.alert(
-            'Bild hinzufügen',
-            'Woher möchtest du das Bild nehmen?',
-            [
-                { text: 'Kamera', onPress: () => pickAndUpload('camera') },
-                { text: 'Galerie', onPress: () => pickAndUpload('library') },
-                { text: 'Abbrechen', style: 'cancel' },
-            ]
-        );
+    const handleAddPress = () => {
+        if (images.length >= maxImages || uploading) return;
+        if (Platform.OS === 'web') {
+            fileInputRef.current?.click();
+        } else {
+            Alert.alert(
+                'Bild hinzufügen',
+                'Woher möchtest du das Bild nehmen?',
+                [
+                    { text: 'Kamera', onPress: () => pickAndUpload('camera') },
+                    { text: 'Galerie', onPress: () => pickAndUpload('library') },
+                    { text: 'Abbrechen', style: 'cancel' },
+                ]
+            );
+        }
     };
 
     const removeImage = (index: number) => {
@@ -85,6 +106,15 @@ export default function ImageGalleryUploader({
 
     return (
         <View style={styles.container}>
+            {Platform.OS === 'web' && (
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleWebFileChange as any}
+                />
+            )}
             <View style={styles.header}>
                 <Text style={[styles.title, { color: colors.onSurface }]}>
                     Weitere Bilder
@@ -102,7 +132,7 @@ export default function ImageGalleryUploader({
                 {/* Add Button */}
                 <TouchableOpacity
                     activeOpacity={0.8}
-                    onPress={showOptions}
+                    onPress={handleAddPress}
                     style={[
                         styles.addButton,
                         {

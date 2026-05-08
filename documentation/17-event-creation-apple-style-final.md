@@ -342,7 +342,7 @@ interface ImageGalleryUploaderProps {
 - Black selected, white unselected
 - Expand/Collapse für 9 initial → 20 total
 - Header: "Wähle Kategorien" (28px)
-- Subtext: "Wir empfehlen Events basierend auf deiner Auswahl."
+- Subtext: "Du kannst bis zu 5 Kategorien auswählen."
 
 **Props** (unverändert):
 ```typescript

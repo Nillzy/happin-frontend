@@ -22,6 +22,7 @@ import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { api } from '../services/api';
 import { authorize, getSession } from '../services/supabase';
 import { useSavedEvents } from '../contexts/SavedEventsContext';
+import { getGradientByIndex } from '../constants/gradients';
 import type { EventListItem, EventListResponse } from '../types/events';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -41,13 +42,6 @@ function getNumColumns(width: number): number {
     if (width >= 768) return 2;
     return 1;
 }
-
-const GRADIENT_PAIRS = [
-    ['#D4006B', '#8B3DC8'],
-    ['#8B3DC8', '#42dae2'],
-    ['#00677f', '#8B3DC8'],
-    ['#FF6FA8', '#D4006B'],
-];
 
 function formatDateGerman(isoDate: string): string {
     const d = new Date(isoDate);
@@ -225,7 +219,7 @@ export default function EventListScreen() {
     };
 
     const renderCard = ({ item, index }: { item: EventListItem; index: number }) => {
-        const gradient = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
+        const gradient = item.gradient_id != null ? getGradientByIndex(item.gradient_id) : getGradientByIndex(index);
         return (
             <TouchableOpacity
                 activeOpacity={0.85}

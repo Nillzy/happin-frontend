@@ -50,6 +50,7 @@ export interface EventDetailResponse extends EventListItem {
     media_urls: string[];
     ticket_options: TicketOption[];
     my_rsvp_status?: RsvpStatus | null;
+    ticket?: { ticket_id: string }[];
 }
 
 export type RsvpStatus = 'Accepted' | 'Declined' | 'Pending';
@@ -99,6 +100,7 @@ export interface EventUpdateRequest {
     location?: Partial<LocationCreate>;
     image_url?: string;
     gradient_id?: number | null;
+    media_urls?: string[];
 }
 
 export interface UserTicket {

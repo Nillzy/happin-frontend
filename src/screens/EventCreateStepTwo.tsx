@@ -22,13 +22,16 @@ import ImageSelectionModal from '../components/atoms/ImageSelectionModal';
 import CategorySelector from '../components/atoms/CategorySelector';
 import DatePicker from '../components/atoms/DatePicker';
 import TimePicker from '../components/atoms/TimePicker';
+import AddressAutocomplete from '../components/atoms/AddressAutocomplete';
+import MapView from '../components/MapView';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
 import { getGradient, type GradientId } from '../constants/gradients';
 import type { EventCreateRequest } from '../types/events';
+import type { AddressSuggestion } from '../services/geocoding';
 
 export default function EventCreateStepTwo() {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
     const router = useRouter();
     const params = useLocalSearchParams<{
         title?: string;
@@ -43,11 +46,7 @@ export default function EventCreateStepTwo() {
     const [galleryImages, setGalleryImages] = useState<string[]>([]);
     const [description, setDescription] = useState('');
     const [categories, setCategories] = useState<string[]>([]);
-    const [city, setCity] = useState('');
-    const [street, setStreet] = useState('');
-    const [houseNumber, setHouseNumber] = useState('');
-    const [postalCode, setPostalCode] = useState('');
-    const [country, setCountry] = useState('Deutschland');
+    const [address, setAddress] = useState<AddressSuggestion | null>(null);
     const [maxCapacity, setMaxCapacity] = useState('');
     const [endDate, setEndDate] = useState('');
     const [endTime, setEndTime] = useState('');
@@ -77,8 +76,8 @@ export default function EventCreateStepTwo() {
             errors.push('Titelbild ist erforderlich (Vorlage oder Upload)');
         }
 
-        if (!city.trim()) {
-            errors.push('Stadt ist ein Pflichtfeld');
+        if (!address?.city) {
+            errors.push('Adresse ist ein Pflichtfeld');
         }
 
         if (errors.length > 0) {
@@ -101,11 +100,11 @@ export default function EventCreateStepTwo() {
             image_url: imageUri || undefined,
             gradient_id: selectedGradientId ?? undefined,
             location: {
-                city: city.trim(),
-                street: street.trim() || undefined,
-                house_number: houseNumber.trim() || undefined,
-                postal_code: postalCode.trim() || undefined,
-                country: country.trim() || undefined,
+                city: address!.city,
+                street: address!.street || undefined,
+                house_number: address!.houseNumber || undefined,
+                postal_code: address!.postalCode || undefined,
+                country: address!.country || undefined,
             },
         };
 
@@ -127,7 +126,7 @@ export default function EventCreateStepTwo() {
         }
     };
 
-    const isFormValid = (selectedGradientId !== undefined || imageUri) && city.trim();
+    const isFormValid = (selectedGradientId !== undefined || imageUri) && !!address?.city;
 
     const handleBack = () => {
         router.back();
@@ -252,88 +251,29 @@ export default function EventCreateStepTwo() {
                             <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>
                                 Ort *
                             </Text>
-                            <TextInput
-                                style={[
-                                    styles.input,
-                                    {
-                                        color: colors.onSurface,
-                                        borderColor: colors.outlineVariant,
-                                    },
-                                ]}
-                                value={city}
-                                onChangeText={setCity}
-                                placeholder="Stadt"
-                                placeholderTextColor={colors.onSurfaceVariant}
+                            <AddressAutocomplete
+                                initialSelected={address}
+                                onSelect={setAddress}
+                                onClear={() => setAddress(null)}
                             />
-                            <View style={styles.row}>
-                                <View style={styles.inputFlex2}>
-                                    <TextInput
-                                        style={[
-                                            styles.input,
-                                            styles.inputNoMargin,
-                                            {
-                                                color: colors.onSurface,
-                                                borderColor: colors.outlineVariant,
-                                            },
-                                        ]}
-                                        value={street}
-                                        onChangeText={setStreet}
-                                        placeholder="Straße"
-                                        placeholderTextColor={colors.onSurfaceVariant}
+                            {address && address.lat !== 0 && address.lng !== 0 && (
+                                <View style={styles.mapPreview}>
+                                    <MapView
+                                        markers={[{
+                                            lat: address.lat,
+                                            lng: address.lng,
+                                            title: address.displayLabel,
+                                            eventId: '__preview__',
+                                        }]}
+                                        centerLat={address.lat}
+                                        centerLng={address.lng}
+                                        zoom={15}
+                                        isDark={isDark}
+                                        showPopups={false}
+                                        interactive={false}
                                     />
                                 </View>
-                                <View style={styles.inputFlex1}>
-                                    <TextInput
-                                        style={[
-                                            styles.input,
-                                            styles.inputNoMargin,
-                                            {
-                                                color: colors.onSurface,
-                                                borderColor: colors.outlineVariant,
-                                            },
-                                        ]}
-                                        value={houseNumber}
-                                        onChangeText={setHouseNumber}
-                                        placeholder="Nr."
-                                        placeholderTextColor={colors.onSurfaceVariant}
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.row}>
-                                <View style={styles.halfField}>
-                                    <TextInput
-                                        style={[
-                                            styles.input,
-                                            styles.inputNoMargin,
-                                            {
-                                                color: colors.onSurface,
-                                                borderColor: colors.outlineVariant,
-                                            },
-                                        ]}
-                                        value={postalCode}
-                                        onChangeText={setPostalCode}
-                                        placeholder="PLZ"
-                                        placeholderTextColor={colors.onSurfaceVariant}
-                                        keyboardType="number-pad"
-                                    />
-                                </View>
-                                <View style={styles.halfField}>
-                                    <TextInput
-                                        style={[
-                                            styles.input,
-                                            styles.inputNoMargin,
-                                            {
-                                                color: colors.onSurface,
-                                                borderColor: colors.outlineVariant,
-                                            },
-                                        ]}
-                                        value={country}
-                                        onChangeText={setCountry}
-                                        placeholder="Land"
-                                        placeholderTextColor={colors.onSurfaceVariant}
-                                    />
-                                </View>
-                            </View>
+                            )}
                         </View>
 
                         {/* Details (optional) */}
@@ -523,11 +463,11 @@ const styles = StyleSheet.create({
     halfField: {
         flex: 1,
     },
-    inputFlex1: {
-        flex: 1,
-    },
-    inputFlex2: {
-        flex: 2,
+    mapPreview: {
+        marginTop: 16,
+        height: 200,
+        borderRadius: 12,
+        overflow: 'hidden',
     },
     errorContainer: {
         marginHorizontal: 24,

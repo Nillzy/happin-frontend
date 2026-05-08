@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
 
 interface Category {
@@ -10,25 +9,17 @@ interface Category {
 
 const CATEGORIES: Category[] = [
     { id: 'music', label: 'Musik' },
+    { id: 'party', label: 'Party' },
     { id: 'sport', label: 'Sport' },
     { id: 'art', label: 'Kunst' },
+    { id: 'culture', label: 'Kultur' },
     { id: 'food', label: 'Essen & Trinken' },
+    { id: 'outdoor', label: 'Outdoor' },
     { id: 'networking', label: 'Networking' },
     { id: 'education', label: 'Bildung' },
-    { id: 'culture', label: 'Kultur' },
-    { id: 'party', label: 'Party' },
-    { id: 'outdoor', label: 'Outdoor' },
-    { id: 'business', label: 'Business & Professional' },
-    { id: 'science', label: 'Science & Technology' },
-    { id: 'health', label: 'Health & Wellness' },
-    { id: 'charity', label: 'Charity & Causes' },
-    { id: 'community', label: 'Community & Culture' },
-    { id: 'family', label: 'Family & Education' },
-    { id: 'fashion', label: 'Fashion & Beauty' },
-    { id: 'film', label: 'Film, Media & Entertainment' },
-    { id: 'hobbies', label: 'Hobbies & Special Interest' },
-    { id: 'travel', label: 'Travel & Outdoor' },
-    { id: 'spirituality', label: 'Spirituality & Religion' },
+    { id: 'science', label: 'Wissenschaft & Tech' },
+    { id: 'health', label: 'Gesundheit' },
+    { id: 'charity', label: 'Wohltätigkeit' },
 ];
 
 interface CategorySelectorProps {
@@ -43,10 +34,6 @@ export default function CategorySelector({
     maxSelection = 5
 }: CategorySelectorProps) {
     const { colors } = useTheme();
-    const [expanded, setExpanded] = useState(false);
-
-    // Show first 9 categories (approximately 3 rows) when collapsed
-    const visibleCategories = expanded ? CATEGORIES : CATEGORIES.slice(0, 9);
 
     const toggleCategory = (id: string) => {
         if (value.includes(id)) {
@@ -64,11 +51,11 @@ export default function CategorySelector({
                 Wähle Kategorien
             </Text>
             <Text style={[styles.subText, { color: colors.onSurfaceVariant }]}>
-                Wir empfehlen Events basierend auf deiner Auswahl.
+                Du kannst bis zu 5 Kategorien auswählen.
             </Text>
 
             <View style={styles.chipGrid}>
-                {visibleCategories.map((cat) => {
+                {CATEGORIES.map((cat) => {
                     const isSelected = value.includes(cat.id);
                     return (
                         <TouchableOpacity
@@ -103,22 +90,6 @@ export default function CategorySelector({
                     );
                 })}
             </View>
-
-            {/* Show More / Show Less Button */}
-            <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => setExpanded(!expanded)}
-                style={styles.expandButton}
-            >
-                <Text style={[styles.expandButtonText, { color: colors.primary }]}>
-                    {expanded ? 'Weniger anzeigen' : `${CATEGORIES.length - 9} weitere Kategorien anzeigen`}
-                </Text>
-                <Ionicons
-                    name={expanded ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color={colors.primary}
-                />
-            </TouchableOpacity>
         </View>
     );
 }
@@ -158,17 +129,6 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '500',
         letterSpacing: -0.2,
-    },
-    expandButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 20,
-        gap: 6,
-    },
-    expandButtonText: {
-        fontSize: 15,
-        fontWeight: '600',
     },
 });
 

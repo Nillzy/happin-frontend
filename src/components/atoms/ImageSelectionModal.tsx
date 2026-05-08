@@ -116,7 +116,8 @@ export default function ImageSelectionModal({
             mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [16, 9],
-            quality: 0.8,
+            quality: 0.85,
+            exif: false,
         });
 
         if (result.canceled || !result.assets[0]) return;

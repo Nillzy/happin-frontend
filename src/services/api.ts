@@ -71,19 +71,26 @@ export const api = {
             body: JSON.stringify(data),
         }),
 
-    updateEvent: (eventId: string, data: EventUpdateRequest, token: string) =>
-        request<EventDetailResponse>(`/api/v1/events/${eventId}`, {
+    updateEvent: async (eventId: string, data: EventUpdateRequest, token: string) => {
+        const result = await request<EventDetailResponse>(`/api/v1/events/${eventId}`, {
             method: 'PATCH',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify(data),
-        }),
+        });
+        _eventCache.delete(eventId);
+        return result;
+    },
 
-    syncTicketOptions: (eventId: string, options: TicketOption[], token: string) =>
-        request<TicketOption[]>(`/api/v1/events/${eventId}/ticket-options`, {
+    syncTicketOptions: async (eventId: string, options: TicketOption[], token: string) => {
+        const result = await request<TicketOption[] | { ticket_options: TicketOption[] }>(`/api/v1/events/${eventId}/ticket-options`, {
             method: 'PUT',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ ticket_options: options }),
-        }),
+        });
+        _eventCache.delete(eventId);
+        // Backend may return either a plain array or { ticket_options: [...] }
+        return Array.isArray(result) ? result : (result as any).ticket_options ?? [];
+    },
 
     rsvpEvent: (eventId: string, status: RsvpStatus, token: string) =>
         request<RsvpResponse>(`/api/v1/events/${eventId}/rsvp`, {
