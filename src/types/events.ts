@@ -49,8 +49,25 @@ export interface EventDetailResponse extends EventListItem {
     host_name?: string;
     media_urls: string[];
     ticket_options: TicketOption[];
+    custom_fields?: CustomField[];
     my_rsvp_status?: RsvpStatus | null;
     ticket?: { ticket_id: string }[];
+}
+
+export type CustomFieldType = 'text' | 'textarea' | 'single_select' | 'multi_select';
+
+export interface CustomField {
+    custom_field_id?: string;
+    label: string;
+    field_type: CustomFieldType;
+    is_required: boolean;
+    options?: string[] | null;
+    sort_order: number;
+}
+
+export interface CustomFieldResponseItem {
+    custom_field_id: string;
+    value: string | string[];
 }
 
 export type RsvpStatus = 'Accepted' | 'Declined' | 'Pending';

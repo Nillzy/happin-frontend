@@ -28,7 +28,8 @@ import { getSession } from '../services/supabase';
 import { api } from '../services/api';
 import { geocodeAddress } from '../services/geocoding';
 import { getGradientByIndex } from '../constants/gradients';
-import type { EventDetailResponse, RsvpStatus } from '../types/events';
+import type { EventDetailResponse, RsvpStatus, CustomFieldResponseItem } from '../types/events';
+import CustomFieldForm from '../components/atoms/CustomFieldForm';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.75; // 3:4 aspect ratio
@@ -158,6 +159,8 @@ export default function EventScreen() {
     const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus | null>(null);
     const [rsvpMenuVisible, setRsvpMenuVisible] = useState(false);
     const [rsvpLoading, setRsvpLoading] = useState(false);
+    const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
+    const [customFieldsSubmitting, setCustomFieldsSubmitting] = useState(false);
     const [sliderIndex, setSliderIndex] = useState(0);
 
     const openDrawer = () => {
@@ -218,6 +221,10 @@ export default function EventScreen() {
             setRsvpStatus(newStatus);
             if (newStatus === 'Accepted' && prevStatus !== 'Accepted') {
                 setEvent({ ...event, participant_count: event.participant_count + 1 });
+                const hasCustomFields = event.custom_fields && event.custom_fields.length > 0;
+                if (hasCustomFields) {
+                    setTimeout(() => setCustomFieldsModalOpen(true), 300);
+                }
             } else if (newStatus !== 'Accepted' && prevStatus === 'Accepted') {
                 setEvent({ ...event, participant_count: Math.max(0, event.participant_count - 1) });
             }
@@ -232,6 +239,22 @@ export default function EventScreen() {
             Alert.alert('Fehler', msg);
         } finally {
             setRsvpLoading(false);
+        }
+    };
+
+    const handleCustomFieldSubmit = async (responses: CustomFieldResponseItem[]) => {
+        if (!event) return;
+        const token = await getSession();
+        if (!token) return;
+        setCustomFieldsSubmitting(true);
+        try {
+            await api.submitCustomFieldResponses(event.event_id, responses, token);
+            setCustomFieldsModalOpen(false);
+        } catch (err) {
+            console.error('[EventScreen] Custom fields submit error:', err);
+            Alert.alert('Fehler', 'Antworten konnten nicht gespeichert werden.');
+        } finally {
+            setCustomFieldsSubmitting(false);
         }
     };
 
@@ -989,6 +1012,26 @@ export default function EventScreen() {
                     <View style={rsvpStyles.bottomSpacer} />
                 </View>
             </Modal>
+
+            {/* Custom Fields Modal (appears after RSVP Accept if event has custom fields) */}
+            {event && (event.custom_fields?.length ?? 0) > 0 && (
+                <Modal
+                    visible={customFieldsModalOpen}
+                    animationType="slide"
+                    transparent
+                    onRequestClose={() => setCustomFieldsModalOpen(false)}
+                >
+                    <Pressable style={rsvpStyles.backdrop} onPress={() => setCustomFieldsModalOpen(false)} />
+                    <View style={[rsvpStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
+                        <CustomFieldForm
+                            fields={event.custom_fields!}
+                            onSubmit={handleCustomFieldSubmit}
+                            onCancel={() => setCustomFieldsModalOpen(false)}
+                            submitting={customFieldsSubmitting}
+                        />
+                    </View>
+                </Modal>
+            )}
 
         </ScreenWithNav>
     );
