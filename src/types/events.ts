@@ -52,6 +52,7 @@ export interface EventDetailResponse extends EventListItem {
     custom_fields?: CustomField[];
     my_rsvp_status?: RsvpStatus | null;
     ticket?: { ticket_id: string }[];
+    max_tickets_per_person?: number;
 }
 
 export type CustomFieldType = 'text' | 'textarea' | 'single_select' | 'multi_select';
@@ -68,6 +69,11 @@ export interface CustomField {
 export interface CustomFieldResponseItem {
     custom_field_id: string;
     value: string | string[];
+}
+
+export interface TicketResponses {
+    ticket_id: string;
+    responses: CustomFieldResponseItem[];
 }
 
 export type RsvpStatus = 'Accepted' | 'Declined' | 'Pending';
@@ -111,6 +117,7 @@ export interface EventUpdateRequest {
     description?: string | null;
     category?: string | null;
     max_capacity?: number | null;
+    max_tickets_per_person?: number | null;
     is_public?: boolean;
     is_free?: boolean;
     status?: string;
