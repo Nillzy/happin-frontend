@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse } from '@/src/types/events';
+import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse, CustomField, CustomFieldResponseItem } from '@/src/types/events';
 import type { ParticipantListResponse, RemoveParticipantsResponse, ScanTicketResponse } from '@/src/types/host';
 
 /**
@@ -157,5 +157,24 @@ export const api = {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ qr_token: qrToken }),
+        }),
+
+    syncCustomFields: (eventId: string, fields: CustomField[], token: string) =>
+        request<CustomField[]>(`/api/v1/events/${eventId}/custom-fields`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ custom_fields: fields }),
+        }),
+
+    submitCustomFieldResponses: (eventId: string, responses: CustomFieldResponseItem[], token: string) =>
+        request<CustomFieldResponseItem[]>(`/api/v1/events/${eventId}/custom-fields/responses`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ responses }),
+        }),
+
+    getMyCustomFieldResponses: (eventId: string, token: string) =>
+        request<CustomFieldResponseItem[]>(`/api/v1/events/${eventId}/custom-fields/responses/me`, {
+            headers: { Authorization: `Bearer ${token}` },
         }),
 };
