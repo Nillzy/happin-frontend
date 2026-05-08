@@ -13,7 +13,16 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <SavedEventsProvider>
-          <Stack screenOptions={{ headerShown: false }} />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen
+              name="ticket/[eventId]"
+              options={{
+                presentation: 'transparentModal',
+                animation: 'fade',
+                contentStyle: { backgroundColor: 'transparent' },
+              }}
+            />
+          </Stack>
           <StatusBar style={isDark ? 'light' : 'dark'} />
         </SavedEventsProvider>
       </AuthProvider>

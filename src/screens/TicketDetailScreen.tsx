@@ -8,6 +8,10 @@ import {
     ActivityIndicator,
     Dimensions,
     TouchableOpacity,
+    Pressable,
+    PanResponder,
+    Animated,
+    Platform,
 } from 'react-native';
 import type { ViewToken } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
@@ -18,7 +22,9 @@ import { api } from '../services/api';
 import type { EventDetailResponse, UserTicket } from '../types/events';
 import QRCode from 'react-native-qrcode-svg';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const DISMISS_THRESHOLD = 80;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.8;
 
 function formatDateGerman(isoDate: string): string {
     const d = new Date(isoDate);
@@ -41,6 +47,77 @@ export default function TicketDetailScreen() {
     const [activeIndex, setActiveIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+    const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                damping: 20,
+                stiffness: 200,
+            }),
+            Animated.timing(backdropOpacity, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [translateY, backdropOpacity]);
+
+    const dismissSheet = useCallback(() => {
+        Animated.parallel([
+            Animated.timing(translateY, {
+                toValue: SHEET_HEIGHT,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+            Animated.timing(backdropOpacity, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            if (router.canGoBack()) {
+                router.back();
+            } else {
+                router.replace('/');
+            }
+        });
+    }, [translateY, backdropOpacity, router]);
+
+    const handlePanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
+            onPanResponderMove: (_, gestureState) => {
+                if (gestureState.dy > 0) {
+                    translateY.setValue(gestureState.dy);
+                }
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                if (gestureState.dy > DISMISS_THRESHOLD || gestureState.vy > 0.5) {
+                    dismissSheet();
+                } else {
+                    Animated.spring(translateY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
+    const handleScrollEndDrag = useCallback((e: any) => {
+        const offsetY = e.nativeEvent.contentOffset.y;
+        const velocityY = e.nativeEvent.velocity?.y ?? 0;
+        if (offsetY <= 0 && velocityY > 0.5) {
+            dismissSheet();
+        }
+    }, [dismissSheet]);
 
     const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
         if (viewableItems.length > 0 && viewableItems[0].index != null) {
@@ -95,14 +172,6 @@ export default function TicketDetailScreen() {
         void loadData();
     }, [eventId, router]);
 
-    const handleClose = () => {
-        if (router.canGoBack()) {
-            router.back();
-        } else {
-            router.replace('/');
-        }
-    };
-
     const renderQRCard = ({ item }: { item: UserTicket }) => (
         <View style={styles.qrCardWrapper}>
             <View style={[styles.qrCard, { backgroundColor: colors.surface }]}>
@@ -117,49 +186,40 @@ export default function TicketDetailScreen() {
         </View>
     );
 
-    if (loading) {
-        return (
-            <View style={[styles.modalOverlay, { backgroundColor: colors.background }]}>
-                <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+    const renderContent = () => {
+        if (loading) {
+            return (
+                <View style={styles.centeredContent}>
                     <ActivityIndicator size="large" color={colors.primary} />
                 </View>
-            </View>
-        );
-    }
+            );
+        }
 
-    if (error || !event) {
-        return (
-            <View style={[styles.modalOverlay, { backgroundColor: colors.background }]}>
-                <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+        if (error || !event) {
+            return (
+                <View style={styles.centeredContent}>
                     <Text style={[styles.errorText, { color: colors.error }]}>
                         {error || 'Event nicht gefunden'}
                     </Text>
                     <TouchableOpacity
                         style={[styles.button, { backgroundColor: colors.primary }]}
-                        onPress={handleClose}
+                        onPress={dismissSheet}
                     >
                         <Text style={[styles.buttonText, { color: colors.onPrimary }]}>Zurück</Text>
                     </TouchableOpacity>
                 </View>
-            </View>
-        );
-    }
+            );
+        }
 
-    const currentTicket = tickets[activeIndex];
+        const currentTicket = tickets[activeIndex];
 
-    return (
-        <View style={[styles.sheetContainer, { flex: 1, backgroundColor: colors.background }]}>
-            {/* Close Button */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                    <Ionicons name="close" size={28} color={colors.onSurface} />
-                </TouchableOpacity>
-            </View>
-
+        return (
             <ScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                onScrollEndDrag={handleScrollEndDrag}
+                scrollEventThrottle={16}
             >
                 {/* Event Title */}
                 <View style={styles.titleSection}>
@@ -216,7 +276,7 @@ export default function TicketDetailScreen() {
                         )}
                     </View>
                 ) : (
-                    <View style={[styles.qrCard, { backgroundColor: colors.surface }]}>
+                    <View style={[styles.qrCard, { backgroundColor: colors.surface, marginHorizontal: 24 }]}>
                         <Text style={{ color: colors.onSurfaceVariant, textAlign: 'center' }}>
                             Kein Ticket vorhanden
                         </Text>
@@ -277,7 +337,7 @@ export default function TicketDetailScreen() {
                 <TouchableOpacity
                     style={[styles.eventButton, { backgroundColor: colors.primary }]}
                     onPress={() => {
-                        router.back();
+                        dismissSheet();
                         setTimeout(() => router.push(`/event/${eventId}`), 350);
                     }}
                 >
@@ -292,22 +352,73 @@ export default function TicketDetailScreen() {
                     Zeige diesen QR-Code beim Einlass vor
                 </Text>
             </ScrollView>
+        );
+    };
+
+    return (
+        <View style={styles.container}>
+            {/* Backdrop */}
+            <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+                <Pressable style={StyleSheet.absoluteFill} onPress={dismissSheet} />
+            </Animated.View>
+
+            {/* Bottom Sheet */}
+            <Animated.View
+                style={[
+                    styles.sheet,
+                    { backgroundColor: colors.background, transform: [{ translateY }] },
+                ]}
+            >
+                {/* Drag Handle — larger touch target, always works */}
+                <View {...handlePanResponder.panHandlers} style={styles.handleArea}>
+                    <View style={[styles.handle, { backgroundColor: colors.outlineVariant }]} />
+                </View>
+
+                {/* Close Button */}
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={dismissSheet} style={styles.closeButton}>
+                        <Ionicons name="close" size={28} color={colors.onSurface} />
+                    </TouchableOpacity>
+                </View>
+
+                {renderContent()}
+            </Animated.View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    modalOverlay: {
+    container: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
     },
-    sheetContainer: {
-        paddingBottom: 0,
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    sheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: SHEET_HEIGHT,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        overflow: 'hidden',
+    },
+    handleArea: {
+        alignItems: 'center',
+        paddingTop: 12,
+        paddingBottom: 16,
+    },
+    handle: {
+        width: 40,
+        height: 5,
+        borderRadius: 3,
     },
     header: {
         paddingHorizontal: 24,
-        paddingTop: 8,
+        paddingTop: 4,
         paddingBottom: 8,
         flexDirection: 'row',
         justifyContent: 'flex-end',
@@ -320,6 +431,13 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingBottom: 24,
+    },
+    centeredContent: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 48,
+        gap: 16,
     },
 
     // Title Section
@@ -454,22 +572,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
     },
 
-    // Loading/Error
-    loadingContainer: {
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 48,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    errorContainer: {
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 48,
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 16,
-    },
+    // Error
     errorText: {
         fontSize: 16,
         fontWeight: '600',
