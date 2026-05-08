@@ -10,31 +10,59 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import type { CustomField, CustomFieldResponseItem } from '@/src/types/events';
 
-interface Props {
-    fields: CustomField[];
-    onSubmit: (responses: CustomFieldResponseItem[]) => void;
-    onCancel: () => void;
-    submitting?: boolean;
+interface TicketInfo {
+    ticket_id: string;
+    label: string;
 }
 
-export default function CustomFieldForm({ fields, onSubmit, onCancel, submitting }: Props) {
+interface Props {
+    fields: CustomField[];
+    tickets: TicketInfo[];
+    initialValues?: Record<string, CustomFieldResponseItem[]>;
+    onSubmit: (responses: Record<string, CustomFieldResponseItem[]>) => void;
+    onCancel: () => void;
+    submitting?: boolean;
+    hideCancelButton?: boolean;
+    hideTitle?: boolean;
+    onScrollEndDrag?: (e: any) => void;
+}
+
+export default function CustomFieldForm({ fields, tickets, initialValues, onSubmit, onCancel, submitting, hideCancelButton, hideTitle, onScrollEndDrag }: Props) {
     const { colors } = useTheme();
     const sortedFields = [...fields].sort((a, b) => a.sort_order - b.sort_order);
+    const multiTicket = tickets.length > 1;
 
-    const [values, setValues] = useState<Record<string, string | string[]>>(() => {
-        const initial: Record<string, string | string[]> = {};
-        for (const f of sortedFields) {
-            if (f.custom_field_id) {
-                initial[f.custom_field_id] = f.field_type === 'multi_select' ? [] : '';
+    const [activeTab, setActiveTab] = useState(0);
+
+    const [allValues, setAllValues] = useState<Record<string, Record<string, string | string[]>>>(() => {
+        const state: Record<string, Record<string, string | string[]>> = {};
+        for (const ticket of tickets) {
+            const ticketInitial = (initialValues || {})[ticket.ticket_id] || [];
+            const values: Record<string, string | string[]> = {};
+            for (const f of sortedFields) {
+                if (!f.custom_field_id) continue;
+                const existing = ticketInitial.find(r => r.custom_field_id === f.custom_field_id);
+                values[f.custom_field_id] = existing?.value ?? (f.field_type === 'multi_select' ? [] : '');
             }
+            state[ticket.ticket_id] = values;
         }
-        return initial;
+        return state;
     });
-    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [allErrors, setAllErrors] = useState<Record<string, Record<string, string>>>({});
+
+    const currentTicket = tickets[activeTab];
+    const values = allValues[currentTicket.ticket_id] || {};
+    const errors = allErrors[currentTicket.ticket_id] || {};
 
     const updateValue = (fieldId: string, value: string | string[]) => {
-        setValues(prev => ({ ...prev, [fieldId]: value }));
-        setErrors(prev => ({ ...prev, [fieldId]: '' }));
+        setAllValues(prev => ({
+            ...prev,
+            [currentTicket.ticket_id]: { ...prev[currentTicket.ticket_id], [fieldId]: value },
+        }));
+        setAllErrors(prev => ({
+            ...prev,
+            [currentTicket.ticket_id]: { ...prev[currentTicket.ticket_id], [fieldId]: '' },
+        }));
     };
 
     const toggleMultiSelect = (fieldId: string, option: string) => {
@@ -46,28 +74,43 @@ export default function CustomFieldForm({ fields, onSubmit, onCancel, submitting
     };
 
     const validate = (): boolean => {
-        const newErrors: Record<string, string> = {};
-        for (const field of sortedFields) {
-            if (!field.is_required || !field.custom_field_id) continue;
-            const val = values[field.custom_field_id];
-            if (!val || (Array.isArray(val) && val.length === 0) || val === '') {
-                newErrors[field.custom_field_id] = 'Pflichtfeld';
+        const newAllErrors: Record<string, Record<string, string>> = {};
+        let firstErrorTab = -1;
+        for (let i = 0; i < tickets.length; i++) {
+            const ticket = tickets[i];
+            const ticketValues = allValues[ticket.ticket_id] || {};
+            const ticketErrors: Record<string, string> = {};
+            for (const field of sortedFields) {
+                if (!field.is_required || !field.custom_field_id) continue;
+                const val = ticketValues[field.custom_field_id];
+                if (!val || (Array.isArray(val) && val.length === 0) || val === '') {
+                    ticketErrors[field.custom_field_id] = 'Pflichtfeld';
+                    if (firstErrorTab === -1) firstErrorTab = i;
+                }
+            }
+            if (Object.keys(ticketErrors).length > 0) {
+                newAllErrors[ticket.ticket_id] = ticketErrors;
             }
         }
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        setAllErrors(newAllErrors);
+        if (firstErrorTab >= 0) setActiveTab(firstErrorTab);
+        return Object.keys(newAllErrors).length === 0;
     };
 
     const handleSubmit = () => {
         if (!validate()) return;
-        const responses: CustomFieldResponseItem[] = sortedFields
-            .filter(f => f.custom_field_id && values[f.custom_field_id] !== '' &&
-                !(Array.isArray(values[f.custom_field_id]) && (values[f.custom_field_id] as string[]).length === 0))
-            .map(f => ({
-                custom_field_id: f.custom_field_id!,
-                value: values[f.custom_field_id!],
-            }));
-        onSubmit(responses);
+        const result: Record<string, CustomFieldResponseItem[]> = {};
+        for (const ticket of tickets) {
+            const ticketValues = allValues[ticket.ticket_id] || {};
+            result[ticket.ticket_id] = sortedFields
+                .filter(f => f.custom_field_id && ticketValues[f.custom_field_id] !== '' &&
+                    !(Array.isArray(ticketValues[f.custom_field_id]) && (ticketValues[f.custom_field_id] as string[]).length === 0))
+                .map(f => ({
+                    custom_field_id: f.custom_field_id!,
+                    value: ticketValues[f.custom_field_id!],
+                }));
+        }
+        onSubmit(result);
     };
 
     const renderField = (field: CustomField) => {
@@ -176,14 +219,57 @@ export default function CustomFieldForm({ fields, onSubmit, onCancel, submitting
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.title, { color: colors.onSurface }]}>
-                Zusätzliche Angaben
-            </Text>
+        <View style={styles.container}>
+            {!hideTitle && (
+                <Text style={[styles.title, { color: colors.onSurface }]}>
+                    Zusätzliche Angaben
+                </Text>
+            )}
 
-            <ScrollView style={styles.fieldList} showsVerticalScrollIndicator={false}>
-                {sortedFields.map(field => (
-                    <View key={field.custom_field_id} style={styles.fieldWrapper}>
+            {multiTicket && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar}>
+                    {tickets.map((ticket, idx) => {
+                        const isActive = idx === activeTab;
+                        const hasTabError = !!(allErrors[ticket.ticket_id] && Object.keys(allErrors[ticket.ticket_id]).length > 0);
+                        return (
+                            <TouchableOpacity
+                                key={ticket.ticket_id}
+                                style={[
+                                    styles.tab,
+                                    {
+                                        backgroundColor: isActive ? colors.primary : colors.surfaceContainerHigh,
+                                        borderColor: hasTabError ? colors.error : isActive ? colors.primary : colors.outline,
+                                    },
+                                ]}
+                                onPress={() => setActiveTab(idx)}
+                            >
+                                <Text style={[
+                                    styles.tabText,
+                                    { color: isActive ? colors.onPrimary : colors.onSurface },
+                                ]}>
+                                    {ticket.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </ScrollView>
+            )}
+
+            <ScrollView
+                style={styles.fieldList}
+                showsVerticalScrollIndicator={false}
+                onScrollEndDrag={onScrollEndDrag}
+                scrollEventThrottle={16}
+            >
+                {sortedFields.map((field, idx) => (
+                    <View
+                        key={field.custom_field_id}
+                        style={[
+                            styles.fieldCard,
+                            { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant },
+                            idx === sortedFields.length - 1 && { marginBottom: 0 },
+                        ]}
+                    >
                         <View style={styles.labelRow}>
                             <Text style={[styles.label, { color: colors.onSurface }]}>
                                 {field.label}
@@ -203,13 +289,15 @@ export default function CustomFieldForm({ fields, onSubmit, onCancel, submitting
             </ScrollView>
 
             <View style={styles.buttonRow}>
-                <TouchableOpacity
-                    style={[styles.button, styles.cancelButton, { borderColor: colors.outline }]}
-                    onPress={onCancel}
-                    disabled={submitting}
-                >
-                    <Text style={[styles.buttonText, { color: colors.onSurface }]}>Abbrechen</Text>
-                </TouchableOpacity>
+                {!hideCancelButton && (
+                    <TouchableOpacity
+                        style={[styles.button, styles.cancelButton, { borderColor: colors.outline }]}
+                        onPress={onCancel}
+                        disabled={submitting}
+                    >
+                        <Text style={[styles.buttonText, { color: colors.onSurface }]}>Abbrechen</Text>
+                    </TouchableOpacity>
+                )}
                 <TouchableOpacity
                     style={[styles.button, { backgroundColor: colors.primary, opacity: submitting ? 0.6 : 1 }]}
                     onPress={handleSubmit}
@@ -226,20 +314,39 @@ export default function CustomFieldForm({ fields, onSubmit, onCancel, submitting
 
 const styles = StyleSheet.create({
     container: {
-        padding: 20,
-        borderRadius: 20,
-        maxHeight: '80%',
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        flex: 1,
     },
     title: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '700',
         marginBottom: 16,
     },
-    fieldList: {
-        maxHeight: 400,
+    tabBar: {
+        flexDirection: 'row',
+        marginBottom: 16,
+        maxHeight: 40,
     },
-    fieldWrapper: {
-        marginBottom: 20,
+    tab: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 9999,
+        borderWidth: 1,
+        marginRight: 8,
+    },
+    tabText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    fieldList: {
+        flex: 1,
+    },
+    fieldCard: {
+        marginBottom: 12,
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
     },
     labelRow: {
         flexDirection: 'row',
@@ -255,9 +362,9 @@ const styles = StyleSheet.create({
     },
     textInput: {
         borderWidth: 1,
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         fontSize: 15,
     },
     textArea: {
@@ -271,8 +378,8 @@ const styles = StyleSheet.create({
     chip: {
         borderWidth: 1,
         borderRadius: 9999,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingHorizontal: 18,
+        paddingVertical: 10,
     },
     chipText: {
         fontSize: 14,
@@ -285,12 +392,12 @@ const styles = StyleSheet.create({
     buttonRow: {
         flexDirection: 'row',
         gap: 12,
-        marginTop: 20,
+        marginTop: 24,
     },
     button: {
         flex: 1,
         borderRadius: 9999,
-        paddingVertical: 14,
+        paddingVertical: 16,
         alignItems: 'center',
     },
     cancelButton: {

@@ -30,7 +30,7 @@ import { api } from '../services/api';
 import { getSession } from '../services/supabase';
 import { getGradientByIndex, type GradientId } from '../constants/gradients';
 import { geocodeAddress } from '../services/geocoding';
-import type { EventDetailResponse, TicketOption } from '../types/events';
+import type { EventDetailResponse, TicketOption, CustomField, CustomFieldType } from '../types/events';
 import type { AddressSuggestion } from '../services/geocoding';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -51,7 +51,7 @@ function localIso(date: string, time: string): string {
     return `${date}T${time}:00${sign}${pad(Math.floor(Math.abs(tzOffset) / 60))}:${pad(Math.abs(tzOffset) % 60)}`;
 }
 
-type DrawerKey = 'image' | 'description' | 'categories' | 'location' | 'tickets' | 'details' | 'gallery' | null;
+type DrawerKey = 'image' | 'description' | 'categories' | 'location' | 'tickets' | 'details' | 'gallery' | 'customFields' | null;
 
 export default function EventEditScreen() {
     const { colors, isDark } = useTheme();
@@ -72,10 +72,12 @@ export default function EventEditScreen() {
     const [draftCategories, setDraftCategories] = useState<string[]>([]);
     const [draftAddress, setDraftAddress] = useState<AddressSuggestion | null>(null);
     const [draftMaxCapacity, setDraftMaxCapacity] = useState('');
+    const [draftMaxTicketsPerPerson, setDraftMaxTicketsPerPerson] = useState('');
     const [draftEndDate, setDraftEndDate] = useState('');
     const [draftEndTime, setDraftEndTime] = useState('');
     const [draftGalleryImages, setDraftGalleryImages] = useState<string[]>([]);
     const [draftTickets, setDraftTickets] = useState<TicketOption[]>([]);
+    const [draftCustomFields, setDraftCustomFields] = useState<CustomField[]>([]);
     const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
     const pendingSavesRef = useRef(0);
     const mountedRef = useRef(false);
@@ -253,6 +255,7 @@ export default function EventEditScreen() {
             }
             case 'details':
                 setDraftMaxCapacity(event.max_capacity ? String(event.max_capacity) : '');
+                setDraftMaxTicketsPerPerson(event.max_tickets_per_person && event.max_tickets_per_person > 1 ? String(event.max_tickets_per_person) : '');
                 if (event.ends_at) {
                     const end = new Date(event.ends_at);
                     setDraftEndDate(end.toISOString().slice(0, 10));
@@ -271,6 +274,9 @@ export default function EventEditScreen() {
             }
             case 'tickets':
                 setDraftTickets(event.ticket_options?.length ? [...event.ticket_options] : []);
+                break;
+            case 'customFields':
+                setDraftCustomFields(event.custom_fields?.length ? [...event.custom_fields] : []);
                 break;
             case 'image':
                 setShowImageModal(true);
@@ -308,6 +314,7 @@ export default function EventEditScreen() {
             case 'details': {
                 const patch: Record<string, any> = {};
                 patch.max_capacity = draftMaxCapacity ? Number(draftMaxCapacity) : null;
+                patch.max_tickets_per_person = draftMaxTicketsPerPerson ? Number(draftMaxTicketsPerPerson) : 1;
                 patch.ends_at = (draftEndDate && draftEndTime) ? localIso(draftEndDate, draftEndTime) : null;
                 saveField(patch);
                 break;
@@ -325,6 +332,9 @@ export default function EventEditScreen() {
             case 'tickets':
                 saveTickets(draftTickets);
                 break;
+            case 'customFields':
+                saveCustomFields(draftCustomFields);
+                break;
         }
         setActiveDrawer(null);
     };
@@ -338,6 +348,37 @@ export default function EventEditScreen() {
     };
     const removeTicket = (idx: number) => {
         setDraftTickets(prev => prev.filter((_, i) => i !== idx).map((t, i) => ({ ...t, sort_order: i })));
+    };
+
+    // Custom field helpers
+    const saveCustomFields = async (fields: CustomField[]) => {
+        if (!event) return;
+        setEvent(prev => prev ? { ...prev, custom_fields: fields } : prev);
+        pendingSavesRef.current += 1;
+        setSaving(true);
+        try {
+            const token = await getSession();
+            if (!token) return;
+            const saved = await api.syncCustomFields(event.event_id, fields, token);
+            if (Array.isArray(saved)) {
+                setEvent(prev => prev ? { ...prev, custom_fields: saved } : prev);
+            }
+        } catch (e) {
+            console.error('[saveCustomFields] failed:', e);
+        } finally {
+            pendingSavesRef.current -= 1;
+            setSaving(false);
+        }
+    };
+
+    const addCustomField = () => {
+        setDraftCustomFields(prev => [...prev, { label: '', field_type: 'text', is_required: false, options: null, sort_order: prev.length }]);
+    };
+    const updateCustomField = (idx: number, field: keyof CustomField, value: any) => {
+        setDraftCustomFields(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f));
+    };
+    const removeCustomField = (idx: number) => {
+        setDraftCustomFields(prev => prev.filter((_, i) => i !== idx).map((f, i) => ({ ...f, sort_order: i })));
     };
 
     // --- Loading / Error ---
@@ -622,6 +663,31 @@ export default function EventEditScreen() {
                             </View>
                         )}
 
+                        {/* Custom Fields Section */}
+                        {event.custom_fields && event.custom_fields.length > 0 ? (
+                            <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('customFields')}>
+                                <View style={[...glassCard, styles.section, { padding: 20, position: 'relative' }]}>
+                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Zusätzliche Felder</Text>
+                                    {event.custom_fields.map((f, i) => (
+                                        <View key={i} style={[styles.ticketRow, i < (event.custom_fields?.length ?? 0) - 1 && { borderBottomColor: colors.outlineVariant, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[styles.ticketRowName, { color: colors.onSurface }]}>{f.label || '(Ohne Titel)'}</Text>
+                                                <Text style={[styles.ticketRowDesc, { color: colors.onSurfaceVariant }]}>
+                                                    {f.field_type === 'text' ? 'Textfeld' : f.field_type === 'textarea' ? 'Mehrzeiliges Textfeld' : f.field_type === 'single_select' ? 'Einfachauswahl' : 'Mehrfachauswahl'}
+                                                    {f.is_required ? ' · Pflicht' : ''}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    ))}
+                                    {renderEditOverlay(() => openDrawer('customFields'))}
+                                </View>
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={styles.section}>
+                                {renderPlaceholder('Zusätzliche Felder hinzufügen', 'document-text-outline', () => openDrawer('customFields'))}
+                            </View>
+                        )}
+
                         {/* Galerie Section (same as EventScreen) */}
                         {event.media_urls && event.media_urls.length > 0 ? (
                             <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('gallery')}>
@@ -644,6 +710,14 @@ export default function EventEditScreen() {
                                     <Ionicons name="people-outline" size={18} color={colors.onSurfaceVariant} />
                                     <Text style={[styles.detailText, { color: colors.onSurface }]}>
                                         {event.max_capacity ? `Max. ${event.max_capacity} Teilnehmer` : 'Keine Begrenzung'}
+                                    </Text>
+                                </View>
+                                <View style={styles.detailRow}>
+                                    <Ionicons name="person-add-outline" size={18} color={colors.onSurfaceVariant} />
+                                    <Text style={[styles.detailText, { color: colors.onSurface }]}>
+                                        {event.max_tickets_per_person && event.max_tickets_per_person > 1
+                                            ? `Max. ${event.max_tickets_per_person} Personen pro Gast`
+                                            : 'Keine Begleitpersonen'}
                                     </Text>
                                 </View>
                                 {event.ends_at ? (
@@ -801,9 +875,80 @@ export default function EventEditScreen() {
                     </TouchableOpacity>
                 </EditDrawer>
 
+                <EditDrawer visible={activeDrawer === 'customFields'} onClose={closeDrawer} title="Zusätzliche Felder">
+                    {draftCustomFields.map((field, idx) => (
+                        <View key={idx} style={[styles.ticketCard, { borderColor: colors.outlineVariant, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' }]}>
+                            <View style={styles.ticketCardHeader}>
+                                <Text style={[styles.ticketCardNum, { color: colors.onSurfaceVariant }]}>Feld {idx + 1}</Text>
+                                <TouchableOpacity onPress={() => removeCustomField(idx)} hitSlop={8}>
+                                    <Ionicons name="trash-outline" size={18} color={colors.error} />
+                                </TouchableOpacity>
+                            </View>
+                            <TextInput
+                                style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]}
+                                value={field.label}
+                                onChangeText={v => updateCustomField(idx, 'label', v)}
+                                placeholder="Feldbezeichnung (z.B. Allergien?)"
+                                placeholderTextColor={colors.onSurfaceVariant}
+                            />
+                            <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 12 }]}>Feldtyp</Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                                {([['text', 'Text'], ['textarea', 'Mehrzeilig'], ['single_select', 'Einfachauswahl'], ['multi_select', 'Mehrfachauswahl']] as [CustomFieldType, string][]).map(([type, label]) => (
+                                    <TouchableOpacity
+                                        key={type}
+                                        onPress={() => {
+                                            updateCustomField(idx, 'field_type', type);
+                                            if (type === 'text' || type === 'textarea') {
+                                                updateCustomField(idx, 'options', null);
+                                            } else if (!field.options?.length) {
+                                                updateCustomField(idx, 'options', ['']);
+                                            }
+                                        }}
+                                        style={[styles.fieldTypeChip, {
+                                            backgroundColor: field.field_type === type ? colors.primary : colors.surfaceContainerHigh,
+                                            borderColor: field.field_type === type ? colors.primary : colors.outlineVariant,
+                                        }]}
+                                    >
+                                        <Text style={{ fontSize: 13, fontWeight: '600', color: field.field_type === type ? colors.onPrimary : colors.onSurface }}>
+                                            {label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                            {(field.field_type === 'single_select' || field.field_type === 'multi_select') && (
+                                <View style={{ marginTop: 12 }}>
+                                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Optionen (eine pro Zeile)</Text>
+                                    <TextInput
+                                        style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant, minHeight: 80, textAlignVertical: 'top' }]}
+                                        value={(field.options || []).join('\n')}
+                                        onChangeText={v => updateCustomField(idx, 'options', v.split('\n'))}
+                                        placeholder="Option 1&#10;Option 2&#10;Option 3"
+                                        placeholderTextColor={colors.onSurfaceVariant}
+                                        multiline
+                                        numberOfLines={4}
+                                    />
+                                </View>
+                            )}
+                            <TouchableOpacity
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}
+                                onPress={() => updateCustomField(idx, 'is_required', !field.is_required)}
+                            >
+                                <Ionicons name={field.is_required ? 'checkbox' : 'square-outline'} size={22} color={field.is_required ? colors.primary : colors.onSurfaceVariant} />
+                                <Text style={{ fontSize: 14, color: colors.onSurface }}>Pflichtfeld</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                    <TouchableOpacity style={[styles.addTicketBtn, { borderColor: colors.primary }]} onPress={addCustomField}>
+                        <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                        <Text style={[styles.addTicketText, { color: colors.primary }]}>Feld hinzufügen</Text>
+                    </TouchableOpacity>
+                </EditDrawer>
+
                 <EditDrawer visible={activeDrawer === 'details'} onClose={closeDrawer} title="Details bearbeiten">
                     <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Max. Teilnehmer</Text>
                     <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxCapacity} onChangeText={setDraftMaxCapacity} placeholder="Keine Begrenzung" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 4 }]}>Max. Personen pro Gast (inkl. Gast selbst)</Text>
+                    <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxTicketsPerPerson} onChangeText={setDraftMaxTicketsPerPerson} placeholder="1 (keine Begleitpersonen)" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
                     <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 16 }]}>Endet am (optional)</Text>
                     <View style={[styles.drawerRow, { zIndex: 50 }]}>
                         <View style={{ flex: 1 }}>
@@ -954,4 +1099,5 @@ const styles = StyleSheet.create({
     ticketCardNum: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
     addTicketBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderWidth: 2, borderStyle: 'dashed', borderRadius: 14, marginTop: 4 },
     addTicketText: { fontSize: 15, fontWeight: '600' },
+    fieldTypeChip: { borderWidth: 1, borderRadius: 9999, paddingHorizontal: 14, paddingVertical: 8 },
 });
