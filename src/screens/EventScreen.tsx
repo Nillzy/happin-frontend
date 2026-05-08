@@ -426,6 +426,13 @@ export default function EventScreen() {
                             contentContainerStyle={styles.desktopRightContent}
                             showsVerticalScrollIndicator={false}
                         >
+                            {/* Preview Badge */}
+                            {isPreview && (
+                                <View style={styles.previewBannerDesktop}>
+                                    <Text style={styles.previewBadgeText}>VORSCHAU</Text>
+                                </View>
+                            )}
+
                             {/* Host Card */}
                             <View style={[...glassCard, styles.hostCard]}>
                                 <View style={styles.hostInfo}>
@@ -443,7 +450,7 @@ export default function EventScreen() {
                             </View>
 
                             {/* Action Buttons */}
-                            <View style={[styles.actionButtons, { marginBottom: 32 }]}>
+                            <View style={[styles.actionButtons, { marginBottom: 32 }, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
                                 {(() => {
                                     const hasAccess = event.is_free
                                         ? rsvpStatus === 'Accepted'
@@ -590,7 +597,7 @@ export default function EventScreen() {
                             </View>
 
                             {/* Action Buttons */}
-                            <View style={[styles.actionButtons, { marginBottom: 32 }]}>
+                            <View style={[styles.actionButtons, { marginBottom: 32 }, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
                                 {(() => {
                                     const hasAccess = event.is_free
                                         ? rsvpStatus === 'Accepted'
@@ -1145,6 +1152,10 @@ const styles = StyleSheet.create({
         right: 0,
         alignItems: 'center',
         pointerEvents: 'none' as any,
+    },
+    previewBannerDesktop: {
+        alignItems: 'center',
+        marginBottom: 16,
     },
     previewBadgeText: {
         color: '#ffffff',
