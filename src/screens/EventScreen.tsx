@@ -16,6 +16,8 @@ import {
     useWindowDimensions,
     Share,
     PanResponder,
+    TextInput,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
@@ -25,7 +27,7 @@ import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import EventCategories from '../components/event/EventCategories';
 import EventImageGallery from '../components/atoms/EventImageGallery';
 import MapView from '../components/MapView';
-import { getSession } from '../services/supabase';
+import { getSession, getUserProfile } from '../services/supabase';
 import { api } from '../services/api';
 import { geocodeAddress } from '../services/geocoding';
 import { getGradientByIndex } from '../constants/gradients';
@@ -167,7 +169,8 @@ export default function EventScreen() {
     const [initialResponses, setInitialResponses] = useState<Record<string, CustomFieldResponseItem[]>>({});
     const [myTickets, setMyTickets] = useState<{ ticket_id: string; label: string }[]>([]);
     const [ticketCountPickerOpen, setTicketCountPickerOpen] = useState(false);
-    const [pendingTicketCount, setPendingTicketCount] = useState(1);
+    const [attendeeNames, setAttendeeNames] = useState<string[]>(['']);
+    const [buyerDisplayName, setBuyerDisplayName] = useState('');
     const [sliderIndex, setSliderIndex] = useState(0);
 
     // Custom Fields Bottom Sheet (like TicketDetailScreen)
@@ -291,7 +294,7 @@ export default function EventScreen() {
         }
     };
 
-    const handleRsvp = async (newStatus: RsvpStatus, ticketCount: number = 1) => {
+    const handleRsvp = async (newStatus: RsvpStatus, ticketCount: number = 1, names?: string[]) => {
         if (!event) return;
         const token = await getSession();
         if (!token) {
@@ -300,7 +303,7 @@ export default function EventScreen() {
         }
         setRsvpLoading(true);
         try {
-            await api.rsvpEvent(event.event_id, newStatus, token, ticketCount);
+            await api.rsvpEvent(event.event_id, newStatus, token, ticketCount, names);
             const prevStatus = rsvpStatus;
             setRsvpStatus(newStatus);
             if (newStatus === 'Accepted' && prevStatus !== 'Accepted') {
@@ -308,6 +311,7 @@ export default function EventScreen() {
                 const hasCustomFields = event.custom_fields && event.custom_fields.length > 0;
                 if (hasCustomFields) {
                     const freshToken = await getSession();
+                    api.invalidateCaches(event.event_id);
                     const freshEvent = await api.getEventById(event.event_id, freshToken || undefined);
                     setEvent(freshEvent);
                     let tickets = freshEvent.ticket || [];
@@ -316,12 +320,12 @@ export default function EventScreen() {
                             const allTickets = await api.getUserTickets(freshToken);
                             tickets = allTickets.tickets
                                 .filter(t => t.event_id === event.event_id)
-                                .map(t => ({ ticket_id: t.ticket_id }));
+                                .map(t => ({ ticket_id: t.ticket_id, guest_name: t.guest_name }));
                         } catch { /* ignore */ }
                     }
                     const ticketInfos = tickets.map((t, i) => ({
                         ticket_id: t.ticket_id,
-                        label: tickets.length > 1 ? `Person ${i + 1}` : 'Person 1',
+                        label: t.guest_name || (tickets.length > 1 ? `Person ${i + 1}` : 'Person 1'),
                     }));
                     setMyTickets(ticketInfos);
                     if (freshToken) {
@@ -338,6 +342,12 @@ export default function EventScreen() {
                     }
                     setCustomFieldsModalOpen(true);
                 }
+            } else if (newStatus === 'Accepted' && prevStatus === 'Accepted') {
+                // Re-accept: names were updated — refresh event so ticket tabs reflect new names
+                const freshToken = await getSession();
+                api.invalidateCaches(event.event_id);
+                const freshEvent = await api.getEventById(event.event_id, freshToken || undefined);
+                setEvent(freshEvent);
             } else if (newStatus !== 'Accepted' && prevStatus === 'Accepted') {
                 setEvent({ ...event, participant_count: Math.max(0, event.participant_count - 1) });
             }
@@ -358,9 +368,12 @@ export default function EventScreen() {
     const handleRsvpWithTicketCount = (newStatus: RsvpStatus) => {
         if (!event) return;
         const maxPerPerson = event.max_tickets_per_person ?? 1;
-        if (newStatus === 'Accepted' && maxPerPerson > 1 && rsvpStatus !== 'Accepted') {
-            setPendingTicketCount(1);
+        if (newStatus === 'Accepted' && maxPerPerson > 1) {
+            setAttendeeNames(['']);
             setTicketCountPickerOpen(true);
+            getUserProfile().then(p => {
+                setBuyerDisplayName(p?.displayName ?? p?.firstName ?? 'Gast');
+            });
         } else {
             handleRsvp(newStatus);
         }
@@ -368,7 +381,10 @@ export default function EventScreen() {
 
     const confirmTicketCount = () => {
         setTicketCountPickerOpen(false);
-        handleRsvp('Accepted', pendingTicketCount);
+        const resolved = attendeeNames.map((n, i) =>
+            n.trim() || `${buyerDisplayName || 'Gast'} ${i + 1}`
+        );
+        handleRsvp('Accepted', resolved.length, resolved);
     };
 
     const handleCustomFieldSubmit = async (responses: Record<string, CustomFieldResponseItem[]>) => {
@@ -399,12 +415,12 @@ export default function EventScreen() {
                 const allTickets = await api.getUserTickets(token);
                 tickets = allTickets.tickets
                     .filter(t => t.event_id === event.event_id)
-                    .map(t => ({ ticket_id: t.ticket_id }));
+                    .map(t => ({ ticket_id: t.ticket_id, guest_name: t.guest_name }));
             } catch { /* ignore */ }
         }
         const ticketInfos = tickets.map((t, i) => ({
             ticket_id: t.ticket_id,
-            label: tickets.length > 1 ? `Person ${i + 1}` : 'Person 1',
+            label: t.guest_name || (tickets.length > 1 ? `Person ${i + 1}` : 'Person 1'),
         }));
         setMyTickets(ticketInfos);
 
@@ -1199,47 +1215,92 @@ export default function EventScreen() {
                 </View>
             </Modal>
 
-            {/* Ticket Count Picker Modal (when max_tickets_per_person > 1) */}
+            {/* Attendee Names Picker Modal (when max_tickets_per_person > 1) */}
             <Modal
                 visible={ticketCountPickerOpen}
                 animationType="slide"
                 transparent
                 onRequestClose={() => setTicketCountPickerOpen(false)}
             >
-                <Pressable style={rsvpStyles.backdrop} onPress={() => setTicketCountPickerOpen(false)} />
-                <View style={[rsvpStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
-                    <View style={[rsvpStyles.handle, { backgroundColor: colors.outlineVariant }]} />
-                    <Text style={[rsvpStyles.title, { color: colors.onSurface }]}>Mit wie vielen Personen?</Text>
-                    <Text style={{ fontSize: 13, color: colors.onSurfaceVariant, textAlign: 'center', marginTop: -4 }}>
-                        Max. {event?.max_tickets_per_person ?? 1} Personen (inkl. dir)
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 20, gap: 20 }}>
+                <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+                    <Pressable style={rsvpStyles.backdrop} onPress={() => setTicketCountPickerOpen(false)} />
+                    <View style={[rsvpStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
+                        <View style={[rsvpStyles.handle, { backgroundColor: colors.outlineVariant }]} />
+                        <Text style={[rsvpStyles.title, { color: colors.onSurface }]}>Wer kommt mit?</Text>
+                        <Text style={{ fontSize: 13, color: colors.onSurfaceVariant, textAlign: 'center', marginTop: -4, marginBottom: 16 }}>
+                            Max. {event?.max_tickets_per_person ?? 1} Personen (inkl. dir)
+                        </Text>
+                        <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled">
+                            {attendeeNames.map((name, idx) => (
+                                <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 10, gap: 8 }}>
+                                    <TextInput
+                                        style={{
+                                            flex: 1,
+                                            height: 44,
+                                            borderRadius: 12,
+                                            backgroundColor: colors.surfaceContainerHigh,
+                                            paddingHorizontal: 14,
+                                            fontSize: 15,
+                                            color: colors.onSurface,
+                                        }}
+                                        placeholder={`${buyerDisplayName || 'Gast'} ${idx + 1}`}
+                                        placeholderTextColor={colors.onSurfaceVariant}
+                                        value={name}
+                                        onChangeText={text => {
+                                            const updated = [...attendeeNames];
+                                            updated[idx] = text;
+                                            setAttendeeNames(updated);
+                                        }}
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => setAttendeeNames(attendeeNames.filter((_, i) => i !== idx))}
+                                        disabled={attendeeNames.length <= 1}
+                                        style={{ opacity: attendeeNames.length <= 1 ? 0.35 : 1 }}
+                                    >
+                                        <Ionicons name="trash-outline" size={22} color={colors.onSurfaceVariant} />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </ScrollView>
                         <TouchableOpacity
-                            onPress={() => setPendingTicketCount(Math.max(1, pendingTicketCount - 1))}
-                            disabled={pendingTicketCount <= 1}
-                            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceContainerHigh, alignItems: 'center', justifyContent: 'center', opacity: pendingTicketCount <= 1 ? 0.35 : 1 }}
+                            onPress={() => setAttendeeNames([...attendeeNames, ''])}
+                            disabled={attendeeNames.length >= (event?.max_tickets_per_person ?? 1)}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                marginHorizontal: 20,
+                                marginTop: 4,
+                                marginBottom: 16,
+                                paddingVertical: 12,
+                                borderRadius: 12,
+                                borderWidth: 1,
+                                borderColor: colors.outlineVariant,
+                                opacity: attendeeNames.length >= (event?.max_tickets_per_person ?? 1) ? 0.35 : 1,
+                            }}
                         >
-                            <Text style={{ fontSize: 22, color: colors.onSurface }}>−</Text>
+                            <Ionicons name="add" size={20} color={colors.primary} />
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>Teilnehmer hinzufügen</Text>
                         </TouchableOpacity>
-                        <Text style={{ fontSize: 28, fontWeight: '700', color: colors.onSurface, minWidth: 40, textAlign: 'center' }}>{pendingTicketCount}</Text>
-                        <TouchableOpacity
-                            onPress={() => setPendingTicketCount(Math.min(event?.max_tickets_per_person ?? 10, pendingTicketCount + 1))}
-                            disabled={pendingTicketCount >= (event?.max_tickets_per_person ?? 1)}
-                            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceContainerHigh, alignItems: 'center', justifyContent: 'center', opacity: pendingTicketCount >= (event?.max_tickets_per_person ?? 1) ? 0.35 : 1 }}
-                        >
-                            <Text style={{ fontSize: 22, color: colors.onSurface }}>+</Text>
-                        </TouchableOpacity>
+                        <View style={{ paddingHorizontal: 20, paddingBottom: 30 }}>
+                            <TouchableOpacity
+                                style={{ backgroundColor: colors.primary, borderRadius: 9999, paddingVertical: 16, alignItems: 'center' }}
+                                onPress={confirmTicketCount}
+                            >
+                                <Text style={{ color: colors.onPrimary, fontSize: 15, fontWeight: '600' }}>Zusagen</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                    <View style={{ paddingHorizontal: 20, paddingBottom: 30 }}>
-                        <TouchableOpacity
-                            style={{ backgroundColor: colors.primary, borderRadius: 9999, paddingVertical: 16, alignItems: 'center' }}
-                            onPress={confirmTicketCount}
-                        >
-                            <Text style={{ color: colors.onPrimary, fontSize: 15, fontWeight: '600' }}>Zusagen</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
+
+            {/* Loading Overlay between ticket count confirm and custom fields modal */}
+            {rsvpLoading && (event?.custom_fields?.length ?? 0) > 0 && !customFieldsModalOpen && (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 999 }]}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                </View>
+            )}
 
             {/* Custom Fields Bottom Sheet (same pattern as TicketDetailScreen) */}
             {event && (event.custom_fields?.length ?? 0) > 0 && customFieldsModalOpen && (() => {

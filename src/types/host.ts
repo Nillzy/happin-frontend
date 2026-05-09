@@ -12,7 +12,7 @@ export interface Participant {
     ticket_count?: number;
     created_at?: string;
     custom_field_responses?: { custom_field_id: string; value: string | string[] }[];
-    ticket_responses?: { ticket_id: string; responses: { custom_field_id: string; value: string | string[] }[] }[];
+    ticket_responses?: { ticket_id: string; guest_name?: string; responses: { custom_field_id: string; value: string | string[] }[] }[];
 }
 
 export interface ParticipantCounts {
