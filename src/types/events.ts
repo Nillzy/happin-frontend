@@ -51,7 +51,7 @@ export interface EventDetailResponse extends EventListItem {
     ticket_options: TicketOption[];
     custom_fields?: CustomField[];
     my_rsvp_status?: RsvpStatus | null;
-    ticket?: { ticket_id: string }[];
+    ticket?: { ticket_id: string; guest_name?: string }[];
     max_tickets_per_person?: number;
 }
 
@@ -73,6 +73,7 @@ export interface CustomFieldResponseItem {
 
 export interface TicketResponses {
     ticket_id: string;
+    guest_name?: string;
     responses: CustomFieldResponseItem[];
 }
 
@@ -130,6 +131,7 @@ export interface EventUpdateRequest {
 export interface UserTicket {
     ticket_id: string;
     qr_token: string;
+    guest_name?: string;
     event_id: string;
     event_title: string;
     starts_at?: string;

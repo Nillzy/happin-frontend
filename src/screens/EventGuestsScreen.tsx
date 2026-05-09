@@ -346,7 +346,7 @@ export default function EventGuestsScreen() {
                                                 <View key={tr.ticket_id} style={[styles.ticketGroup, tIdx > 0 && { borderTopColor: colors.outlineVariant, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, marginTop: 10 }]}>
                                                     {multiTicket && (
                                                         <Text style={[styles.ticketLabel, { color: colors.primary }]}>
-                                                            Person {tIdx + 1}
+                                                            {tr.guest_name ?? `Person ${tIdx + 1}`}
                                                         </Text>
                                                     )}
                                                     {tr.responses.map((r) => (

@@ -92,11 +92,15 @@ export const api = {
         return Array.isArray(result) ? result : (result as any).ticket_options ?? [];
     },
 
-    rsvpEvent: (eventId: string, status: RsvpStatus, token: string, ticketCount: number = 1) =>
+    rsvpEvent: (eventId: string, status: RsvpStatus, token: string, ticketCount: number = 1, attendeeNames?: string[]) =>
         request<RsvpResponse>(`/api/v1/events/${eventId}/rsvp`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ status, ticket_count: ticketCount }),
+            body: JSON.stringify({
+                status,
+                ticket_count: ticketCount,
+                ...(attendeeNames ? { guest_names: attendeeNames } : {}),
+            }),
         }),
 
     getEventParticipants: (eventId: string, token: string) =>
@@ -177,4 +181,9 @@ export const api = {
         request<TicketResponses[]>(`/api/v1/events/${eventId}/custom-fields/responses/me`, {
             headers: { Authorization: `Bearer ${token}` },
         }),
+
+    invalidateCaches: (eventId?: string) => {
+        if (eventId) _eventCache.delete(eventId);
+        _ticketsCache = null;
+    },
 };
