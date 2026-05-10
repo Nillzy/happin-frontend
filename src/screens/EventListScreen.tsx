@@ -289,17 +289,19 @@ export default function EventListScreen() {
                                 ))}
                             </View>
                         )}
+                        {item.is_free && (
                         <View style={[
                             styles.priceBadge,
-                            { backgroundColor: item.is_free ? `${'#16a34a'}18` : `${colors.primary}18` }
+                            { backgroundColor: `${'#16a34a'}18` }
                         ]}>
                             <Text style={[
                                 styles.priceBadgeText,
-                                { color: item.is_free ? '#16a34a' : colors.primary }
+                                { color: '#16a34a' }
                             ]}>
-                                {item.is_free ? 'Kostenlos' : 'Tickets'}
+                                Kostenlos
                             </Text>
                         </View>
+                        )}
                     </View>
                 </View>
             </TouchableOpacity>

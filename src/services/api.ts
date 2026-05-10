@@ -159,3 +159,7 @@ export const api = {
             body: JSON.stringify({ qr_token: qrToken }),
         }),
 };
+
+export function invalidateTicketsCache() {
+    _ticketsCache = null;
+}

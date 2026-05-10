@@ -89,6 +89,10 @@ export default function EventEditScreen() {
             if (!silent) setLoading(true);
             const token = await getSession();
             const data = await api.getEventById(eventId, token || undefined);
+            if (!data.is_host) {
+                router.replace(`/event/${eventId}`);
+                return;
+            }
             setEvent(data);
             const loc = data.location;
             if (loc) {
@@ -455,7 +459,7 @@ export default function EventEditScreen() {
 
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {/* === Hero Image with Title Overlay (identical to EventScreen) === */}
-                    <View style={styles.heroContainer}>
+                    <View style={[styles.heroContainer, isWeb && { height: 320 }]}>
                         {showImage ? (
                             <Image source={{ uri: effectiveImageUrl! }} style={styles.heroImage} resizeMode="cover" />
                         ) : (

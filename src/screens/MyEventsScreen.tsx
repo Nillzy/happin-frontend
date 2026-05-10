@@ -174,68 +174,9 @@ export default function MyEventsScreen() {
         void loadEvents();
     }, [loadEvents]);
 
-    // MOCK: Fake Events zum Testen der UI — entfernen wenn echte Daten da sind
-    const MOCK_ORGANIZED: (EventListItem & Record<string, any>)[] = [
-        {
-            event_id: 'mock-private-001',
-            title: 'Drink and Drive mit Lukas Auto',
-            starts_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-            is_public: false,
-            is_free: true,
-            status: 'published',
-            participant_count: 8,
-            max_capacity: 20,
-            is_host: true,
-            location: { location_id: 'mock', city: 'Stuttgart' },
-            rsvp_accepted: 8,
-            rsvp_declined: 3,
-        },
-        {
-            event_id: 'mock-public-001',
-            title: 'Summer Rooftop Session',
-            starts_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            is_public: true,
-            is_free: false,
-            status: 'published',
-            participant_count: 42,
-            max_capacity: 100,
-            is_host: true,
-            location: { location_id: 'mock', city: 'Berlin' },
-            rsvp_accepted: 42,
-            ticket_revenue_cents: 126000,
-        },
-        {
-            event_id: 'mock-public-002',
-            title: 'Techno Warehouse Rave',
-            starts_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-            is_public: true,
-            is_free: false,
-            status: 'published',
-            participant_count: 200,
-            max_capacity: 200,
-            is_host: true,
-            location: { location_id: 'mock', city: 'Stuttgart' },
-            rsvp_accepted: 200,
-            ticket_revenue_cents: 599800,
-            waitlist_count: 37,
-        },
-    ];
 
-    const MOCK_ATTENDING: EventListItem = {
-        event_id: 'mock-attending-001',
-        title: 'Boiler Room Stuttgart',
-        starts_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-        is_public: true,
-        is_free: false,
-        status: 'published',
-        participant_count: 340,
-        is_host: false,
-        category: 'Musik,Techno',
-        location: { location_id: 'mock', city: 'Stuttgart' },
-    };
-
-    const displayOrganized = [...MOCK_ORGANIZED, ...organizedEvents];
-    const displayAttending = [MOCK_ATTENDING, ...attendingEvents];
+    const displayOrganized = organizedEvents;
+    const displayAttending = attendingEvents;
 
     const renderHostCard = (event: EventListItem, index: number) => {
         const gradient = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
