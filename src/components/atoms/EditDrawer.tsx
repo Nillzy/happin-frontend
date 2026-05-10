@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -24,6 +24,8 @@ interface EditDrawerProps {
     children: React.ReactNode;
     /** Disable the inner ScrollView (useful when children manage their own scroll) */
     noScroll?: boolean;
+    /** Prevent dismissing via gesture, backdrop tap, or close button */
+    disableClose?: boolean;
 }
 
 export default function EditDrawer({
@@ -32,20 +34,40 @@ export default function EditDrawer({
     title,
     children,
     noScroll,
+    disableClose,
 }: EditDrawerProps) {
     const { colors } = useTheme();
 
+    const disableCloseRef = useRef(disableClose);
+    disableCloseRef.current = disableClose;
+
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+
     const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+    const animateClose = useCallback(() => {
+        Animated.timing(translateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 300,
+            useNativeDriver: true,
+        }).start(() => onCloseRef.current());
+    }, [translateY]);
+
     const panResponder = useRef(
         PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
+            onStartShouldSetPanResponder: () => !disableCloseRef.current,
+            onMoveShouldSetPanResponder: (_, gs) => !disableCloseRef.current && Math.abs(gs.dy) > 5,
             onPanResponderMove: (_, gs) => {
                 if (gs.dy > 0) translateY.setValue(gs.dy);
             },
             onPanResponderRelease: (_, gs) => {
                 if (gs.dy > 100) {
-                    handleClose();
+                    Animated.timing(translateY, {
+                        toValue: SCREEN_HEIGHT,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }).start(() => onCloseRef.current());
                 } else {
                     Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
                 }
@@ -64,13 +86,10 @@ export default function EditDrawer({
         }
     }, [visible]);
 
-    const handleClose = () => {
-        Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 300,
-            useNativeDriver: true,
-        }).start(() => onClose());
-    };
+    const handleClose = useCallback(() => {
+        if (disableCloseRef.current) return;
+        animateClose();
+    }, [animateClose]);
 
     if (!visible) return null;
 
@@ -99,17 +118,18 @@ export default function EditDrawer({
                         styles.sheet,
                         { backgroundColor: colors.background, transform: [{ translateY }] },
                     ]}
-                    {...panResponder.panHandlers}
                 >
-                    <View style={styles.dragHandle}>
+                    <View {...panResponder.panHandlers} style={styles.dragHandle}>
                         <View style={[styles.dragIndicator, { backgroundColor: colors.outlineVariant }]} />
                     </View>
 
                     <View style={styles.header}>
                         <Text style={[styles.headerTitle, { color: colors.onSurface }]}>{title}</Text>
-                        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                            <Ionicons name="close" size={28} color={colors.onSurface} />
-                        </TouchableOpacity>
+                        {!disableClose && (
+                            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                                <Ionicons name="close" size={28} color={colors.onSurface} />
+                            </TouchableOpacity>
+                        )}
                     </View>
 
                     {content}
@@ -137,7 +157,7 @@ const styles = StyleSheet.create({
     dragHandle: {
         alignItems: 'center',
         paddingTop: 12,
-        paddingBottom: 8,
+        paddingBottom: 12,
     },
     dragIndicator: {
         width: 40,
@@ -166,7 +186,6 @@ const styles = StyleSheet.create({
         paddingBottom: 24,
     },
     contentContainer: {
-        paddingHorizontal: 24,
         paddingBottom: 24,
         flex: 1,
     },

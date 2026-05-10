@@ -17,6 +17,7 @@ import Navbar from '../components/atoms/Navbar';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
 import type { Participant } from '../types/host';
+import type { CustomField } from '../types/events';
 
 export default function EventGuestsScreen() {
     const { colors } = useTheme();
@@ -29,6 +30,8 @@ export default function EventGuestsScreen() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [removing, setRemoving] = useState(false);
     const [confirmVisible, setConfirmVisible] = useState(false);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [customFields, setCustomFields] = useState<CustomField[]>([]);
 
     useEffect(() => {
         void loadData();
@@ -48,11 +51,15 @@ export default function EventGuestsScreen() {
                 return;
             }
 
-            const participantData = await api.getEventParticipants(eventId, token);
+            const [participantData, eventData] = await Promise.all([
+                api.getEventParticipants(eventId, token),
+                api.getEventById(eventId, token),
+            ]);
             const filtered = participantData.participants.filter(
                 (p: Participant) => p.status.toLowerCase() === status
             );
             setParticipants(filtered);
+            setCustomFields(eventData.custom_fields ?? []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Fehler beim Laden');
         } finally {
@@ -128,6 +135,16 @@ export default function EventGuestsScreen() {
         return phone.slice(0, -4).replace(/./g, (c, i) => (i > 6 ? '•' : c)) + phone.slice(-4);
     };
 
+    const getFieldLabel = (fieldId: string): string => {
+        const field = customFields.find(f => f.custom_field_id === fieldId);
+        return field?.label ?? fieldId;
+    };
+
+    const formatValue = (value: string | string[]): string => {
+        if (Array.isArray(value)) return value.join(', ');
+        return String(value);
+    };
+
     if (loading) {
         return (
             <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -169,6 +186,46 @@ export default function EventGuestsScreen() {
                     </Text>
                 </View>
 
+                {/* Responses Summary */}
+                {customFields.length > 0 && (() => {
+                    const fieldAgg: Record<string, Record<string, number>> = {};
+                    for (const p of participants) {
+                        const allResponses = p.ticket_responses
+                            ? p.ticket_responses.flatMap(tr => tr.responses)
+                            : (p.custom_field_responses || []);
+                        for (const r of allResponses) {
+                            const label = getFieldLabel(r.custom_field_id);
+                            if (!fieldAgg[label]) fieldAgg[label] = {};
+                            const vals = Array.isArray(r.value) ? r.value : [r.value];
+                            for (const v of vals) {
+                                fieldAgg[label][v] = (fieldAgg[label][v] || 0) + 1;
+                            }
+                        }
+                    }
+                    const entries = Object.entries(fieldAgg);
+                    if (entries.length === 0) return null;
+                    return (
+                        <View style={[styles.summaryCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                            <Text style={[styles.summaryTitle, { color: colors.onSurfaceVariant }]}>Zusammenfassung</Text>
+                            {entries.map(([label, counts]) => (
+                                <View key={label} style={styles.summaryField}>
+                                    <Text style={[styles.summaryFieldLabel, { color: colors.onSurface }]}>{label}</Text>
+                                    <View style={styles.summaryChips}>
+                                        {Object.entries(counts)
+                                            .sort(([, a], [, b]) => b - a)
+                                            .map(([value, count]) => (
+                                                <View key={value} style={[styles.summaryChip, { backgroundColor: `${colors.primary}15` }]}>
+                                                    <Text style={[styles.summaryChipText, { color: colors.onSurface }]}>{value}</Text>
+                                                    <Text style={[styles.summaryChipCount, { color: colors.primary }]}>{count}×</Text>
+                                                </View>
+                                            ))}
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    );
+                })()}
+
                 {/* Bulk Action Bar */}
                 {selectedIds.size > 0 && (
                     <View style={[styles.bulkBar, { backgroundColor: `${colors.error}15`, borderColor: `${colors.error}30` }]}>
@@ -193,57 +250,132 @@ export default function EventGuestsScreen() {
                 <View style={[styles.guestListContainer, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
                     {participants.map((participant, index) => {
                         const isSelected = selectedIds.has(participant.participation_id);
+                        const isExpanded = expandedId === participant.participation_id;
+                        const hasTicketResponses = (participant.ticket_responses?.length ?? 0) > 0;
+                        const hasLegacyResponses = (participant.custom_field_responses?.length ?? 0) > 0;
+                        const hasResponses = hasTicketResponses || hasLegacyResponses;
+                        const multiTicket = (participant.ticket_responses?.length ?? 0) > 1;
+
+                        const summaryLines = (() => {
+                            if (!hasResponses) return [];
+                            const fieldMap: Record<string, string[]> = {};
+                            if (hasTicketResponses) {
+                                for (const tr of participant.ticket_responses!) {
+                                    for (const r of tr.responses) {
+                                        const label = getFieldLabel(r.custom_field_id);
+                                        if (!fieldMap[label]) fieldMap[label] = [];
+                                        fieldMap[label].push(formatValue(r.value));
+                                    }
+                                }
+                            } else {
+                                for (const r of participant.custom_field_responses!) {
+                                    const label = getFieldLabel(r.custom_field_id);
+                                    fieldMap[label] = [formatValue(r.value)];
+                                }
+                            }
+                            return Object.entries(fieldMap).map(([label, vals]) => `${label}: ${vals.join(', ')}`);
+                        })();
 
                         return (
-                            <TouchableOpacity
-                                key={participant.participation_id}
-                                style={[
-                                    styles.guestRow,
-                                    { borderBottomColor: colors.outlineVariant },
-                                    index === participants.length - 1 && { borderBottomWidth: 0 }
-                                ]}
-                                onPress={() => toggleSelection(participant.participation_id)}
-                                activeOpacity={0.7}
-                            >
-                                {/* Checkbox */}
-                                <View
+                            <View key={participant.participation_id}>
+                                <TouchableOpacity
                                     style={[
-                                        styles.checkbox,
-                                        {
-                                            backgroundColor: isSelected ? colors.primary : 'transparent',
-                                            borderColor: isSelected ? colors.primary : colors.outlineVariant,
-                                        },
+                                        styles.guestRow,
+                                        { borderBottomColor: colors.outlineVariant },
+                                        index === participants.length - 1 && !isExpanded && { borderBottomWidth: 0 }
                                     ]}
+                                    onPress={() => setExpandedId(isExpanded ? null : participant.participation_id)}
+                                    onLongPress={() => toggleSelection(participant.participation_id)}
+                                    activeOpacity={0.7}
                                 >
-                                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                                </View>
+                                    {/* Checkbox */}
+                                    <TouchableOpacity
+                                        onPress={() => toggleSelection(participant.participation_id)}
+                                        hitSlop={8}
+                                    >
+                                        <View
+                                            style={[
+                                                styles.checkbox,
+                                                {
+                                                    backgroundColor: isSelected ? colors.primary : 'transparent',
+                                                    borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                                                },
+                                            ]}
+                                        >
+                                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                                        </View>
+                                    </TouchableOpacity>
 
-                                {/* Avatar */}
-                                <View style={[styles.avatar, { backgroundColor: statusColor }]}>
-                                    <Text style={styles.avatarText}>{getInitials(participant.person)}</Text>
-                                </View>
+                                    {/* Avatar */}
+                                    <View style={[styles.avatar, { backgroundColor: statusColor }]}>
+                                        <Text style={styles.avatarText}>{getInitials(participant.person)}</Text>
+                                    </View>
 
-                                {/* Info */}
-                                <View style={styles.guestInfo}>
-                                    <Text style={[styles.guestName, { color: colors.onSurface }]}>
-                                        {participant.person.first_name} {participant.person.last_name || ''}
-                                    </Text>
-                                    {participant.person.phone_number && (
-                                        <Text style={[styles.guestPhone, { color: colors.outline }]}>
-                                            {maskPhone(participant.person.phone_number)}
+                                    {/* Info */}
+                                    <View style={styles.guestInfo}>
+                                        <Text style={[styles.guestName, { color: colors.onSurface }]}>
+                                            {participant.person.first_name} {participant.person.last_name || ''}
                                         </Text>
+                                        {!isExpanded && summaryLines.length > 0 && (
+                                            <Text style={[styles.guestSummary, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+                                                {summaryLines.join(' · ')}
+                                            </Text>
+                                        )}
+                                    </View>
+
+                                    {/* Ticket Badge */}
+                                    {(participant.ticket_count ?? 0) > 1 && (
+                                        <View style={[styles.ticketBadge, { backgroundColor: `${colors.tertiary}20` }]}>
+                                            <Text style={[styles.ticketBadgeText, { color: colors.tertiary }]}>
+                                                {participant.ticket_count}
+                                            </Text>
+                                        </View>
                                     )}
-                                </View>
 
-                                {/* Ticket Badge */}
-                                {(participant.ticket_count ?? 0) > 1 && (
-                                    <View style={[styles.ticketBadge, { backgroundColor: `${colors.tertiary}20` }]}>
-                                        <Text style={[styles.ticketBadgeText, { color: colors.tertiary }]}>
-                                            {participant.ticket_count} Tickets
-                                        </Text>
+                                    {/* Expand indicator */}
+                                    {hasResponses && (
+                                        <Text style={{ fontSize: 12, color: colors.onSurfaceVariant }}>{isExpanded ? '▲' : '▼'}</Text>
+                                    )}
+                                </TouchableOpacity>
+
+                                {/* Expanded detail view */}
+                                {isExpanded && hasResponses && (
+                                    <View style={[styles.responsesContainer, { borderBottomColor: colors.outlineVariant, backgroundColor: `${colors.surfaceContainerHigh}50` }]}>
+                                        {hasTicketResponses ? (
+                                            participant.ticket_responses!.map((tr, tIdx) => (
+                                                <View key={tr.ticket_id} style={[styles.ticketGroup, tIdx > 0 && { borderTopColor: colors.outlineVariant, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, marginTop: 10 }]}>
+                                                    {multiTicket && (
+                                                        <Text style={[styles.ticketLabel, { color: colors.primary }]}>
+                                                            {tr.guest_name ?? `Person ${tIdx + 1}`}
+                                                        </Text>
+                                                    )}
+                                                    {tr.responses.map((r) => (
+                                                        <View key={r.custom_field_id} style={styles.responseRow}>
+                                                            <Text style={[styles.responseLabel, { color: colors.onSurfaceVariant }]}>
+                                                                {getFieldLabel(r.custom_field_id)}
+                                                            </Text>
+                                                            <Text style={[styles.responseValue, { color: colors.onSurface }]}>
+                                                                {formatValue(r.value)}
+                                                            </Text>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            ))
+                                        ) : (
+                                            participant.custom_field_responses!.map((r) => (
+                                                <View key={r.custom_field_id} style={styles.responseRow}>
+                                                    <Text style={[styles.responseLabel, { color: colors.onSurfaceVariant }]}>
+                                                        {getFieldLabel(r.custom_field_id)}
+                                                    </Text>
+                                                    <Text style={[styles.responseValue, { color: colors.onSurface }]}>
+                                                        {formatValue(r.value)}
+                                                    </Text>
+                                                </View>
+                                            ))
+                                        )}
                                     </View>
                                 )}
-                            </TouchableOpacity>
+                            </View>
                         );
                     })}
 
@@ -377,6 +509,76 @@ const styles = StyleSheet.create({
     },
     ticketBadgeText: { fontSize: 12, fontWeight: '700' },
     emptyText: { fontSize: 14, textAlign: 'center', padding: 40 },
+    responsesContainer: {
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        paddingLeft: 90,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    responseRow: {
+        marginBottom: 8,
+    },
+    responseLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    responseValue: {
+        fontSize: 14,
+    },
+    ticketLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        marginBottom: 6,
+        marginTop: 8,
+    },
+    ticketGroup: {},
+    guestSummary: {
+        fontSize: 12,
+        marginTop: 2,
+    },
+    summaryCard: {
+        marginHorizontal: 16,
+        marginBottom: 16,
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+    },
+    summaryTitle: {
+        fontSize: 11,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 12,
+    },
+    summaryField: {
+        marginBottom: 10,
+    },
+    summaryFieldLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 6,
+    },
+    summaryChips: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+    },
+    summaryChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        gap: 4,
+    },
+    summaryChipText: {
+        fontSize: 13,
+    },
+    summaryChipCount: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
 });
 
 const modalStyles = StyleSheet.create({

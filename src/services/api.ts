@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse } from '@/src/types/events';
+import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse, CustomField, CustomFieldResponseItem, TicketResponses } from '@/src/types/events';
 import type { ParticipantListResponse, RemoveParticipantsResponse, ScanTicketResponse } from '@/src/types/host';
 
 /**
@@ -92,11 +92,15 @@ export const api = {
         return Array.isArray(result) ? result : (result as any).ticket_options ?? [];
     },
 
-    rsvpEvent: (eventId: string, status: RsvpStatus, token: string) =>
+    rsvpEvent: (eventId: string, status: RsvpStatus, token: string, ticketCount: number = 1, attendeeNames?: string[]) =>
         request<RsvpResponse>(`/api/v1/events/${eventId}/rsvp`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ status }),
+            body: JSON.stringify({
+                status,
+                ticket_count: ticketCount,
+                ...(attendeeNames ? { guest_names: attendeeNames } : {}),
+            }),
         }),
 
     getEventParticipants: (eventId: string, token: string) =>
@@ -158,6 +162,30 @@ export const api = {
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ qr_token: qrToken }),
         }),
+
+    syncCustomFields: (eventId: string, fields: CustomField[], token: string) =>
+        request<CustomField[]>(`/api/v1/events/${eventId}/custom-fields`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ custom_fields: fields }),
+        }),
+
+    submitCustomFieldResponses: (eventId: string, ticketId: string, responses: CustomFieldResponseItem[], token: string) =>
+        request<CustomFieldResponseItem[]>(`/api/v1/events/${eventId}/custom-fields/responses`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ ticket_id: ticketId, responses }),
+        }),
+
+    getMyCustomFieldResponses: (eventId: string, token: string) =>
+        request<TicketResponses[]>(`/api/v1/events/${eventId}/custom-fields/responses/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
+    invalidateCaches: (eventId?: string) => {
+        if (eventId) _eventCache.delete(eventId);
+        _ticketsCache = null;
+    },
 };
 
 export function invalidateTicketsCache() {

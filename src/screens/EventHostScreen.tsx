@@ -10,14 +10,16 @@ import {
     Platform,
     Share,
     Linking,
+    Modal,
+    Pressable,
 } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
-import type { EventDetailResponse } from '../types/events';
-import type { ParticipantCounts } from '../types/host';
+import type { EventDetailResponse, CustomField } from '../types/events';
+import type { Participant, ParticipantCounts } from '../types/host';
 
 const copyToClipboard = async (text: string): Promise<boolean> => {
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -39,6 +41,8 @@ export default function EventHostScreen() {
 
     const [event, setEvent] = useState<EventDetailResponse | null>(null);
     const [counts, setCounts] = useState<ParticipantCounts>({ accepted: 0, declined: 0, pending: 0 });
+    const [participants, setParticipants] = useState<Participant[]>([]);
+    const [customFields, setCustomFields] = useState<CustomField[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +71,8 @@ export default function EventHostScreen() {
 
             setEvent(eventData);
             setCounts(participantData.counts);
+            setParticipants(participantData.participants);
+            setCustomFields(eventData.custom_fields ?? []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Fehler beim Laden');
         } finally {
@@ -167,6 +173,8 @@ export default function EventHostScreen() {
                     onShareLink={shareInvitationLink}
                     colors={colors}
                     eventId={eventId!}
+                    participants={participants}
+                    customFields={customFields}
                 />
             </ScrollView>
         </View>
@@ -182,6 +190,8 @@ function OverviewTab({
     onShareLink,
     colors,
     eventId,
+    participants,
+    customFields,
 }: {
     counts: ParticipantCounts;
     maxCapacity?: number;
@@ -189,14 +199,37 @@ function OverviewTab({
     onShareLink: () => void;
     colors: ReturnType<typeof useTheme>['colors'];
     eventId: string;
+    participants: Participant[];
+    customFields: CustomField[];
 }) {
     const router = useRouter();
     const totalAccepted = counts.accepted;
     const capacityPercent = maxCapacity ? Math.round((totalAccepted / maxCapacity) * 100) : 0;
+    const [summaryOpen, setSummaryOpen] = useState(false);
 
     const handleStatusClick = (status: 'accepted' | 'declined' | 'pending') => {
         router.push(`/event/${eventId}/guests?status=${status}`);
     };
+
+    const fieldSummaries = customFields.map(field => {
+        const valueCounts: Record<string, number> = {};
+        let total = 0;
+        for (const p of participants) {
+            const ticketResponses = p.ticket_responses || [];
+            for (const tr of ticketResponses) {
+                const resp = tr.responses.find(r => r.custom_field_id === field.custom_field_id);
+                if (!resp) continue;
+                const vals = Array.isArray(resp.value) ? resp.value : [resp.value];
+                for (const v of vals) {
+                    if (v) {
+                        valueCounts[v] = (valueCounts[v] || 0) + 1;
+                        total++;
+                    }
+                }
+            }
+        }
+        return { field, valueCounts, total };
+    }).filter(s => Object.keys(s.valueCounts).length > 0);
 
     return (
         <View style={styles.tabContent}>
@@ -254,6 +287,17 @@ function OverviewTab({
                 </View>
             )}
 
+            {/* Summary Button */}
+            {customFields.length > 0 && (
+                <TouchableOpacity
+                    style={[styles.summaryButton, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
+                    onPress={() => setSummaryOpen(true)}
+                >
+                    <Text style={[styles.summaryButtonText, { color: colors.onSurface }]}>Antworten-Übersicht</Text>
+                    <Text style={[styles.summaryButtonArrow, { color: colors.outline }]}>›</Text>
+                </TouchableOpacity>
+            )}
+
             {/* Scan Button */}
             <TouchableOpacity
                 style={[styles.scanButton, { backgroundColor: colors.primary }]}
@@ -292,6 +336,62 @@ function OverviewTab({
                     </View>
                 </View>
             )}
+
+            {/* Summary Modal */}
+            <Modal
+                visible={summaryOpen}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setSummaryOpen(false)}
+            >
+                <Pressable style={modalStyles.backdrop} onPress={() => setSummaryOpen(false)} />
+                <View style={[modalStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
+                    <View style={[modalStyles.handle, { backgroundColor: colors.outlineVariant }]} />
+                    <Text style={[modalStyles.title, { color: colors.onSurface }]}>Antworten-Übersicht</Text>
+
+                    <ScrollView style={modalStyles.scrollContent} showsVerticalScrollIndicator={false}>
+                        {fieldSummaries.length === 0 ? (
+                            <Text style={[modalStyles.emptyText, { color: colors.outline }]}>
+                                Noch keine Antworten eingegangen.
+                            </Text>
+                        ) : fieldSummaries.map(({ field, valueCounts, total }) => {
+                            const sorted = Object.entries(valueCounts).sort((a, b) => b[1] - a[1]);
+                            const maxCount = sorted[0]?.[1] ?? 1;
+
+                            return (
+                                <View key={field.custom_field_id} style={modalStyles.fieldSection}>
+                                    <Text style={[modalStyles.fieldLabel, { color: colors.onSurface }]}>
+                                        {field.label}
+                                    </Text>
+                                    {sorted.map(([value, count]) => {
+                                        const percent = Math.round((count / maxCount) * 100);
+                                        return (
+                                            <View key={value} style={modalStyles.barRow}>
+                                                <View style={modalStyles.barLabelRow}>
+                                                    <Text style={[modalStyles.barLabel, { color: colors.onSurface }]} numberOfLines={1}>
+                                                        {value}
+                                                    </Text>
+                                                    <Text style={[modalStyles.barCount, { color: colors.outline }]}>
+                                                        {count}× ({Math.round((count / total) * 100)}%)
+                                                    </Text>
+                                                </View>
+                                                <View style={[modalStyles.barBg, { backgroundColor: colors.surfaceContainerHigh }]}>
+                                                    <View
+                                                        style={[
+                                                            modalStyles.barFill,
+                                                            { width: `${percent}%`, backgroundColor: colors.primary },
+                                                        ]}
+                                                    />
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -392,4 +492,85 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     copyBtnText: { fontSize: 14, fontWeight: '700' },
+
+    summaryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        marginBottom: 16,
+    },
+    summaryButtonText: { fontSize: 15, fontWeight: '600' },
+    summaryButtonArrow: { fontSize: 22, fontWeight: '600' },
+});
+
+const modalStyles = StyleSheet.create({
+    backdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    sheet: {
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 12,
+        maxHeight: '75%',
+    },
+    handle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 16,
+    },
+    title: {
+        fontSize: 17,
+        fontWeight: '700',
+        paddingHorizontal: 20,
+        marginBottom: 16,
+    },
+    scrollContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 40,
+    },
+    fieldSection: {
+        marginBottom: 24,
+    },
+    fieldLabel: {
+        fontSize: 15,
+        fontWeight: '700',
+        marginBottom: 10,
+    },
+    barRow: {
+        marginBottom: 10,
+    },
+    barLabelRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    barLabel: {
+        fontSize: 14,
+        flex: 1,
+    },
+    barCount: {
+        fontSize: 13,
+        marginLeft: 8,
+    },
+    barBg: {
+        height: 8,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    barFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    emptyText: {
+        fontSize: 14,
+        textAlign: 'center',
+        paddingVertical: 20,
+    },
 });

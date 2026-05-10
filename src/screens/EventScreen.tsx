@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -15,6 +15,9 @@ import {
     Alert,
     useWindowDimensions,
     Share,
+    PanResponder,
+    TextInput,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
@@ -24,13 +27,15 @@ import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import EventCategories from '../components/event/EventCategories';
 import EventImageGallery from '../components/atoms/EventImageGallery';
 import MapView from '../components/MapView';
-import { getSession } from '../services/supabase';
+import { getSession, getUserProfile } from '../services/supabase';
 import { api, invalidateTicketsCache } from '../services/api';
 import { geocodeAddress } from '../services/geocoding';
 import { getGradientByIndex } from '../constants/gradients';
-import type { EventDetailResponse, RsvpStatus } from '../types/events';
+import type { EventDetailResponse, RsvpStatus, CustomFieldResponseItem, TicketResponses } from '../types/events';
+import CustomFieldForm from '../components/atoms/CustomFieldForm';
+import ConfirmModal from '../components/atoms/ConfirmModal';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.75; // 3:4 aspect ratio
 
 const GRADIENT_FALLBACK = ['#D4006B', '#8B3DC8'];
@@ -153,7 +158,92 @@ export default function EventScreen() {
     const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus | null>(null);
     const [rsvpMenuVisible, setRsvpMenuVisible] = useState(false);
     const [rsvpLoading, setRsvpLoading] = useState(false);
+    const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
+    const [customFieldsSubmitting, setCustomFieldsSubmitting] = useState(false);
+    const [cfConfirmVisible, setCfConfirmVisible] = useState(false);
+    const [initialResponses, setInitialResponses] = useState<Record<string, CustomFieldResponseItem[]>>({});
+    const [myTickets, setMyTickets] = useState<{ ticket_id: string; label: string }[]>([]);
+    const [ticketCountPickerOpen, setTicketCountPickerOpen] = useState(false);
+    const [attendeeNames, setAttendeeNames] = useState<string[]>(['']);
+    const [buyerDisplayName, setBuyerDisplayName] = useState('');
     const [sliderIndex, setSliderIndex] = useState(0);
+
+    // Custom Fields Bottom Sheet (like TicketDetailScreen)
+    const CF_SHEET_HEIGHT = SCREEN_HEIGHT * 0.9;
+    const cfTranslateY = useRef(new Animated.Value(CF_SHEET_HEIGHT)).current;
+    const cfBackdropOpacity = useRef(new Animated.Value(0)).current;
+    const cfIsFirstSubmissionRef = useRef(false);
+    const cfHasRequiredFieldsRef = useRef(false);
+
+    useEffect(() => {
+        if (customFieldsModalOpen) {
+            const hasAny = Object.values(initialResponses).some(r => r.length > 0);
+            cfIsFirstSubmissionRef.current = !hasAny;
+            cfHasRequiredFieldsRef.current = (event?.custom_fields ?? []).some(f => f.is_required);
+            cfTranslateY.setValue(CF_SHEET_HEIGHT);
+            cfBackdropOpacity.setValue(0);
+            Animated.parallel([
+                Animated.spring(cfTranslateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
+                Animated.timing(cfBackdropOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+            ]).start();
+        }
+    }, [customFieldsModalOpen]);
+
+    const dismissCustomFields = useCallback(() => {
+        Animated.parallel([
+            Animated.timing(cfTranslateY, { toValue: CF_SHEET_HEIGHT, duration: 250, useNativeDriver: true }),
+            Animated.timing(cfBackdropOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+        ]).start(() => setCustomFieldsModalOpen(false));
+    }, [cfTranslateY, cfBackdropOpacity, CF_SHEET_HEIGHT]);
+
+    const cancelAndRevokeRsvp = useCallback(() => {
+        dismissCustomFields();
+        if (event) {
+            handleRsvp('Declined');
+        }
+    }, [dismissCustomFields, event]);
+
+    const tryDismissCustomFields = useCallback(() => {
+        if (cfIsFirstSubmissionRef.current && cfHasRequiredFieldsRef.current) {
+            Animated.spring(cfTranslateY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
+            setCfConfirmVisible(true);
+        } else {
+            dismissCustomFields();
+        }
+    }, [dismissCustomFields, cfTranslateY]);
+
+    const handleCfScrollEndDrag = useCallback((e: any) => {
+        const offsetY = e.nativeEvent.contentOffset.y;
+        const velocityY = e.nativeEvent.velocity?.y ?? 0;
+        if (offsetY <= 0 && velocityY > 0.5) {
+            tryDismissCustomFields();
+        }
+    }, [tryDismissCustomFields]);
+
+    const cfPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_: any, gs: any) => gs.dy > 5,
+            onPanResponderMove: (_: any, gs: any) => {
+                if (gs.dy > 0) cfTranslateY.setValue(gs.dy);
+            },
+            onPanResponderRelease: (_: any, gs: any) => {
+                if (gs.dy > 80 || gs.vy > 0.5) {
+                    if (cfIsFirstSubmissionRef.current && cfHasRequiredFieldsRef.current) {
+                        Animated.spring(cfTranslateY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
+                        setCfConfirmVisible(true);
+                    } else {
+                        Animated.parallel([
+                            Animated.timing(cfTranslateY, { toValue: CF_SHEET_HEIGHT, duration: 250, useNativeDriver: true }),
+                            Animated.timing(cfBackdropOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+                        ]).start(() => setCustomFieldsModalOpen(false));
+                    }
+                } else {
+                    Animated.spring(cfTranslateY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
+                }
+            },
+        })
+    ).current;
 
     const openDrawer = () => {
         setDrawerOpen(true);
@@ -199,7 +289,7 @@ export default function EventScreen() {
         }
     };
 
-    const handleRsvp = async (newStatus: RsvpStatus) => {
+    const handleRsvp = async (newStatus: RsvpStatus, ticketCount: number = 1, names?: string[]) => {
         if (!event) return;
         const token = await getSession();
         if (!token) {
@@ -208,11 +298,51 @@ export default function EventScreen() {
         }
         setRsvpLoading(true);
         try {
-            await api.rsvpEvent(event.event_id, newStatus, token);
+            await api.rsvpEvent(event.event_id, newStatus, token, ticketCount, names);
             const prevStatus = rsvpStatus;
             setRsvpStatus(newStatus);
             if (newStatus === 'Accepted' && prevStatus !== 'Accepted') {
-                setEvent({ ...event, participant_count: event.participant_count + 1 });
+                setEvent({ ...event, participant_count: event.participant_count + ticketCount });
+                const hasCustomFields = event.custom_fields && event.custom_fields.length > 0;
+                if (hasCustomFields) {
+                    const freshToken = await getSession();
+                    api.invalidateCaches(event.event_id);
+                    const freshEvent = await api.getEventById(event.event_id, freshToken || undefined);
+                    setEvent(freshEvent);
+                    let tickets = freshEvent.ticket || [];
+                    if (tickets.length === 0 && freshToken) {
+                        try {
+                            const allTickets = await api.getUserTickets(freshToken);
+                            tickets = allTickets.tickets
+                                .filter(t => t.event_id === event.event_id)
+                                .map(t => ({ ticket_id: t.ticket_id, guest_name: t.guest_name }));
+                        } catch { /* ignore */ }
+                    }
+                    const ticketInfos = tickets.map((t, i) => ({
+                        ticket_id: t.ticket_id,
+                        label: t.guest_name || (tickets.length > 1 ? `Person ${i + 1}` : 'Person 1'),
+                    }));
+                    setMyTickets(ticketInfos);
+                    if (freshToken) {
+                        try {
+                            const data = await api.getMyCustomFieldResponses(freshEvent.event_id, freshToken);
+                            const mapped: Record<string, CustomFieldResponseItem[]> = {};
+                            for (const item of data) {
+                                mapped[item.ticket_id] = item.responses;
+                            }
+                            setInitialResponses(mapped);
+                        } catch {
+                            setInitialResponses({});
+                        }
+                    }
+                    setCustomFieldsModalOpen(true);
+                }
+            } else if (newStatus === 'Accepted' && prevStatus === 'Accepted') {
+                // Re-accept: names were updated — refresh event so ticket tabs reflect new names
+                const freshToken = await getSession();
+                api.invalidateCaches(event.event_id);
+                const freshEvent = await api.getEventById(event.event_id, freshToken || undefined);
+                setEvent(freshEvent);
             } else if (newStatus !== 'Accepted' && prevStatus === 'Accepted') {
                 setEvent({ ...event, participant_count: Math.max(0, event.participant_count - 1) });
             }
@@ -230,11 +360,85 @@ export default function EventScreen() {
         }
     };
 
+    const handleRsvpWithTicketCount = (newStatus: RsvpStatus) => {
+        if (!event) return;
+        const maxPerPerson = event.max_tickets_per_person ?? 1;
+        if (newStatus === 'Accepted' && maxPerPerson > 1) {
+            setAttendeeNames(['']);
+            setTicketCountPickerOpen(true);
+            getUserProfile().then(p => {
+                setBuyerDisplayName(p?.displayName ?? p?.firstName ?? 'Gast');
+            });
+        } else {
+            handleRsvp(newStatus);
+        }
+    };
+
+    const confirmTicketCount = () => {
+        setTicketCountPickerOpen(false);
+        const resolved = attendeeNames.map((n, i) =>
+            n.trim() || `${buyerDisplayName || 'Gast'} ${i + 1}`
+        );
+        handleRsvp('Accepted', resolved.length, resolved);
+    };
+
+    const handleCustomFieldSubmit = async (responses: Record<string, CustomFieldResponseItem[]>) => {
+        if (!event) return;
+        const token = await getSession();
+        if (!token) return;
+        setCustomFieldsSubmitting(true);
+        try {
+            for (const [ticketId, ticketResponses] of Object.entries(responses)) {
+                if (!ticketId) continue;
+                await api.submitCustomFieldResponses(event.event_id, ticketId, ticketResponses, token);
+            }
+            dismissCustomFields();
+        } catch (err) {
+            console.error('[EventScreen] Custom fields submit error:', err);
+            Alert.alert('Fehler', 'Antworten konnten nicht gespeichert werden.');
+        } finally {
+            setCustomFieldsSubmitting(false);
+        }
+    };
+
+    const openCustomFieldsModal = async () => {
+        if (!event) return;
+        const token = await getSession();
+        let tickets = event.ticket || [];
+        if (tickets.length === 0 && token) {
+            try {
+                const allTickets = await api.getUserTickets(token);
+                tickets = allTickets.tickets
+                    .filter(t => t.event_id === event.event_id)
+                    .map(t => ({ ticket_id: t.ticket_id, guest_name: t.guest_name }));
+            } catch { /* ignore */ }
+        }
+        const ticketInfos = tickets.map((t, i) => ({
+            ticket_id: t.ticket_id,
+            label: t.guest_name || (tickets.length > 1 ? `Person ${i + 1}` : 'Person 1'),
+        }));
+        setMyTickets(ticketInfos);
+
+        if (token) {
+            try {
+                const data = await api.getMyCustomFieldResponses(event.event_id, token);
+                const mapped: Record<string, CustomFieldResponseItem[]> = {};
+                for (const item of data) {
+                    mapped[item.ticket_id] = item.responses;
+                }
+                setInitialResponses(mapped);
+            } catch {
+                setInitialResponses({});
+            }
+        }
+        setCustomFieldsModalOpen(true);
+    };
+
     const handleStickyBarPress = () => {
         if (!event) return;
         if (effectiveIsFree) {
             if (event.is_public) {
-                handleRsvp(rsvpStatus === 'Accepted' ? 'Declined' : 'Accepted');
+                handleRsvpWithTicketCount(rsvpStatus === 'Accepted' ? 'Declined' : 'Accepted');
             } else {
                 setRsvpMenuVisible(true);
             }
@@ -473,10 +677,17 @@ export default function EventScreen() {
                                     <Ionicons name="share-outline" size={22} color={colors.onSurface} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={glassActionBtn}>
-                                    <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
-                                </TouchableOpacity>
+                                {rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 ? (
+                                    <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
+                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben</Text>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <TouchableOpacity style={glassActionBtn}>
+                                        <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
 
                             {/* Categories */}
@@ -621,10 +832,17 @@ export default function EventScreen() {
                                     <Ionicons name="share-outline" size={22} color={colors.onSurface} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={glassActionBtn}>
-                                    <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
-                                </TouchableOpacity>
+                                {rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 ? (
+                                    <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
+                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben</Text>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <TouchableOpacity style={glassActionBtn}>
+                                        <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
 
                             {categories.length > 0 && (
@@ -974,7 +1192,7 @@ export default function EventScreen() {
                                 <TouchableOpacity
                                     activeOpacity={0.85}
                                     onPress={() => {
-                                        handleRsvp(opt.status);
+                                        handleRsvpWithTicketCount(opt.status);
                                         setRsvpMenuVisible(false);
                                     }}
                                     style={[
@@ -1011,6 +1229,148 @@ export default function EventScreen() {
                     <View style={rsvpStyles.bottomSpacer} />
                 </View>
             </Modal>
+
+            {/* Attendee Names Picker Modal (when max_tickets_per_person > 1) */}
+            <Modal
+                visible={ticketCountPickerOpen}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setTicketCountPickerOpen(false)}
+            >
+                <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+                    <Pressable style={rsvpStyles.backdrop} onPress={() => setTicketCountPickerOpen(false)} />
+                    <View style={[rsvpStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
+                        <View style={[rsvpStyles.handle, { backgroundColor: colors.outlineVariant }]} />
+                        <Text style={[rsvpStyles.title, { color: colors.onSurface }]}>Wer kommt mit?</Text>
+                        <Text style={{ fontSize: 13, color: colors.onSurfaceVariant, textAlign: 'center', marginTop: -4, marginBottom: 16 }}>
+                            Max. {event?.max_tickets_per_person ?? 1} Personen (inkl. dir)
+                        </Text>
+                        <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled">
+                            {attendeeNames.map((name, idx) => (
+                                <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 10, gap: 8 }}>
+                                    <TextInput
+                                        style={{
+                                            flex: 1,
+                                            height: 44,
+                                            borderRadius: 12,
+                                            backgroundColor: colors.surfaceContainerHigh,
+                                            paddingHorizontal: 14,
+                                            fontSize: 15,
+                                            color: colors.onSurface,
+                                        }}
+                                        placeholder={`${buyerDisplayName || 'Gast'} ${idx + 1}`}
+                                        placeholderTextColor={colors.onSurfaceVariant}
+                                        value={name}
+                                        onChangeText={text => {
+                                            const updated = [...attendeeNames];
+                                            updated[idx] = text;
+                                            setAttendeeNames(updated);
+                                        }}
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => setAttendeeNames(attendeeNames.filter((_, i) => i !== idx))}
+                                        disabled={attendeeNames.length <= 1}
+                                        style={{ opacity: attendeeNames.length <= 1 ? 0.35 : 1 }}
+                                    >
+                                        <Ionicons name="trash-outline" size={22} color={colors.onSurfaceVariant} />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </ScrollView>
+                        <TouchableOpacity
+                            onPress={() => setAttendeeNames([...attendeeNames, ''])}
+                            disabled={attendeeNames.length >= (event?.max_tickets_per_person ?? 1)}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                marginHorizontal: 20,
+                                marginTop: 4,
+                                marginBottom: 16,
+                                paddingVertical: 12,
+                                borderRadius: 12,
+                                borderWidth: 1,
+                                borderColor: colors.outlineVariant,
+                                opacity: attendeeNames.length >= (event?.max_tickets_per_person ?? 1) ? 0.35 : 1,
+                            }}
+                        >
+                            <Ionicons name="add" size={20} color={colors.primary} />
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>Teilnehmer hinzufügen</Text>
+                        </TouchableOpacity>
+                        <View style={{ paddingHorizontal: 20, paddingBottom: 30 }}>
+                            <TouchableOpacity
+                                style={{ backgroundColor: colors.primary, borderRadius: 9999, paddingVertical: 16, alignItems: 'center' }}
+                                onPress={confirmTicketCount}
+                            >
+                                <Text style={{ color: colors.onPrimary, fontSize: 15, fontWeight: '600' }}>Zusagen</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Loading Overlay between ticket count confirm and custom fields modal */}
+            {rsvpLoading && (event?.custom_fields?.length ?? 0) > 0 && !customFieldsModalOpen && (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 999 }]}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                </View>
+            )}
+
+            {/* Custom Fields Bottom Sheet (same pattern as TicketDetailScreen) */}
+            {event && (event.custom_fields?.length ?? 0) > 0 && customFieldsModalOpen && (() => {
+                return (
+                    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                        <Animated.View style={[cfStyles.backdrop, { opacity: cfBackdropOpacity }]}>
+                            <Pressable style={StyleSheet.absoluteFill} onPress={tryDismissCustomFields} />
+                        </Animated.View>
+
+                        <Animated.View
+                            style={[
+                                cfStyles.sheet,
+                                { backgroundColor: colors.background, transform: [{ translateY: cfTranslateY }] },
+                            ]}
+                        >
+                            <View {...cfPanResponder.panHandlers} style={cfStyles.handleArea}>
+                                <View style={[cfStyles.handle, { backgroundColor: colors.outlineVariant }]} />
+                            </View>
+
+                            <View style={cfStyles.header}>
+                                <Text style={[cfStyles.headerTitle, { color: colors.onSurface }]}>
+                                    Zusätzliche Angaben
+                                </Text>
+                                <TouchableOpacity onPress={tryDismissCustomFields} style={cfStyles.closeButton}>
+                                    <Ionicons name="close" size={28} color={colors.onSurface} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <CustomFieldForm
+                                fields={event.custom_fields!}
+                                tickets={myTickets.length > 0 ? myTickets : [{ ticket_id: '', label: 'Person 1' }]}
+                                initialValues={initialResponses}
+                                onSubmit={handleCustomFieldSubmit}
+                                onCancel={tryDismissCustomFields}
+                                submitting={customFieldsSubmitting}
+                                hideTitle
+                                onScrollEndDrag={handleCfScrollEndDrag}
+                            />
+                        </Animated.View>
+                    </View>
+                );
+            })()}
+
+            <ConfirmModal
+                visible={cfConfirmVisible}
+                title="Abbrechen?"
+                message="Wenn du die Pflichtfelder nicht ausfüllst, wird deine Zusage zurückgenommen."
+                cancelLabel="Weiter ausfüllen"
+                confirmLabel="Teilnahme absagen"
+                onCancel={() => setCfConfirmVisible(false)}
+                onConfirm={() => {
+                    setCfConfirmVisible(false);
+                    cancelAndRevokeRsvp();
+                }}
+            />
 
         </ScreenWithNav>
     );
@@ -1576,5 +1936,47 @@ const rsvpStyles = StyleSheet.create({
     },
     bottomSpacer: {
         height: Platform.OS === 'ios' ? 34 : 20,
+    },
+});
+
+const cfStyles = StyleSheet.create({
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    sheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: SCREEN_HEIGHT * 0.9,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        overflow: 'hidden',
+    },
+    handleArea: {
+        alignItems: 'center',
+        paddingTop: 12,
+        paddingBottom: 16,
+    },
+    handle: {
+        width: 40,
+        height: 5,
+        borderRadius: 3,
+    },
+    header: {
+        paddingHorizontal: 24,
+        paddingBottom: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+    },
+    closeButton: {
+        padding: 8,
     },
 });
