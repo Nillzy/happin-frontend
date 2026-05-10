@@ -40,6 +40,12 @@
           }
         }
       ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Happin möchte Events in deinen Kalender eintragen."
+        }
+      ],
       "expo-secure-store",
       [
         "expo-camera",

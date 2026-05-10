@@ -156,6 +156,11 @@ export const api = {
             `/api/v1/images/search?q=${encodeURIComponent(query)}&per_page=${perPage}`
         ),
 
+    getWalletUrl: (eventId: string, token?: string) =>
+        request<{ wallet_url: string }>(`/api/v1/events/${eventId}/wallet`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }),
+
     scanTicket: (eventId: string, qrToken: string, token: string) =>
         request<ScanTicketResponse>(`/api/v1/events/${eventId}/tickets/scan`, {
             method: 'POST',
