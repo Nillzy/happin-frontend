@@ -20,6 +20,9 @@ import {
     KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+// legacy API: required for writeAsStringAsync + cacheDirectory on Expo SDK 54
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Calendar from 'expo-calendar';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -172,6 +175,7 @@ export default function EventScreen() {
     const [attendeeNames, setAttendeeNames] = useState<string[]>(['']);
     const [buyerDisplayName, setBuyerDisplayName] = useState('');
     const [sliderIndex, setSliderIndex] = useState(0);
+    const [calendarModalVisible, setCalendarModalVisible] = useState(false);
 
     // Custom Fields Bottom Sheet (like TicketDetailScreen)
     const CF_SHEET_HEIGHT = SCREEN_HEIGHT * 0.9;
@@ -291,6 +295,100 @@ export default function EventScreen() {
             setError(e instanceof Error ? e.message : 'Event konnte nicht geladen werden');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCalendarDownload = async () => {
+        if (!event) return;
+
+        if (Platform.OS === 'web') {
+            try {
+                const token = await getSession();
+                const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+                const url = `${baseUrl}/api/v1/events/${event.event_id}/calendar.ics`;
+                const headers: Record<string, string> = token
+                    ? { Authorization: `Bearer ${token}` }
+                    : {};
+                const response = await fetch(url, { headers });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const blob = await response.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objectUrl;
+                a.download = `event-${event.event_id}.ics`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(objectUrl);
+            } catch {
+                Alert.alert('Fehler', 'Kalender-Export konnte nicht heruntergeladen werden.');
+            }
+            return;
+        }
+
+        try {
+            const { status: existing } = await Calendar.getCalendarPermissionsAsync();
+            if (existing !== 'granted') {
+                const { status } = await Calendar.requestCalendarPermissionsAsync();
+                if (status !== 'granted') {
+                    Alert.alert(
+                        'Kalenderzugriff verweigert',
+                        'Bitte erlaube den Kalender-Zugriff in den Einstellungen, um Events hinzuzufügen.'
+                    );
+                    return;
+                }
+            }
+            setCalendarModalVisible(true);
+        } catch {
+            Alert.alert('Fehler', 'Kalender-Zugriff konnte nicht angefragt werden.');
+        }
+    };
+
+    const handleCalendarConfirm = async () => {
+        if (!event) return;
+        setCalendarModalVisible(false);
+        try {
+            let calendarId: string;
+            if (Platform.OS === 'ios') {
+                const defaultCalendar = await Calendar.getDefaultCalendarAsync();
+                calendarId = defaultCalendar.id;
+            } else {
+                const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+                const writable = calendars.find(c => c.allowsModifications);
+                if (!writable) {
+                    Alert.alert('Fehler', 'Kein beschreibbarer Kalender auf dem Gerät gefunden.');
+                    return;
+                }
+                calendarId = writable.id;
+            }
+
+            const startDate = new Date(event.starts_at);
+            const endDate = event.ends_at
+                ? new Date(event.ends_at)
+                : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+
+            const locationParts = event.location
+                ? [
+                    event.location.street,
+                    event.location.house_number,
+                    event.location.postal_code,
+                    event.location.city,
+                  ].filter(Boolean)
+                : [];
+            const location = locationParts.length > 0 ? locationParts.join(' ') : undefined;
+
+            await Calendar.createEventAsync(calendarId, {
+                title: event.title,
+                startDate,
+                endDate,
+                location,
+                notes: event.description ?? undefined,
+            });
+
+            Alert.alert('Gespeichert', 'Das Event wurde zu deinem Kalender hinzugefügt.');
+        } catch (e) {
+            console.error('[EventScreen] Calendar createEvent error:', e);
+            Alert.alert('Fehler', 'Das Event konnte nicht zum Kalender hinzugefügt werden.');
         }
     };
 
@@ -654,25 +752,18 @@ export default function EventScreen() {
                             </View>
 
                             {/* Action Buttons */}
-                            <View style={[styles.actionButtons, { marginBottom: 32 }, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
-                                {(() => {
-                                    const hasAccess = event.is_free
-                                        ? rsvpStatus === 'Accepted'
-                                        : (event.ticket ?? []).length > 0;
-                                    return (
-                                        <TouchableOpacity
-                                            style={[glassActionBtn, !hasAccess && { opacity: 0.4 }]}
-                                            onPress={hasAccess ? () => router.push(`/ticket/${id}`) : undefined}
-                                            disabled={!hasAccess}
-                                        >
-                                            <Ionicons name="qr-code-outline" size={22} color={hasAccess ? colors.onSurface : colors.onSurfaceVariant} />
-                                            <Text style={[styles.actionButtonText, { color: hasAccess ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
-                                        </TouchableOpacity>
-                                    );
-                                })()}
-                                <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
-                                    <Ionicons name="mail-outline" size={22} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kontakt</Text>
+                            <View style={styles.actionButtons}>
+                                <TouchableOpacity
+                                    style={[glassActionBtn, rsvpStatus !== 'Accepted' && { opacity: 0.4, backgroundColor: isDark ? 'rgba(80,80,80,0.6)' : 'rgba(200,200,200,0.7)' }]}
+                                    onPress={rsvpStatus === 'Accepted' ? () => router.push(`/ticket/${id}`) : undefined}
+                                    disabled={rsvpStatus !== 'Accepted'}
+                                >
+                                    <Ionicons name="qr-code-outline" size={24} color={rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant} />
+                                    <Text style={[styles.actionButtonText, { color: rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
+                                    <Ionicons name="calendar" size={24} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kalenderimport</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
                                     <Ionicons name="share-outline" size={22} color={colors.onSurface} />
@@ -1215,6 +1306,63 @@ export default function EventScreen() {
                 </View>
             </Modal>
 
+            {/* Calendar Confirmation Modal */}
+            <Modal
+                visible={calendarModalVisible}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setCalendarModalVisible(false)}
+            >
+                <Pressable style={rsvpStyles.backdrop} onPress={() => setCalendarModalVisible(false)} />
+                <View style={[rsvpStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
+                    <View style={[rsvpStyles.handle, { backgroundColor: colors.outlineVariant }]} />
+
+                    <View style={calendarStyles.titleRow}>
+                        <Ionicons name="calendar" size={22} color={colors.primary} style={{ marginRight: 8 }} />
+                        <Text style={[rsvpStyles.title, { color: colors.onSurface, marginBottom: 0 }]}>
+                            Zum Kalender hinzufügen
+                        </Text>
+                    </View>
+
+                    <View style={calendarStyles.eventInfo}>
+                        <Text style={[calendarStyles.eventTitle, { color: colors.onSurface }]}>
+                            {event?.title}
+                        </Text>
+                        <Text style={[calendarStyles.eventMeta, { color: colors.onSurfaceVariant }]}>
+                            {event?.starts_at ? formatDateGerman(event.starts_at) : ''}
+                        </Text>
+                        {event?.location && (
+                            <Text style={[calendarStyles.eventMeta, { color: colors.onSurfaceVariant }]}>
+                                {[event.location.street, event.location.house_number, event.location.postal_code, event.location.city]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                            </Text>
+                        )}
+                    </View>
+
+                    <View style={calendarStyles.actions}>
+                        <TouchableOpacity
+                            style={[calendarStyles.confirmButton, { backgroundColor: colors.primary }]}
+                            onPress={handleCalendarConfirm}
+                        >
+                            <Text style={[calendarStyles.confirmButtonText, { color: colors.onPrimary }]}>
+                                Hinzufügen
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={calendarStyles.cancelButton}
+                            onPress={() => setCalendarModalVisible(false)}
+                        >
+                            <Text style={[calendarStyles.cancelButtonText, { color: colors.onSurfaceVariant }]}>
+                                Abbrechen
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={rsvpStyles.bottomSpacer} />
+                </View>
+            </Modal>
+
             {/* Attendee Names Picker Modal (when max_tickets_per_person > 1) */}
             <Modal
                 visible={ticketCountPickerOpen}
@@ -1613,6 +1761,7 @@ const styles = StyleSheet.create({
     actionButtonText: {
         fontSize: 12,
         fontWeight: '600',
+        textAlign: 'center',
     },
 
     // Sections
@@ -1963,5 +2112,51 @@ const cfStyles = StyleSheet.create({
     },
     closeButton: {
         padding: 8,
+    },
+});
+
+const calendarStyles = StyleSheet.create({
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        marginBottom: 16,
+    },
+    eventInfo: {
+        paddingHorizontal: 20,
+        marginBottom: 24,
+        gap: 4,
+    },
+    eventTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    eventMeta: {
+        fontSize: 14,
+    },
+    actions: {
+        paddingHorizontal: 20,
+        gap: 10,
+    },
+    confirmButton: {
+        paddingVertical: 16,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 52,
+    },
+    confirmButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    cancelButton: {
+        paddingVertical: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cancelButtonText: {
+        fontSize: 15,
+        fontWeight: '500',
     },
 });

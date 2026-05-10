@@ -21,7 +21,7 @@ This is the central index for all project documentation in the `documentation/` 
 | [13-event-host-screen.md](./13-event-host-screen.md) | Event Host Screen: Verwaltungsoberfläche für Hosts mit Statistiken und Gästeliste. **VERALTET** - siehe 24-event-host-redesign-guest-navigation.md. |
 | [14-account-screen.md](./14-account-screen.md) | Konto-Screen: Profilbild-Platzhalter, Anzeigename bearbeiten, E-Mail, Statistiken, Events, Tickets, Standort (AsyncStorage + `person.city` im Backend), Dark-Mode-Toggle, Logout, Account löschen. |
 | [15-bottom-navigation.md](./15-bottom-navigation.md) | Bottom Navigation Bar: 5 Haupt-Tabs (Explore, Karte, Erstellen, Events, Konto) mit Ionicons, ScreenWithNav Wrapper, Mobile-First Design. |
-| [16-event-screen-redesign.md](./16-event-screen-redesign.md) | Event Detail Screen: Luma-inspiriertes Layout mit Hero Image, Action Buttons, Location Card, Host Section, Material Design 3 Farben. |
+| [16-event-screen-redesign.md](./16-event-screen-redesign.md) | Event Detail Screen: Luma-inspiriertes Layout mit Hero Image, Action Buttons (inkl. ICS-Download), Location Card, Host Section, Material Design 3 Farben. |
 | [17-map-screen.md](./17-map-screen.md) | Kartenansicht (Tab „Karte"): MapTiler/MapLibre-Integration, plattformübergreifende MapView-Komponente, Geocoding beim Event-Erstellen, stadtbasierte Zentrierung, Custom Map Styles, City Autocomplete. |
 | [17-event-creation-apple-style-final.md](./17-event-creation-apple-style-final.md) | **Event Creation - Apple-Style Redesign (Final)**: Komplette Dokumentation des 2-Step Flows (Essentials + Details), SegmentedControl, ImageGalleryUploader, CategorySelector (Eventbrite-style), Full-width Buttons, Validation, Components, Migration Notes. **Aktualisiert mit Gradient-Auswahl** (siehe 23-gradient-selection.md). |
 | [18-event-detail-categories-gallery.md](./18-event-detail-categories-gallery.md) | **Event Detail - Kategorien & Galerie**: Integration von Kategorien-Chips und Bildergalerie in Event Detail Screen, EventImageGallery Component, Design-Entscheidungen, Material Design 3 Consistency. |
@@ -34,6 +34,8 @@ This is the central index for all project documentation in the `documentation/` 
 | [26-event-edit-screen-redesign.md](./26-event-edit-screen-redesign.md) | **Event Edit Screen Redesign**: Draft-basierter Erstellungsflow (Step 1 → Entwurf → EventEditScreen), generische Edit-Seite mit Live-Vorschau + Edit-Drawers, Ticket-Konfiguration, Backend-Anforderungen. |
 | [27-stock-image-suggestions.md](./27-stock-image-suggestions.md) | **Stockbild-Vorschläge**: Thematische Unsplash-Bilder im Titelbild-Modal basierend auf Eventtitel, Keyword-Extraktion, Fallback-Modus, Backend-Proxy-TODOs. |
 | [28-android-bottom-sheet-gestures.md](./28-android-bottom-sheet-gestures.md) | **Android Bottom Sheet & Gesture Patterns**: Korrekte Implementierung von Swipe-to-Dismiss Sheets (Animated.View + PanResponder statt Modal), ScrollView-Dismiss, ConfirmModal statt Alert.alert, Ref-Pattern für Closures. |
+| [29-kalender-export-frontend.md](./28-kalender-export-frontend.md) | **Kalender-Export (ICS) Frontend**: ICS-Download-Button im EventScreen, Platform-Split Web/Native (expo-file-system + expo-sharing), Auth-Token-Handling, Fehlerbehandlung. |
+| [30-google-wallet-frontend.md](./29-google-wallet-frontend.md) | **Google Wallet Integration Frontend**: `getWalletUrl` in api.ts, Handler im TicketDetailScreen, Platform-Split (nur Android + Web), Fehlerbehandlung. |
 | [CLAUDE_PROMPT_BACKEND_INTEGRATION.md](./CLAUDE_PROMPT_BACKEND_INTEGRATION.md) | **Claude-Prompt für Backend-Integration**: Priorisierte TODO-Liste aller offenen Backend-Aufgaben (Draft-Flow, Bild-Upload, Unsplash-Proxy, Permissions, MyEvents-Daten). |
 | [CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md](./CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md) | Vollständiger Claude-Prompt für Event-Creation UI Redesign & Feature-Implementierung (Phasen 1-3). |
 | [EVENT_CREATION_UX_ANALYSIS.md](./EVENT_CREATION_UX_ANALYSIS.md) | UX-Analyse des bestehenden Event-Creation Flows mit identifizierten Problemen und Verbesserungsvorschlägen. |
@@ -56,6 +58,7 @@ This is the central index for all project documentation in the `documentation/` 
 - ✅ **DatePicker kompakter**: Tageszellen feste Höhe 34px statt `aspectRatio: 1`
 - ✅ **DatePicker/TimePicker z-index**: Inline-Popover liegt korrekt über nachfolgenden Cards (`zIndex: 100` auf Datum&Uhrzeit-Card, `overflow: visible` auf ScrollView + Card)
 - ✅ **Account-Screen**: Sektionen „Meine Events" und „Meine Tickets" entfernt; GPS-Button als Happin-Pin-SVG (statt Emoji)
+- ✅ **ICS-Download-Button**: "Register"-Button im EventScreen → ICS-Datei herunterladen (Web: Browser-Download, Native: Share-Sheet)
 
 ### Event-Management
 - ✅ **MyEventsScreen Redesign**: Collapsible Sections, QR-Code Ticket-Cards, Split-Navigation

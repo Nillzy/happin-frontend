@@ -12,6 +12,8 @@ import {
     PanResponder,
     Animated,
     Platform,
+    Alert,
+    Linking,
 } from 'react-native';
 import type { ViewToken } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
@@ -47,6 +49,7 @@ export default function TicketDetailScreen() {
     const [activeIndex, setActiveIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [walletLoading, setWalletLoading] = useState(false);
 
     const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -87,6 +90,20 @@ export default function TicketDetailScreen() {
             }
         });
     }, [translateY, backdropOpacity, router]);
+
+    const handleAddToWallet = async () => {
+        if (!eventId) return;
+        setWalletLoading(true);
+        try {
+            const token = await getSession();
+            const { wallet_url } = await api.getWalletUrl(eventId, token ?? undefined);
+            await Linking.openURL(wallet_url);
+        } catch {
+            Alert.alert('Fehler', 'Google Wallet konnte nicht geöffnet werden.');
+        } finally {
+            setWalletLoading(false);
+        }
+    };
 
     const handlePanResponder = useRef(
         PanResponder.create({
@@ -321,17 +338,22 @@ export default function TicketDetailScreen() {
                     )}
                 </View>
 
-                {/* Add to Google Wallet Button */}
-                <TouchableOpacity
-                    style={[styles.walletButton, { backgroundColor: colors.surface, borderColor: colors.outlineVariant }]}
-                    onPress={() => {
-                        console.log('Add to Google Wallet');
-                    }}
-                >
-                    <Text style={[styles.walletButtonText, { color: colors.onSurface }]}>
-                        Zu Google Wallet hinzufügen
-                    </Text>
-                </TouchableOpacity>
+                {/* Add to Google Wallet Button — nur Android + Web */}
+                {Platform.OS !== 'ios' && (
+                    <TouchableOpacity
+                        style={[styles.walletButton, { backgroundColor: colors.surface, borderColor: colors.outlineVariant }]}
+                        onPress={handleAddToWallet}
+                        disabled={walletLoading}
+                    >
+                        {walletLoading ? (
+                            <ActivityIndicator size="small" color={colors.onSurface} />
+                        ) : (
+                            <Text style={[styles.walletButtonText, { color: colors.onSurface }]}>
+                                Zu Google Wallet hinzufügen
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+                )}
 
                 {/* Veranstaltung ansehen Button */}
                 <TouchableOpacity

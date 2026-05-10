@@ -51,8 +51,8 @@ Der EventScreen wurde komplett neu designed mit einem Luma-inspirierten Layout. 
 ┌─────────────────────────────────────┐
 │ Action Buttons Row                  │
 │ ┌────┐ ┌────┐ ┌────┐ ┌────┐        │
-│ │ ✓  │ │ ✉  │ │ ↗  │ │ ⋯  │        │
-│ │Reg.│ │Con.│ │Shr.│ │More│        │
+│ │ QR │ │ 📅 │ │ ↗  │ │ ⋯  │        │
+│ │Code│ │Kal.│ │Shr.│ │More│        │
 │ └────┘ └────┘ └────┘ └────┘        │
 └─────────────────────────────────────┘
 ┌─────────────────────────────────────┐
@@ -103,10 +103,10 @@ Der EventScreen wurde komplett neu designed mit einem Luma-inspirierten Layout. 
    - Three-dot Menu rechts
 
 3. **Action Buttons**
-   - 4 Buttons: Register, Contact, Share, More
+   - 4 Buttons: QR-Code, Kalenderimport, Share, More (Desktop) / Kalenderimport, Kontakt, Teilen, Mehr (Mobile)
    - Flexbox Row mit gap: 8px
-   - Icons: Ionicons (`checkbox-outline`, `mail-outline`, `share-outline`, `ellipsis-horizontal`)
-   - Register Button: Primary Style (Border)
+   - Icons: Ionicons (`qr-code-outline`, `calendar`, `share-outline`, `ellipsis-horizontal`)
+   - Kalenderimport-Button löst `handleCalendarDownload` aus (siehe Doc 28)
 
 4. **Location Card**
    - Address + City/Country
@@ -287,6 +287,16 @@ shadowRadius: 4
 - Touch Targets: Minimum 48px (Material Design 3 Guideline)
 
 ## Änderungshistorie
+
+- **2026-05-08**: Desktop-Layout: Contact-Button → Kalenderimport
+  - Desktop Action-Buttons-Row: "Contact" (`mail-outline`, `handleContact`) ersetzt durch "Kalenderimport" (`calendar`, `handleCalendarDownload`)
+  - Parität mit Mobile-Layout wiederhergestellt (nach Merge-Konflikt)
+
+- **2026-05-07**: ICS-Download implementiert
+  - "Register"-Button → "ICS herunterladen"
+  - `handleRegister` → `handleCalendarDownload` (Platform-Split Web/Native)
+  - Pakete: expo-file-system, expo-sharing
+  - Dokumentation: siehe 28-kalender-export-frontend.md
 
 - **2026-05-05**: Initial implementiert
   - Luma-inspiriertes Layout
