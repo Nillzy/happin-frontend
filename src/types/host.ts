@@ -10,6 +10,7 @@ export interface Participant {
     person: PersonInfo;
     status: 'Accepted' | 'Declined' | 'Pending';
     ticket_count?: number;
+    ticket_options_bought?: Record<string, number>;
     created_at?: string;
     custom_field_responses?: { custom_field_id: string; value: string | string[] }[];
     ticket_responses?: { ticket_id: string; guest_name?: string; responses: { custom_field_id: string; value: string | string[] }[] }[];
@@ -21,9 +22,16 @@ export interface ParticipantCounts {
     pending: number;
 }
 
+export interface TicketOptionSummary {
+    name: string;
+    price: number;
+    sold: number;
+}
+
 export interface ParticipantListResponse {
     participants: Participant[];
     counts: ParticipantCounts;
+    ticket_option_summary: TicketOptionSummary[];
 }
 
 export interface RemoveParticipantsRequest {

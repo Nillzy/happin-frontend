@@ -190,27 +190,10 @@ export default function EventListScreen() {
     }, []);
 
     // MOCK: Fake Event zum Testen der Card UI — entfernen wenn nicht mehr benötigt
-    const MOCK_TECHNO_EVENT: EventListItem = {
-        event_id: 'mock-techno-001',
-        title: 'Neon Pulse — Techno Lasershow',
-        starts_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
-        is_public: true,
-        is_free: false,
-        status: 'published',
-        participant_count: 487,
-        max_capacity: 600,
-        category: 'Techno,Rave',
-        image_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80',
-        location: { location_id: 'mock', city: 'Berlin' },
-    };
-    const displayEvents = [MOCK_TECHNO_EVENT, ...events];
+    const displayEvents = events;
 
     const handleEventPress = (event: EventListItem) => {
-        if (event.is_host) {
-            router.push(`/event/${event.event_id}/manage`);
-        } else {
-            router.push(`/event/${event.event_id}`);
-        }
+        router.push(`/event/${event.event_id}`);
     };
 
     const handleToggleSave = (event: EventListItem, e?: any) => {
@@ -253,6 +236,11 @@ export default function EventListScreen() {
                             <Text style={[styles.hostBadgeText, { color: colors.onPrimary }]}>Dein Event</Text>
                         </View>
                     )}
+                    {item.is_free && (
+                        <View style={styles.freeBadge}>
+                            <Text style={styles.freeBadgeText}>Kostenlos</Text>
+                        </View>
+                    )}
                     <TouchableOpacity
                         style={styles.likeButton}
                         onPress={(e) => handleToggleSave(item, e)}
@@ -289,17 +277,6 @@ export default function EventListScreen() {
                                 ))}
                             </View>
                         )}
-                        <View style={[
-                            styles.priceBadge,
-                            { backgroundColor: item.is_free ? `${'#16a34a'}18` : `${colors.primary}18` }
-                        ]}>
-                            <Text style={[
-                                styles.priceBadgeText,
-                                { color: item.is_free ? '#16a34a' : colors.primary }
-                            ]}>
-                                {item.is_free ? 'Kostenlos' : 'Tickets'}
-                            </Text>
-                        </View>
                     </View>
                 </View>
             </TouchableOpacity>
@@ -618,14 +595,21 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 0.3,
     },
-    priceBadge: {
+    freeBadge: {
+        position: 'absolute',
+        bottom: 12,
+        right: 12,
+        backgroundColor: 'rgba(22, 163, 74, 0.88)',
         paddingHorizontal: 10,
-        paddingVertical: 4,
+        paddingVertical: 5,
         borderRadius: 8,
     },
-    priceBadgeText: {
+    freeBadgeText: {
         fontSize: 11,
         fontWeight: '700',
+        color: '#ffffff',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
     },
     emptyContainer: {
         paddingVertical: 64,
