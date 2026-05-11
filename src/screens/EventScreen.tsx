@@ -71,6 +71,33 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
     const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
     const bgColor = isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)';
 
+    if (event.is_host) {
+        const tickets = event.ticket_options ?? [];
+        const cheapest = tickets.length ? Math.min(...tickets.map(t => t.price)) : null;
+        const totalAvailable = tickets.reduce((sum, t) => sum + (t.quantity_limit ?? 0), 0);
+        const hasLimits = tickets.some(t => t.quantity_limit != null);
+        return (
+            <View style={[deskBarStyles.bar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
+                <View style={deskBarStyles.info}>
+                    <Text style={[deskBarStyles.price, { color: colors.onSurface }]}>
+                        {isFree ? 'Kostenlos' : cheapest != null ? `ab ${cheapest.toFixed(2)} €` : 'Kostenpflichtig'}
+                    </Text>
+                    <Text style={[deskBarStyles.hint, { color: colors.onSurfaceVariant }]}>
+                        {event.participant_count} Teilnehmer
+                        {!isFree && hasLimits ? ` · ${totalAvailable} Tickets verfügbar` : ' · Dein Event'}
+                    </Text>
+                </View>
+                <TouchableOpacity
+                    style={[deskBarStyles.btn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1, borderColor: colors.outlineVariant }]}
+                    onPress={() => {}}
+                    disabled
+                >
+                    <Text style={[deskBarStyles.btnText, { color: colors.onSurfaceVariant }]}>Veranstalter</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
     if (isFree) {
         const btnBg = (event.is_public && rsvpStatus === 'Accepted') ? 'transparent' : colors.primary;
         const btnBorder = (event.is_public && rsvpStatus === 'Accepted') ? colors.outline : 'transparent';
@@ -117,13 +144,13 @@ const deskBarStyles = StyleSheet.create({
         justifyContent: 'space-between',
         borderTopWidth: StyleSheet.hairlineWidth,
         paddingVertical: 16,
-        paddingHorizontal: 4,
+        paddingHorizontal: 16,
         marginTop: 24,
         borderRadius: 12,
     },
     info: { flex: 1, marginRight: 16 },
-    price: { fontSize: 18, fontWeight: '800' },
-    hint: { fontSize: 13, marginTop: 2 },
+    price: { fontSize: 18, fontWeight: '800', marginLeft: 8 },
+    hint: { fontSize: 13, marginTop: 2, marginLeft: 8 },
     btn: {
         paddingHorizontal: 28,
         paddingVertical: 14,
@@ -286,6 +313,30 @@ export default function EventScreen() {
             setError(e instanceof Error ? e.message : 'Event konnte nicht geladen werden');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const silentRefresh = async (purchasedOptionId?: string, purchasedCount?: number) => {
+        if (!id) return;
+        try {
+            const token = await getSession();
+            const data = await api.getEventById(id, token || undefined);
+            setRsvpStatus(data.my_rsvp_status ?? null);
+            setEvent(prev => {
+                if (!prev) return data;
+                return {
+                    ...data,
+                    ticket_options: purchasedOptionId
+                        ? data.ticket_options.map(t =>
+                            t.ticket_option_id === purchasedOptionId
+                                ? { ...t, quantity_limit: t.quantity_limit != null ? Math.max(0, t.quantity_limit - (purchasedCount ?? 0)) : null }
+                                : t
+                          )
+                        : data.ticket_options,
+                };
+            });
+        } catch {
+            // Stille Fehler ignorieren — User sieht noch die alten Daten
         }
     };
 
@@ -908,6 +959,35 @@ export default function EventScreen() {
 
             {/* Sticky Bottom Bar — mobile only */}
             {!isDesktop && (() => {
+                if (event.is_host) {
+                    const tickets = event.ticket_options ?? [];
+                    const cheapest = tickets.length ? Math.min(...tickets.map(t => t.price)) : null;
+                    const totalAvailable = tickets.reduce((sum, t) => sum + (t.quantity_limit ?? 0), 0);
+                    const hasLimits = tickets.some(t => t.quantity_limit != null);
+                    return (
+                        <View style={[
+                            styles.stickyBar,
+                            { borderTopColor: colors.outlineVariant },
+                            isWeb
+                                ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
+                                : { backgroundColor: colors.surface },
+                        ]}>
+                            <View style={styles.stickyBarInfo}>
+                                <Text style={[styles.stickyBarPrice, { color: colors.onSurface }]}>
+                                    {effectiveIsFree ? 'Kostenlos' : cheapest != null ? `ab ${cheapest.toFixed(2)} €` : 'Kostenpflichtig'}
+                                </Text>
+                                <Text style={[styles.stickyBarHint, { color: colors.onSurfaceVariant }]}>
+                                    {event.participant_count} Teilnehmer
+                                    {!effectiveIsFree && hasLimits ? ` · ${totalAvailable} Tickets verfügbar` : ' · Dein Event'}
+                                </Text>
+                            </View>
+                            <View style={[styles.stickyBarButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1, borderColor: colors.outlineVariant }]}>
+                                <Text style={[styles.stickyBarButtonText, { color: colors.onSurfaceVariant }]}>Veranstalter</Text>
+                            </View>
+                        </View>
+                    );
+                }
+
                 if (effectiveIsFree) {
                     const statusHint = rsvpStatus === 'Accepted' ? 'Du hast zugesagt'
                         : rsvpStatus === 'Declined' ? 'Du hast abgesagt'
@@ -1143,18 +1223,21 @@ export default function EventScreen() {
                                     onPress={async () => {
                                         if (!selected) return;
                                         setCheckoutLoading(true);
+                                        const purchasedOptionId = selected.ticket_option_id;
+                                        const purchasedCount = ticketCount;
                                         try {
                                             const token = await getSession();
                                             if (!token) { Alert.alert('Fehler', 'Bitte melde dich an.'); return; }
                                             await api.createTickets(
                                                 event.event_id,
-                                                selected.ticket_option_id ?? null,
-                                                ticketCount,
+                                                purchasedOptionId ?? null,
+                                                purchasedCount,
                                                 token
                                             );
                                             invalidateTicketsCache();
+                                            api.invalidateCaches(event.event_id);
                                             closeDrawer();
-                                            await loadEvent();
+                                            await silentRefresh(purchasedOptionId, purchasedCount);
                                         } catch (err: any) {
                                             Alert.alert('Fehler', err?.message ?? 'Ticket konnte nicht gebucht werden.');
                                         } finally {

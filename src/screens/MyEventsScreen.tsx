@@ -190,9 +190,10 @@ export default function MyEventsScreen() {
             style: 'currency',
             currency: 'EUR',
         });
+        const ticketsSold = event.participant_count ?? 0;
         const capacityText = event.max_capacity
-            ? `${accepted}/${event.max_capacity}`
-            : `${accepted}`;
+            ? `${isPublic && !event.is_free ? ticketsSold : accepted}/${event.max_capacity}`
+            : `${isPublic && !event.is_free ? ticketsSold : accepted}`;
 
         return (
             <TouchableOpacity
@@ -256,7 +257,7 @@ export default function MyEventsScreen() {
                                     {capacityText}
                                 </Text>
                                 <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
-                                    Plätze
+                                    {isPublic && !event.is_free ? 'Tickets' : 'Plätze'}
                                 </Text>
                             </View>
                             {waitlist > 0 && (
@@ -272,15 +273,19 @@ export default function MyEventsScreen() {
                                     </View>
                                 </>
                             )}
-                            <View style={[styles.hostCardStatDivider, { backgroundColor: colors.outlineVariant }]} />
-                            <View style={styles.hostCardStatItem}>
-                                <Text style={[styles.hostCardStatValue, { color: colors.primary }]}>
-                                    {revenueFormatted}
-                                </Text>
-                                <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
-                                    Umsatz
-                                </Text>
-                            </View>
+                            {!event.is_free && (
+                                <>
+                                    <View style={[styles.hostCardStatDivider, { backgroundColor: colors.outlineVariant }]} />
+                                    <View style={styles.hostCardStatItem}>
+                                        <Text style={[styles.hostCardStatValue, { color: colors.primary }]}>
+                                            {revenueFormatted}
+                                        </Text>
+                                        <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
+                                            Umsatz
+                                        </Text>
+                                    </View>
+                                </>
+                            )}
                         </>
                     ) : (
                         <>
