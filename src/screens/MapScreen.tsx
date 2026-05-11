@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { useUserCity } from '@/hooks/use-user-city';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
+import { SkeletonBox } from '../components/atoms/SkeletonBox';
 import MapView, { MapMarker } from '../components/MapView';
 import { api } from '../services/api';
 import { geocodeCity, geocodeAddress } from '../services/geocoding';
@@ -133,11 +134,20 @@ export default function MapScreen() {
                 {Platform.OS === 'web' && <Navbar showCta={false} />}
 
                 {loading ? (
-                    <View style={styles.centered}>
-                        <ActivityIndicator size="large" color={colors.primary} />
-                        <Text style={[styles.hint, { color: colors.onSurfaceVariant }]}>
-                            Karte wird geladen…
-                        </Text>
+                    <View style={styles.skeletonMap}>
+                        {/* Karten-Fläche */}
+                        <SkeletonBox height={'100%' as any} borderRadius={0} />
+                        {/* Style-Buttons oben links */}
+                        <View style={styles.skeletonBar}>
+                            <SkeletonBox width={90} height={30} borderRadius={9999} />
+                            <SkeletonBox width={110} height={30} borderRadius={9999} />
+                        </View>
+                        {/* Marker-Punkte */}
+                        <SkeletonBox width={18} height={18} borderRadius={9} style={{ position: 'absolute', top: '28%', left: '35%' }} />
+                        <SkeletonBox width={18} height={18} borderRadius={9} style={{ position: 'absolute', top: '42%', left: '55%' }} />
+                        <SkeletonBox width={18} height={18} borderRadius={9} style={{ position: 'absolute', top: '55%', left: '25%' }} />
+                        <SkeletonBox width={18} height={18} borderRadius={9} style={{ position: 'absolute', top: '35%', left: '70%' }} />
+                        <SkeletonBox width={18} height={18} borderRadius={9} style={{ position: 'absolute', top: '65%', left: '60%' }} />
                     </View>
                 ) : error ? (
                     <View style={styles.centered}>
@@ -187,6 +197,8 @@ const styles = StyleSheet.create({
     root: { flex: 1 },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
     mapWrapper: { flex: 1 },
+    skeletonMap: { flex: 1, position: 'relative', overflow: 'hidden' },
+    skeletonBar: { position: 'absolute', top: 10, left: 10, flexDirection: 'row', gap: 8 },
     styleBar: {
         flexDirection: 'row',
         gap: 8,

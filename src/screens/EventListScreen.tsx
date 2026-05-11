@@ -19,6 +19,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
+import { SkeletonEventCard } from '../components/atoms/SkeletonBox';
 import { api } from '../services/api';
 import { authorize, getSession } from '../services/supabase';
 import { useSavedEvents } from '../contexts/SavedEventsContext';
@@ -405,9 +406,21 @@ export default function EventListScreen() {
                 </View>
 
                 {loading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={colors.primary} />
-                    </View>
+                    isWeb ? (
+                        <ScrollView style={styles.webScroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                            <View style={[styles.gridContainer, { maxWidth: CONTAINER_MAX_WIDTH, alignSelf: 'center', width: '100%' }]}>
+                                {Array.from({ length: 6 }).map((_, i) => (
+                                    <View key={i} style={[styles.gridItem, { width: cardWidth, marginRight: (i + 1) % numColumns === 0 ? 0 : GRID_GAP_H, marginBottom: GRID_GAP_V }]}>
+                                        <SkeletonEventCard web />
+                                    </View>
+                                ))}
+                            </View>
+                        </ScrollView>
+                    ) : (
+                        <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+                            {Array.from({ length: 4 }).map((_, i) => <SkeletonEventCard key={i} />)}
+                        </ScrollView>
+                    )
                 ) : error ? (
                     <View style={styles.errorContainer}>
                         <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>

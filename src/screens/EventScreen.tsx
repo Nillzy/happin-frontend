@@ -15,6 +15,7 @@ import {
     Alert,
     useWindowDimensions,
     Share,
+    Linking,
     PanResponder,
     TextInput,
     KeyboardAvoidingView,
@@ -36,10 +37,11 @@ import { geocodeAddress } from '../services/geocoding';
 import { getGradientByIndex } from '../constants/gradients';
 import type { EventDetailResponse, RsvpStatus, CustomFieldResponseItem, TicketResponses } from '../types/events';
 import CustomFieldForm from '../components/atoms/CustomFieldForm';
+import { SkeletonBox } from '../components/atoms/SkeletonBox';
 import ConfirmModal from '../components/atoms/ConfirmModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const HERO_HEIGHT = SCREEN_WIDTH * 0.75; // 3:4 aspect ratio
+const HERO_HEIGHT = SCREEN_WIDTH * 0.56; // ~16:9
 
 const GRADIENT_FALLBACK = ['#D4006B', '#8B3DC8'];
 
@@ -596,27 +598,45 @@ export default function EventScreen() {
         }
     };
 
-    const handleContact = () => {
-        // TODO: Contact host
-        console.log('Contact host');
-    };
-
     const handleShare = async () => {
         const link = `https://happin.fun/event/${id}`;
+        const formattedDate = event ? new Intl.DateTimeFormat('de-DE', {
+            day: 'numeric', month: 'long', year: 'numeric',
+        }).format(new Date(event.starts_at)) : '';
+        const shareMessage = event
+            ? `Schau mal, dieses Event habe ich gefunden! 🎉\n\n"${event.title}" findet am ${formattedDate} statt – vielleicht interessiert dich das?\n\n${link}`
+            : link;
         try {
-            await Share.share({
-                message: link,
-            });
+            await Share.share({ message: shareMessage });
         } catch {
-            // User cancelled share dialog
+            // cancelled
         }
     };
+
 
     if (loading) {
         return (
             <ScreenWithNav showBottomNav={false}>
                 <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-                    <ActivityIndicator size="large" color={colors.primary} />
+                    {/* Hero placeholder */}
+                    <SkeletonBox height={HERO_HEIGHT} borderRadius={0} />
+                    <View style={{ padding: 20, gap: 12 }}>
+                        <SkeletonBox height={28} width="80%" borderRadius={8} />
+                        <SkeletonBox height={16} width="55%" borderRadius={6} />
+                        <SkeletonBox height={16} width="45%" borderRadius={6} />
+                        {/* Action buttons */}
+                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <SkeletonBox key={i} height={72} borderRadius={12} style={{ flex: 1 }} />
+                            ))}
+                        </View>
+                        {/* Description lines */}
+                        <View style={{ gap: 8, marginTop: 8 }}>
+                            <SkeletonBox height={14} borderRadius={5} />
+                            <SkeletonBox height={14} borderRadius={5} />
+                            <SkeletonBox height={14} width="70%" borderRadius={5} />
+                        </View>
+                    </View>
                 </View>
             </ScreenWithNav>
         );
@@ -807,36 +827,28 @@ export default function EventScreen() {
                                     const hasAccess = effectiveIsFree
                                         ? rsvpStatus === 'Accepted'
                                         : (event.ticket ?? []).length > 0;
-                                    return (
+                                    return hasAccess ? (
                                         <TouchableOpacity
-                                            style={[glassActionBtn, !hasAccess && { opacity: 0.4 }]}
-                                            onPress={hasAccess ? () => router.push(`/ticket/${id}`) : undefined}
-                                            disabled={!hasAccess}
+                                            style={glassActionBtn}
+                                            onPress={() => router.push(`/ticket/${id}`)}
                                         >
-                                            <Ionicons name="qr-code-outline" size={22} color={hasAccess ? colors.onSurface : colors.onSurfaceVariant} />
-                                            <Text style={[styles.actionButtonText, { color: hasAccess ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
+                                            <Ionicons name="qr-code-outline" size={22} color={colors.onSurface} />
+                                            <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Ticket</Text>
                                         </TouchableOpacity>
-                                    );
+                                    ) : null;
                                 })()}
-                                <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
-                                    <Ionicons name="mail-outline" size={22} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kontakt</Text>
-                                </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
-                                    <Ionicons name="calendar" size={24} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kalenderimport</Text>
+                                    <Ionicons name="calendar-outline" size={22} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>ICS-Import</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
                                     <Ionicons name="share-outline" size={22} color={colors.onSurface} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
-                                {rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 ? (
-                                    <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
-                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
-                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben</Text>
-                                    </TouchableOpacity>
-                                ) : (
-                                    <TouchableOpacity style={glassActionBtn}>
-                                        <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
-                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
+                                {event.is_host && (
+                                    <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/event/${id}/manage`)}>
+                                        <Ionicons name="settings-outline" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
@@ -964,34 +976,28 @@ export default function EventScreen() {
                                     const hasAccess = effectiveIsFree
                                         ? rsvpStatus === 'Accepted'
                                         : (event.ticket ?? []).length > 0;
-                                    return (
+                                    return hasAccess ? (
                                         <TouchableOpacity
-                                            style={[glassActionBtn, !hasAccess && { opacity: 0.4 }]}
-                                            onPress={hasAccess ? () => router.push(`/ticket/${id}`) : undefined}
-                                            disabled={!hasAccess}
+                                            style={glassActionBtn}
+                                            onPress={() => router.push(`/ticket/${id}`)}
                                         >
-                                            <Ionicons name="qr-code-outline" size={22} color={hasAccess ? colors.onSurface : colors.onSurfaceVariant} />
-                                            <Text style={[styles.actionButtonText, { color: hasAccess ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
+                                            <Ionicons name="qr-code-outline" size={22} color={colors.onSurface} />
+                                            <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Ticket</Text>
                                         </TouchableOpacity>
-                                    );
+                                    ) : null;
                                 })()}
-                                <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
-                                    <Ionicons name="mail-outline" size={22} color={colors.onSurface} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kontakt</Text>
+                                <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
+                                    <Ionicons name="calendar-outline" size={22} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>ICS-Import</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
                                     <Ionicons name="share-outline" size={22} color={colors.onSurface} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
-                                {rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 ? (
-                                    <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
-                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
-                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben</Text>
-                                    </TouchableOpacity>
-                                ) : (
-                                    <TouchableOpacity style={glassActionBtn}>
-                                        <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
-                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
+                                {event.is_host && (
+                                    <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/event/${id}/manage`)}>
+                                        <Ionicons name="settings-outline" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
