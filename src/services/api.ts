@@ -192,3 +192,7 @@ export const api = {
         _ticketsCache = null;
     },
 };
+
+export function invalidateTicketsCache() {
+    _ticketsCache = null;
+}

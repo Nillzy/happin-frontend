@@ -19,7 +19,7 @@ import Navbar from '../components/atoms/Navbar';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
 import type { EventDetailResponse, CustomField } from '../types/events';
-import type { Participant, ParticipantCounts } from '../types/host';
+import type { Participant, ParticipantCounts, TicketOptionSummary } from '../types/host';
 
 const copyToClipboard = async (text: string): Promise<boolean> => {
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -42,6 +42,7 @@ export default function EventHostScreen() {
     const [event, setEvent] = useState<EventDetailResponse | null>(null);
     const [counts, setCounts] = useState<ParticipantCounts>({ accepted: 0, declined: 0, pending: 0 });
     const [participants, setParticipants] = useState<Participant[]>([]);
+    const [ticketOptionSummary, setTicketOptionSummary] = useState<TicketOptionSummary[]>([]);
     const [customFields, setCustomFields] = useState<CustomField[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -72,6 +73,7 @@ export default function EventHostScreen() {
             setEvent(eventData);
             setCounts(participantData.counts);
             setParticipants(participantData.participants);
+            setTicketOptionSummary(participantData.ticket_option_summary ?? []);
             setCustomFields(eventData.custom_fields ?? []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Fehler beim Laden');
@@ -175,6 +177,7 @@ export default function EventHostScreen() {
                     eventId={eventId!}
                     participants={participants}
                     customFields={customFields}
+                    ticketOptionSummary={ticketOptionSummary}
                 />
             </ScrollView>
         </View>
@@ -192,6 +195,7 @@ function OverviewTab({
     eventId,
     participants,
     customFields,
+    ticketOptionSummary,
 }: {
     counts: ParticipantCounts;
     maxCapacity?: number;
@@ -201,6 +205,7 @@ function OverviewTab({
     eventId: string;
     participants: Participant[];
     customFields: CustomField[];
+    ticketOptionSummary: TicketOptionSummary[];
 }) {
     const router = useRouter();
     const totalAccepted = counts.accepted;
@@ -284,6 +289,53 @@ function OverviewTab({
                             ]}
                         />
                     </View>
+                </View>
+            )}
+
+            {/* Ticket-Typ Übersicht */}
+            {ticketOptionSummary.length > 0 && (
+                <View style={[styles.sectionCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                    <Text style={[styles.sectionTitle, { color: colors.outline }]}>Ticket-Übersicht</Text>
+                    {ticketOptionSummary.map((opt, i) => (
+                        <View key={i} style={[styles.ticketRow, i < ticketOptionSummary.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant }]}>
+                            <Text style={[styles.ticketRowName, { color: colors.onSurface }]}>{opt.name}</Text>
+                            <View style={styles.ticketRowRight}>
+                                <Text style={[styles.ticketRowPrice, { color: colors.onSurfaceVariant }]}>
+                                    {opt.price === 0 ? 'Kostenlos' : `${opt.price.toFixed(2)} €`}
+                                </Text>
+                                <Text style={[styles.ticketRowCount, { color: colors.primary }]}>{opt.sold}×</Text>
+                            </View>
+                        </View>
+                    ))}
+                </View>
+            )}
+
+            {/* Käufer-Liste */}
+            {participants.filter(p => (p.ticket_count ?? 0) > 0).length > 0 && (
+                <View style={[styles.sectionCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                    <Text style={[styles.sectionTitle, { color: colors.outline }]}>Käufer</Text>
+                    {participants
+                        .filter(p => (p.ticket_count ?? 0) > 0)
+                        .sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0))
+                        .map((p, i, arr) => {
+                            const name = `${p.person.first_name}${p.person.last_name ? ` ${p.person.last_name}` : ''}`;
+                            const opts = p.ticket_options_bought ?? {};
+                            const optLines = Object.entries(opts).map(([n, c]) => `${c}× ${n}`).join(', ');
+                            return (
+                                <View key={p.participation_id} style={[styles.buyerRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant }]}>
+                                    <View style={[styles.buyerAvatar, { backgroundColor: `${colors.primary}22` }]}>
+                                        <Text style={[styles.buyerAvatarText, { color: colors.primary }]}>
+                                            {p.person.first_name[0]}{p.person.last_name?.[0] ?? ''}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.buyerInfo}>
+                                        <Text style={[styles.buyerName, { color: colors.onSurface }]}>{name}</Text>
+                                        {optLines ? <Text style={[styles.buyerOpts, { color: colors.onSurfaceVariant }]}>{optLines}</Text> : null}
+                                    </View>
+                                    <Text style={[styles.buyerCount, { color: colors.primary }]}>{p.ticket_count} Ticket{(p.ticket_count ?? 0) > 1 ? 's' : ''}</Text>
+                                </View>
+                            );
+                        })}
                 </View>
             )}
 
@@ -504,6 +556,52 @@ const styles = StyleSheet.create({
     },
     summaryButtonText: { fontSize: 15, fontWeight: '600' },
     summaryButtonArrow: { fontSize: 22, fontWeight: '600' },
+
+    sectionCard: {
+        borderRadius: 20,
+        borderWidth: 1,
+        marginBottom: 16,
+        overflow: 'hidden',
+    },
+    sectionTitle: {
+        fontSize: 11,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 10,
+    },
+    ticketRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    ticketRowName: { fontSize: 15, fontWeight: '600', flex: 1 },
+    ticketRowRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    ticketRowPrice: { fontSize: 13 },
+    ticketRowCount: { fontSize: 16, fontWeight: '700', minWidth: 32, textAlign: 'right' },
+    buyerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        gap: 12,
+    },
+    buyerAvatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    buyerAvatarText: { fontSize: 13, fontWeight: '700' },
+    buyerInfo: { flex: 1 },
+    buyerName: { fontSize: 15, fontWeight: '600' },
+    buyerOpts: { fontSize: 12, marginTop: 2 },
+    buyerCount: { fontSize: 13, fontWeight: '700' },
 });
 
 const modalStyles = StyleSheet.create({
