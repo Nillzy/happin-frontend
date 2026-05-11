@@ -176,8 +176,7 @@ export default function TicketDetailScreen() {
                 try {
                     const ticketData = await api.getUserTickets(token);
                     const matchingTickets = ticketData.tickets
-                        .filter(t => t.event_id === eventId)
-                        .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''));
+                        .filter(t => t.event_id === eventId);
                     setTickets(matchingTickets);
                 } catch {
                     // Ticket-Laden fehlgeschlagen
@@ -196,6 +195,11 @@ export default function TicketDetailScreen() {
     const renderQRCard = ({ item }: { item: UserTicket }) => (
         <View style={[styles.qrCardWrapper, { width: effectiveWidth }]}>
             <View style={[styles.qrCard, { backgroundColor: colors.surface, width: effectiveWidth - 48 }]}>
+                {item.guest_name && (
+                    <Text style={[styles.ticketName, { color: colors.onSurface }]}>
+                        {item.guest_name}
+                    </Text>
+                )}
                 <View style={[styles.qrCode, { backgroundColor: '#FFFFFF', width: effectiveWidth - 128 }]}>
                     <QRCode
                         value={item.qr_token}
@@ -277,7 +281,7 @@ export default function TicketDetailScreen() {
                         {tickets.length > 1 && (
                             <View style={styles.pagination}>
                                 <Text style={[styles.paginationText, { color: colors.onSurfaceVariant }]}>
-                                    Ticket {activeIndex + 1} von {tickets.length}
+                                    Ticket {tickets[activeIndex]?.ticket_number ?? activeIndex + 1} von {tickets.length}
                                 </Text>
                                 <View style={styles.dots}>
                                     {tickets.map((_, i) => (
@@ -491,6 +495,14 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '500',
         textAlign: 'center',
+    },
+
+    ticketName: {
+        fontSize: 18,
+        fontWeight: '700',
+        textAlign: 'center',
+        marginBottom: 20,
+        letterSpacing: -0.3,
     },
 
     // Carousel

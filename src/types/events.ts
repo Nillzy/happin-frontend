@@ -132,6 +132,7 @@ export interface UserTicket {
     ticket_id: string;
     qr_token: string;
     guest_name?: string;
+    ticket_number?: number;
     event_id: string;
     event_title: string;
     starts_at?: string;
