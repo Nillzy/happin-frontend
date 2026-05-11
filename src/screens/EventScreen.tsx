@@ -31,7 +31,7 @@ import EventCategories from '../components/event/EventCategories';
 import EventImageGallery from '../components/atoms/EventImageGallery';
 import MapView from '../components/MapView';
 import { getSession, getUserProfile } from '../services/supabase';
-import { api } from '../services/api';
+import { api, invalidateTicketsCache } from '../services/api';
 import { geocodeAddress } from '../services/geocoding';
 import { getGradientByIndex } from '../constants/gradients';
 import type { EventDetailResponse, RsvpStatus, CustomFieldResponseItem, TicketResponses } from '../types/events';
@@ -43,14 +43,6 @@ const HERO_HEIGHT = SCREEN_WIDTH * 0.75; // 3:4 aspect ratio
 
 const GRADIENT_FALLBACK = ['#D4006B', '#8B3DC8'];
 
-
-// Mock-Ticketoptionen als Fallback wenn event.ticket_options leer ist
-const MOCK_TICKET_OPTIONS = [
-    { name: 'Early Bird', price: 15.00, sort_order: 0, quantity_limit: 50 },
-    { name: 'Standard', price: 29.90, sort_order: 1, quantity_limit: 200 },
-    { name: 'VIP', price: 59.00, sort_order: 2, quantity_limit: 30, description: 'Eigener Bereich mit Lounge-Zugang, Willkommensdrink & Priority-Einlass' },
-    { name: 'Gruppenticket (4 Pers.)', price: 99.00, sort_order: 3, quantity_limit: 20 },
-];
 
 const RSVP_OPTIONS: { status: RsvpStatus; icon: string; label: string; sublabel: string }[] = [
     { status: 'Accepted', icon: '✓', label: 'Zusagen', sublabel: 'Ich bin dabei' },
@@ -69,8 +61,9 @@ function formatDateGerman(isoDate: string): string {
     }).format(d);
 }
 
-function DesktopStickyBar({ event, colors, isDark, rsvpStatus, rsvpLoading, onRsvp, onTickets }: {
+function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoading, onRsvp, onTickets }: {
     event: EventDetailResponse;
+    isFree: boolean;
     colors: any;
     isDark: boolean;
     rsvpStatus: RsvpStatus | null;
@@ -81,7 +74,34 @@ function DesktopStickyBar({ event, colors, isDark, rsvpStatus, rsvpLoading, onRs
     const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
     const bgColor = isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)';
 
-    if (event.is_free) {
+    if (event.is_host) {
+        const tickets = event.ticket_options ?? [];
+        const cheapest = tickets.length ? Math.min(...tickets.map(t => t.price)) : null;
+        const totalAvailable = tickets.reduce((sum, t) => sum + (t.quantity_limit ?? 0), 0);
+        const hasLimits = tickets.some(t => t.quantity_limit != null);
+        return (
+            <View style={[deskBarStyles.bar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
+                <View style={deskBarStyles.info}>
+                    <Text style={[deskBarStyles.price, { color: colors.onSurface }]}>
+                        {isFree ? 'Kostenlos' : cheapest != null ? `ab ${cheapest.toFixed(2)} €` : 'Kostenpflichtig'}
+                    </Text>
+                    <Text style={[deskBarStyles.hint, { color: colors.onSurfaceVariant }]}>
+                        {event.participant_count} Teilnehmer
+                        {!isFree && hasLimits ? ` · ${totalAvailable} Tickets verfügbar` : ' · Dein Event'}
+                    </Text>
+                </View>
+                <TouchableOpacity
+                    style={[deskBarStyles.btn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1, borderColor: colors.outlineVariant }]}
+                    onPress={() => {}}
+                    disabled
+                >
+                    <Text style={[deskBarStyles.btnText, { color: colors.onSurfaceVariant }]}>Veranstalter</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    if (isFree) {
         const btnBg = (event.is_public && rsvpStatus === 'Accepted') ? 'transparent' : colors.primary;
         const btnBorder = (event.is_public && rsvpStatus === 'Accepted') ? colors.outline : 'transparent';
         const btnTextColor = (event.is_public && rsvpStatus === 'Accepted') ? colors.onSurface : colors.onPrimary;
@@ -104,7 +124,8 @@ function DesktopStickyBar({ event, colors, isDark, rsvpStatus, rsvpLoading, onRs
         );
     }
 
-    const tickets = event.ticket_options?.length ? event.ticket_options : MOCK_TICKET_OPTIONS;
+
+    const tickets = event.ticket_options ?? [];
     const cheapest = Math.min(...tickets.map(t => t.price));
     return (
         <View style={[deskBarStyles.bar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
@@ -126,13 +147,13 @@ const deskBarStyles = StyleSheet.create({
         justifyContent: 'space-between',
         borderTopWidth: StyleSheet.hairlineWidth,
         paddingVertical: 16,
-        paddingHorizontal: 4,
+        paddingHorizontal: 16,
         marginTop: 24,
         borderRadius: 12,
     },
     info: { flex: 1, marginRight: 16 },
-    price: { fontSize: 18, fontWeight: '800' },
-    hint: { fontSize: 13, marginTop: 2 },
+    price: { fontSize: 18, fontWeight: '800', marginLeft: 8 },
+    hint: { fontSize: 13, marginTop: 2, marginLeft: 8 },
     btn: {
         paddingHorizontal: 28,
         paddingVertical: 14,
@@ -161,6 +182,7 @@ export default function EventScreen() {
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [selectedTicketIdx, setSelectedTicketIdx] = useState(0);
     const [ticketCount, setTicketCount] = useState(1);
+    const [checkoutLoading, setCheckoutLoading] = useState(false);
     const drawerAnim = useRef(new Animated.Value(0)).current;
 
     const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus | null>(null);
@@ -392,6 +414,30 @@ export default function EventScreen() {
         }
     };
 
+    const silentRefresh = async (purchasedOptionId?: string, purchasedCount?: number) => {
+        if (!id) return;
+        try {
+            const token = await getSession();
+            const data = await api.getEventById(id, token || undefined);
+            setRsvpStatus(data.my_rsvp_status ?? null);
+            setEvent(prev => {
+                if (!prev) return data;
+                return {
+                    ...data,
+                    ticket_options: purchasedOptionId
+                        ? data.ticket_options.map(t =>
+                            t.ticket_option_id === purchasedOptionId
+                                ? { ...t, quantity_limit: t.quantity_limit != null ? Math.max(0, t.quantity_limit - (purchasedCount ?? 0)) : null }
+                                : t
+                          )
+                        : data.ticket_options,
+                };
+            });
+        } catch {
+            // Stille Fehler ignorieren — User sieht noch die alten Daten
+        }
+    };
+
     const handleRsvp = async (newStatus: RsvpStatus, ticketCount: number = 1, names?: string[]) => {
         if (!event) return;
         const token = await getSession();
@@ -539,7 +585,7 @@ export default function EventScreen() {
 
     const handleStickyBarPress = () => {
         if (!event) return;
-        if (event.is_free) {
+        if (effectiveIsFree) {
             if (event.is_public) {
                 handleRsvpWithTicketCount(rsvpStatus === 'Accepted' ? 'Declined' : 'Accepted');
             } else {
@@ -594,6 +640,10 @@ export default function EventScreen() {
 
     const hostInitial = event.host_name?.charAt(0).toUpperCase() || 'H';
     const categories = event.category ? event.category.split(',').map(c => c.trim()) : [];
+
+    // Ein Event gilt als kostenpflichtig sobald mind. eine Ticketoption mit Preis > 0 existiert
+    const hasPaidTickets = (event.ticket_options ?? []).some(t => t.price > 0);
+    const effectiveIsFree = event.is_free && !hasPaidTickets;
 
     const isWeb = Platform.OS === 'web';
     const isDesktop = isWeb && windowWidth >= 900;
@@ -752,20 +802,29 @@ export default function EventScreen() {
                             </View>
 
                             {/* Action Buttons */}
-                            <View style={styles.actionButtons}>
-                                <TouchableOpacity
-                                    style={[glassActionBtn, rsvpStatus !== 'Accepted' && { opacity: 0.4, backgroundColor: isDark ? 'rgba(80,80,80,0.6)' : 'rgba(200,200,200,0.7)' }]}
-                                    onPress={rsvpStatus === 'Accepted' ? () => router.push(`/ticket/${id}`) : undefined}
-                                    disabled={rsvpStatus !== 'Accepted'}
-                                >
-                                    <Ionicons name="qr-code-outline" size={24} color={rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant} />
-                                    <Text style={[styles.actionButtonText, { color: rsvpStatus === 'Accepted' ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
+                            <View style={[styles.actionButtons, { marginBottom: 32 }, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
+                                {(() => {
+                                    const hasAccess = effectiveIsFree
+                                        ? rsvpStatus === 'Accepted'
+                                        : (event.ticket ?? []).length > 0;
+                                    return (
+                                        <TouchableOpacity
+                                            style={[glassActionBtn, !hasAccess && { opacity: 0.4 }]}
+                                            onPress={hasAccess ? () => router.push(`/ticket/${id}`) : undefined}
+                                            disabled={!hasAccess}
+                                        >
+                                            <Ionicons name="qr-code-outline" size={22} color={hasAccess ? colors.onSurface : colors.onSurfaceVariant} />
+                                            <Text style={[styles.actionButtonText, { color: hasAccess ? colors.onSurface : colors.onSurfaceVariant }]}>QR-Code</Text>
+                                        </TouchableOpacity>
+                                    );
+                                })()}
+                                <TouchableOpacity style={glassActionBtn} onPress={handleContact}>
+                                    <Ionicons name="mail-outline" size={22} color={colors.onSurface} />
+                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kontakt</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
                                     <Ionicons name="calendar" size={24} color={colors.onSurface} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Kalenderimport</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
                                     <Ionicons name="share-outline" size={22} color={colors.onSurface} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
@@ -838,6 +897,7 @@ export default function EventScreen() {
                             <View style={isPreview ? { opacity: 0.4 } : undefined} pointerEvents={isPreview ? 'none' : 'auto'}>
                                 <DesktopStickyBar
                                     event={event}
+                                    isFree={effectiveIsFree}
                                     colors={colors}
                                     isDark={isDark}
                                     rsvpStatus={rsvpStatus}
@@ -901,7 +961,7 @@ export default function EventScreen() {
                             {/* Action Buttons */}
                             <View style={[styles.actionButtons, { marginBottom: 32 }, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
                                 {(() => {
-                                    const hasAccess = event.is_free
+                                    const hasAccess = effectiveIsFree
                                         ? rsvpStatus === 'Accepted'
                                         : (event.ticket ?? []).length > 0;
                                     return (
@@ -999,7 +1059,36 @@ export default function EventScreen() {
 
             {/* Sticky Bottom Bar — mobile only */}
             {!isDesktop && (() => {
-                if (event.is_free) {
+                if (event.is_host) {
+                    const tickets = event.ticket_options ?? [];
+                    const cheapest = tickets.length ? Math.min(...tickets.map(t => t.price)) : null;
+                    const totalAvailable = tickets.reduce((sum, t) => sum + (t.quantity_limit ?? 0), 0);
+                    const hasLimits = tickets.some(t => t.quantity_limit != null);
+                    return (
+                        <View style={[
+                            styles.stickyBar,
+                            { borderTopColor: colors.outlineVariant },
+                            isWeb
+                                ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
+                                : { backgroundColor: colors.surface },
+                        ]}>
+                            <View style={styles.stickyBarInfo}>
+                                <Text style={[styles.stickyBarPrice, { color: colors.onSurface }]}>
+                                    {effectiveIsFree ? 'Kostenlos' : cheapest != null ? `ab ${cheapest.toFixed(2)} €` : 'Kostenpflichtig'}
+                                </Text>
+                                <Text style={[styles.stickyBarHint, { color: colors.onSurfaceVariant }]}>
+                                    {event.participant_count} Teilnehmer
+                                    {!effectiveIsFree && hasLimits ? ` · ${totalAvailable} Tickets verfügbar` : ' · Dein Event'}
+                                </Text>
+                            </View>
+                            <View style={[styles.stickyBarButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1, borderColor: colors.outlineVariant }]}>
+                                <Text style={[styles.stickyBarButtonText, { color: colors.onSurfaceVariant }]}>Veranstalter</Text>
+                            </View>
+                        </View>
+                    );
+                }
+
+                if (effectiveIsFree) {
                     const statusHint = rsvpStatus === 'Accepted' ? 'Du hast zugesagt'
                         : rsvpStatus === 'Declined' ? 'Du hast abgesagt'
                         : rsvpStatus === 'Pending' ? 'Noch unsicher'
@@ -1047,7 +1136,7 @@ export default function EventScreen() {
                     );
                 }
 
-                const tickets = event.ticket_options?.length ? event.ticket_options : MOCK_TICKET_OPTIONS;
+                const tickets = event.ticket_options ?? [];
                 const cheapest = Math.min(...tickets.map(t => t.price));
                 return (
                     <View style={[
@@ -1080,9 +1169,7 @@ export default function EventScreen() {
 
             {/* Ticket-Drawer Bottom Sheet */}
             {drawerOpen && event && (() => {
-                const tickets = event.ticket_options?.length
-                    ? event.ticket_options
-                    : MOCK_TICKET_OPTIONS;
+                const tickets = event.ticket_options ?? [];
                 const selected = tickets[selectedTicketIdx];
                 const total = (selected?.price ?? 0) * ticketCount;
 
@@ -1231,16 +1318,36 @@ export default function EventScreen() {
                                     </Text>
                                 </View>
                                 <TouchableOpacity
-                                    style={[styles.checkoutButton, { backgroundColor: colors.primary }]}
-                                    onPress={() => {
-                                        // TODO: Checkout-Logik implementieren
-                                        console.log('Checkout:', { ticket: selected?.name, count: ticketCount, total });
-                                        closeDrawer();
+                                    style={[styles.checkoutButton, { backgroundColor: colors.primary }, checkoutLoading && { opacity: 0.6 }]}
+                                    disabled={checkoutLoading || !selected}
+                                    onPress={async () => {
+                                        if (!selected) return;
+                                        setCheckoutLoading(true);
+                                        const purchasedOptionId = selected.ticket_option_id;
+                                        const purchasedCount = ticketCount;
+                                        try {
+                                            const token = await getSession();
+                                            if (!token) { Alert.alert('Fehler', 'Bitte melde dich an.'); return; }
+                                            await api.createTickets(
+                                                event.event_id,
+                                                purchasedOptionId ?? null,
+                                                purchasedCount,
+                                                token
+                                            );
+                                            invalidateTicketsCache();
+                                            api.invalidateCaches(event.event_id);
+                                            closeDrawer();
+                                            await silentRefresh(purchasedOptionId, purchasedCount);
+                                        } catch (err: any) {
+                                            Alert.alert('Fehler', err?.message ?? 'Ticket konnte nicht gebucht werden.');
+                                        } finally {
+                                            setCheckoutLoading(false);
+                                        }
                                     }}
                                 >
                                     <Ionicons name="cart-outline" size={20} color={colors.onPrimary} style={{ marginRight: 8 }} />
                                     <Text style={[styles.checkoutButtonText, { color: colors.onPrimary }]}>
-                                        {total === 0 ? 'Kostenlos buchen' : 'Zur Kasse'}
+                                        {checkoutLoading ? 'Wird gebucht…' : total === 0 ? 'Kostenlos buchen' : 'Zur Kasse'}
                                     </Text>
                                 </TouchableOpacity>
                             </View>

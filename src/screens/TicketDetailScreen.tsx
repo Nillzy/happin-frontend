@@ -14,6 +14,7 @@ import {
     Platform,
     Alert,
     Linking,
+    useWindowDimensions,
 } from 'react-native';
 import type { ViewToken } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
@@ -25,6 +26,7 @@ import type { EventDetailResponse, UserTicket } from '../types/events';
 import QRCode from 'react-native-qrcode-svg';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MAX_SHEET_WIDTH = 480;
 const DISMISS_THRESHOLD = 80;
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.8;
 
@@ -43,6 +45,8 @@ export default function TicketDetailScreen() {
     const { colors } = useTheme();
     const router = useRouter();
     const { eventId } = useLocalSearchParams<{ eventId: string }>();
+    const { width: windowWidth } = useWindowDimensions();
+    const effectiveWidth = Math.min(windowWidth, MAX_SHEET_WIDTH);
 
     const [event, setEvent] = useState<EventDetailResponse | null>(null);
     const [tickets, setTickets] = useState<UserTicket[]>([]);
@@ -146,9 +150,9 @@ export default function TicketDetailScreen() {
 
     const handleScrollEnd = useCallback((e: any) => {
         const offset = e.nativeEvent.contentOffset.x;
-        const index = Math.round(offset / SCREEN_WIDTH);
+        const index = Math.round(offset / effectiveWidth);
         setActiveIndex(index);
-    }, []);
+    }, [effectiveWidth]);
 
     useEffect(() => {
         const loadData = async () => {
@@ -190,12 +194,12 @@ export default function TicketDetailScreen() {
     }, [eventId, router]);
 
     const renderQRCard = ({ item }: { item: UserTicket }) => (
-        <View style={styles.qrCardWrapper}>
-            <View style={[styles.qrCard, { backgroundColor: colors.surface }]}>
-                <View style={[styles.qrCode, { backgroundColor: '#FFFFFF' }]}>
+        <View style={[styles.qrCardWrapper, { width: effectiveWidth }]}>
+            <View style={[styles.qrCard, { backgroundColor: colors.surface, width: effectiveWidth - 48 }]}>
+                <View style={[styles.qrCode, { backgroundColor: '#FFFFFF', width: effectiveWidth - 128 }]}>
                     <QRCode
                         value={item.qr_token}
-                        size={SCREEN_WIDTH - 176}
+                        size={effectiveWidth - 176}
                         backgroundColor="#FFFFFF"
                     />
                 </View>
@@ -250,7 +254,7 @@ export default function TicketDetailScreen() {
 
                 {/* QR Cards — Swipeable */}
                 {tickets.length > 0 ? (
-                    <View style={styles.carouselContainer}>
+                    <View style={[styles.carouselContainer, { alignItems: 'center' }]}>
                         <FlatList
                             data={tickets}
                             renderItem={renderQRCard}
@@ -261,9 +265,10 @@ export default function TicketDetailScreen() {
                             onMomentumScrollEnd={handleScrollEnd}
                             onViewableItemsChanged={onViewableItemsChanged}
                             viewabilityConfig={viewabilityConfig}
+                            style={{ width: effectiveWidth }}
                             getItemLayout={(_, index) => ({
-                                length: SCREEN_WIDTH,
-                                offset: SCREEN_WIDTH * index,
+                                length: effectiveWidth,
+                                offset: effectiveWidth * index,
                                 index,
                             })}
                         />
@@ -385,7 +390,17 @@ export default function TicketDetailScreen() {
             <Animated.View
                 style={[
                     styles.sheet,
-                    { backgroundColor: colors.background, transform: [{ translateY }] },
+                    {
+                        backgroundColor: colors.background,
+                        transform: [{ translateY }],
+                        ...(Platform.OS === 'web' && windowWidth > MAX_SHEET_WIDTH ? {
+                            left: '50%',
+                            right: 'auto',
+                            width: MAX_SHEET_WIDTH,
+                            transform: [{ translateX: '-50%' as any }, { translateY }],
+                            borderRadius: 24,
+                        } : {}),
+                    },
                 ]}
             >
                 {/* Drag Handle — larger touch target, always works */}
