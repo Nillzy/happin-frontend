@@ -5,39 +5,61 @@ import {
     ScrollView,
     TouchableOpacity,
     StyleSheet,
-    ActivityIndicator,
-    Alert,
     Platform,
     Share,
-    Linking,
     Modal,
     Pressable,
+    Image,
+    useWindowDimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import Navbar from '../components/atoms/Navbar';
+import { Ionicons } from '@expo/vector-icons';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
+import { getGradientByIndex } from '../constants/gradients';
+import { SkeletonBox } from '../components/atoms/SkeletonBox';
 import type { EventDetailResponse, CustomField } from '../types/events';
 import type { Participant, ParticipantCounts, TicketOptionSummary } from '../types/host';
 
-const copyToClipboard = async (text: string): Promise<boolean> => {
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-        try {
-            await navigator.clipboard.writeText(text);
-            return true;
-        } catch {
-            return false;
-        }
-    }
-    // Fallback for native - would need expo-clipboard for full support
-    return false;
-};
+// ── QR Code SVG Icon ─────────────────────────────────────────────────────────
+
+function QrCodeIcon({ size = 28, color = '#fff' }: { size?: number; color?: string }) {
+    const s = size;
+    const u = s / 7; // unit = 1 cell out of 7
+    return (
+        <View style={{ width: s, height: s }}>
+            {/* Top-left finder pattern */}
+            <View style={{ position: 'absolute', left: 0, top: 0, width: u * 3, height: u * 3, borderWidth: u * 0.5, borderColor: color, borderRadius: u * 0.4 }} />
+            <View style={{ position: 'absolute', left: u, top: u, width: u, height: u, backgroundColor: color, borderRadius: u * 0.2 }} />
+            {/* Top-right finder pattern */}
+            <View style={{ position: 'absolute', right: 0, top: 0, width: u * 3, height: u * 3, borderWidth: u * 0.5, borderColor: color, borderRadius: u * 0.4 }} />
+            <View style={{ position: 'absolute', right: u, top: u, width: u, height: u, backgroundColor: color, borderRadius: u * 0.2 }} />
+            {/* Bottom-left finder pattern */}
+            <View style={{ position: 'absolute', left: 0, bottom: 0, width: u * 3, height: u * 3, borderWidth: u * 0.5, borderColor: color, borderRadius: u * 0.4 }} />
+            <View style={{ position: 'absolute', left: u, bottom: u, width: u, height: u, backgroundColor: color, borderRadius: u * 0.2 }} />
+            {/* Data dots (simplified) */}
+            <View style={{ position: 'absolute', right: u * 0.5, top: u * 3.5, width: u * 0.8, height: u * 0.8, backgroundColor: color, borderRadius: u * 0.15 }} />
+            <View style={{ position: 'absolute', right: u * 1.8, top: u * 3.5, width: u * 0.8, height: u * 0.8, backgroundColor: color, borderRadius: u * 0.15 }} />
+            <View style={{ position: 'absolute', right: u * 0.5, top: u * 4.7, width: u * 0.8, height: u * 0.8, backgroundColor: color, borderRadius: u * 0.15 }} />
+            <View style={{ position: 'absolute', right: u * 1.8, top: u * 5.6, width: u * 0.8, height: u * 0.8, backgroundColor: color, borderRadius: u * 0.15 }} />
+            <View style={{ position: 'absolute', left: u * 3.5, top: u * 3.5, width: u * 0.8, height: u * 0.8, backgroundColor: color, borderRadius: u * 0.15 }} />
+            <View style={{ position: 'absolute', left: u * 4.7, top: u * 4.7, width: u * 0.8, height: u * 0.8, backgroundColor: color, borderRadius: u * 0.15 }} />
+            <View style={{ position: 'absolute', left: u * 3.5, top: u * 5.6, width: u * 0.8, height: u * 0.8, backgroundColor: color, borderRadius: u * 0.15 }} />
+        </View>
+    );
+}
+
+// ── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function EventHostScreen() {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
     const router = useRouter();
     const { eventId } = useLocalSearchParams<{ eventId: string }>();
+    const { width: windowWidth } = useWindowDimensions();
+    const isWeb = Platform.OS === 'web';
+    const isDesktop = isWeb && windowWidth >= 768;
 
     const [event, setEvent] = useState<EventDetailResponse | null>(null);
     const [counts, setCounts] = useState<ParticipantCounts>({ accepted: 0, declined: 0, pending: 0 });
@@ -82,29 +104,6 @@ export default function EventHostScreen() {
         }
     };
 
-    const copyInvitationLink = async () => {
-        if (!event?.event_id) return;
-        const fullLink = `https://happin.fun/event/${event.event_id}`;
-        const success = await copyToClipboard(fullLink);
-        if (success) {
-            Alert.alert('Kopiert', 'Einladungslink wurde in die Zwischenablage kopiert.');
-        } else {
-            Alert.alert('Link', fullLink);
-        }
-    };
-
-    const shareInvitationLink = async () => {
-        if (!event?.event_id) return;
-        const fullLink = `https://happin.fun/event/${event.event_id}`;
-        try {
-            await Share.share({
-                message: `Komm zu ${event.title}!\n${fullLink}`,
-            });
-        } catch {
-            // User cancelled
-        }
-    };
-
     const formatDate = (isoDate: string) => {
         const d = new Date(isoDate);
         return new Intl.DateTimeFormat('de-DE', {
@@ -117,13 +116,52 @@ export default function EventHostScreen() {
         }).format(d) + ' Uhr';
     };
 
+    const handleBack = () => {
+        if (router.canGoBack()) {
+            router.back();
+        } else {
+            router.push('/');
+        }
+    };
+
+    const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+    const bgColor = isDark ? 'rgba(18,19,26,0.92)' : 'rgba(255,255,255,0.92)';
+
     if (loading) {
         return (
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                <Navbar showBack />
-                <View style={styles.centered}>
-                    <ActivityIndicator size="large" color={colors.primary} />
-                </View>
+                <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+                    <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+                </TouchableOpacity>
+                {isDesktop ? (
+                    <View style={styles.desktopLayout}>
+                        {/* Left: hero placeholder */}
+                        <View style={[styles.desktopLeft, { backgroundColor: colors.surfaceContainer, borderRightColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)' }]}>
+                            <SkeletonBox height={'100%' as any} borderRadius={0} />
+                        </View>
+                        {/* Right: content placeholders */}
+                        <View style={[styles.desktopRight, { padding: 24, gap: 16 }]}>
+                            <SkeletonBox height={120} borderRadius={20} />
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                {Array.from({ length: 3 }).map((_, i) => <SkeletonBox key={i} height={72} borderRadius={12} style={{ flex: 1 }} />)}
+                            </View>
+                            <SkeletonBox height={80} borderRadius={16} />
+                            <SkeletonBox height={60} borderRadius={16} />
+                        </View>
+                    </View>
+                ) : (
+                    <ScrollView contentContainerStyle={{ paddingBottom: 110 }}>
+                        {/* Hero placeholder */}
+                        <SkeletonBox height={300} borderRadius={0} style={{ marginBottom: 16 }} />
+                        <View style={{ paddingHorizontal: 16, gap: 12 }}>
+                            <SkeletonBox height={120} borderRadius={20} />
+                            <SkeletonBox height={60} borderRadius={20} />
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                {Array.from({ length: 3 }).map((_, i) => <SkeletonBox key={i} height={72} borderRadius={12} style={{ flex: 1 }} />)}
+                            </View>
+                        </View>
+                    </ScrollView>
+                )}
             </View>
         );
     }
@@ -131,7 +169,9 @@ export default function EventHostScreen() {
     if (error || !event) {
         return (
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                <Navbar showBack />
+                <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+                    <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+                </TouchableOpacity>
                 <View style={styles.centered}>
                     <Text style={[styles.errorText, { color: colors.error }]}>
                         {error || 'Event nicht gefunden'}
@@ -144,77 +184,338 @@ export default function EventHostScreen() {
         );
     }
 
+    const handleShare = async () => {
+        const link = `https://happin.fun/event/${eventId}`;
+        const formattedDate = event ? new Intl.DateTimeFormat('de-DE', {
+            day: 'numeric', month: 'long', year: 'numeric',
+        }).format(new Date(event.starts_at)) : '';
+        const shareMessage = event
+            ? `Hey, hast du schon von meinem Event gehört? 🎉\n\n"${event.title}" findet am ${formattedDate} statt – ich würde mich freuen, dich dort zu sehen!\n\n${link}`
+            : link;
+        try {
+            await Share.share({ message: shareMessage });
+        } catch {
+            // cancelled
+        }
+    };
+
+    const scanButton = (
+        <TouchableOpacity
+            style={[styles.scanButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.push(`/event/${eventId}/scan`)}
+            activeOpacity={0.85}
+        >
+            <Text style={[styles.scanButtonText, { color: colors.onPrimary }]}>Tickets scannen</Text>
+            <QrCodeIcon size={26} color={colors.onPrimary} />
+        </TouchableOpacity>
+    );
+
     return (
         <View style={[styles.root, { backgroundColor: colors.background }]}>
-            <Navbar showBack />
+            {/* Back button – always top-left */}
+            <TouchableOpacity
+                style={[
+                    styles.backButton,
+                    { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' },
+                ]}
+                onPress={handleBack}
+            >
+                <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+            </TouchableOpacity>
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-                {/* Event Header */}
-                <View style={[styles.headerCard, { backgroundColor: colors.surfaceContainer, borderColor: `${colors.primary}25` }]}>
-                    <Text style={[styles.headerLabel, { color: colors.outline }]}>Dein Event</Text>
-                    <Text style={[styles.headerTitle, { color: colors.onSurface }]}>{event.title}</Text>
-                    <Text style={[styles.headerDate, { color: colors.onSurfaceVariant }]}>
-                        {formatDate(event.starts_at)}
-                    </Text>
+            {isDesktop ? (
+                // ── Desktop layout ───────────────────────────────────────────
+                // Left panel: sticky event hero. Right panel: scrollable content + sticky scan bar.
+                <View style={styles.desktopLayout}>
+                    {/* Left: sticky hero panel */}
+                    <View style={[styles.desktopLeft, { backgroundColor: colors.surfaceContainer, borderRightColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)' }]}>
+                        <DesktopHeroPanel
+                            event={event}
+                            formatDate={formatDate}
+                            colors={colors}
+                        />
+                    </View>
 
-                    {/* Button zur Gast-Ansicht */}
-                    <TouchableOpacity
-                        style={[styles.guestViewButton, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}
-                        onPress={() => router.push(`/event/${eventId}`)}
-                    >
-                        <Text style={[styles.guestViewButtonText, { color: colors.onSurface }]}>
-                            Zur Gast-Ansicht
-                        </Text>
-                    </TouchableOpacity>
+                    {/* Right: scrollable content + sticky scan button at bottom */}
+                    <View style={styles.desktopRight}>
+                        <ScrollView
+                            style={styles.desktopScroll}
+                            contentContainerStyle={styles.desktopScrollContent}
+                        >
+                            <OverviewContent
+                                counts={counts}
+                                maxCapacity={event.max_capacity}
+                                colors={colors}
+                                isDark={isDark}
+                                isWeb={isWeb}
+                                eventId={eventId!}
+                                participants={participants}
+                                customFields={customFields}
+                                ticketOptionSummary={ticketOptionSummary}
+                                isDesktop
+                                onShare={handleShare}
+                            />
+                        </ScrollView>
+                        <View style={[styles.desktopStickyBar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
+                            {scanButton}
+                        </View>
+                    </View>
                 </View>
-
-                <OverviewTab
-                    counts={counts}
-                    maxCapacity={event.max_capacity}
-                    onCopyLink={copyInvitationLink}
-                    onShareLink={shareInvitationLink}
-                    colors={colors}
-                    eventId={eventId!}
-                    participants={participants}
-                    customFields={customFields}
-                    ticketOptionSummary={ticketOptionSummary}
-                />
-            </ScrollView>
+            ) : (
+                // ── Mobile layout ────────────────────────────────────────────
+                <>
+                    <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+                        <HeaderCard
+                            event={event}
+                            formatDate={formatDate}
+                        />
+                        <OverviewContent
+                            counts={counts}
+                            maxCapacity={event.max_capacity}
+                            colors={colors}
+                            isDark={isDark}
+                            isWeb={isWeb}
+                            eventId={eventId!}
+                            participants={participants}
+                            customFields={customFields}
+                            ticketOptionSummary={ticketOptionSummary}
+                            onShare={handleShare}
+                        />
+                    </ScrollView>
+                    {/* Mobile sticky bottom bar */}
+                    <View
+                        style={[
+                            styles.mobileStickyBar,
+                            {
+                                borderTopColor: colors.outlineVariant,
+                                backgroundColor: colors.surface,
+                            },
+                        ]}
+                    >
+                        {scanButton}
+                    </View>
+                </>
+            )}
         </View>
     );
 }
 
-// ── Overview Tab Component ──────────────────────────────────────────────────
+// ── Desktop Hero Panel (left sticky column) ───────────────────────────────────
 
-function OverviewTab({
+function DesktopHeroPanel({
+    event,
+    formatDate,
+    colors,
+}: {
+    event: EventDetailResponse;
+    formatDate: (d: string) => string;
+    colors: ReturnType<typeof useTheme>['colors'];
+}) {
+    const locationText = event.location
+        ? [event.location.street, event.location.house_number, event.location.city]
+              .filter(Boolean).join(' ') || event.location.city || null
+        : null;
+
+    const textOverlay = (
+        <View style={heroStyles.overlay}>
+            <Text style={heroStyles.overlayLabel}>Dein Event</Text>
+            <Text style={heroStyles.overlayTitle}>{event.title}</Text>
+            <Text style={heroStyles.overlayDate}>{formatDate(event.starts_at)}</Text>
+            {locationText && (
+                <View style={heroStyles.overlayLocation}>
+                    <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.7)" />
+                    <Text style={heroStyles.overlayLocationText} numberOfLines={1}>{locationText}</Text>
+                </View>
+            )}
+        </View>
+    );
+
+    return (
+        <View style={heroStyles.root}>
+            {event.image_url ? (
+                <>
+                    <Image source={{ uri: event.image_url }} style={heroStyles.image} resizeMode="cover" />
+                    <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.80)']}
+                        style={heroStyles.gradient}
+                    />
+                </>
+            ) : (
+                <>
+                    <LinearGradient
+                        colors={getGradientByIndex(event.gradient_id ?? 0)}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={heroStyles.image}
+                    />
+                    <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.65)']}
+                        style={heroStyles.gradient}
+                    />
+                </>
+            )}
+            {textOverlay}
+        </View>
+    );
+}
+
+const heroStyles = StyleSheet.create({
+    root: { flex: 1, position: 'relative', overflow: 'hidden' },
+    image: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+    gradient: { ...StyleSheet.absoluteFillObject },
+    overlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 24,
+        paddingBottom: 28,
+    },
+    overlayLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+        color: 'rgba(255,255,255,0.65)',
+        marginBottom: 6,
+    },
+    overlayTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        letterSpacing: -0.4,
+        color: '#fff',
+        lineHeight: 30,
+        marginBottom: 6,
+    },
+    overlayDate: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.78)',
+        lineHeight: 20,
+    },
+    overlayLocation: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 4,
+    },
+    overlayLocationText: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.65)',
+        flex: 1,
+    },
+});
+
+// ── Mobile Hero Header ────────────────────────────────────────────────────────
+
+function HeaderCard({
+    event,
+    formatDate,
+}: {
+    event: EventDetailResponse;
+    formatDate: (d: string) => string;
+}) {
+    return (
+        <View style={mobileHeroStyles.root}>
+            <View style={mobileHeroStyles.imageWrapper}>
+                {event.image_url ? (
+                    <Image
+                        source={{ uri: event.image_url }}
+                        style={mobileHeroStyles.image}
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <LinearGradient
+                        colors={getGradientByIndex(event.gradient_id ?? 0)}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={mobileHeroStyles.image}
+                    />
+                )}
+                <LinearGradient
+                    colors={['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.72)']}
+                    locations={[0.35, 1]}
+                    style={mobileHeroStyles.gradient}
+                />
+                <View style={mobileHeroStyles.overlay}>
+                    <Text style={mobileHeroStyles.overlayLabel}>Dein Event</Text>
+                    <Text style={mobileHeroStyles.overlayTitle} numberOfLines={3}>{event.title}</Text>
+                    <Text style={mobileHeroStyles.overlayDate}>{formatDate(event.starts_at)}</Text>
+                </View>
+            </View>
+        </View>
+    );
+}
+
+const mobileHeroStyles = StyleSheet.create({
+    root: { marginBottom: 16 },
+    imageWrapper: {
+        width: '100%',
+        aspectRatio: 4 / 3,
+        overflow: 'hidden',
+    },
+    image: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+    gradient: { ...StyleSheet.absoluteFillObject },
+    overlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 20,
+        paddingBottom: 24,
+    },
+    overlayLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+        color: 'rgba(255,255,255,0.7)',
+        marginBottom: 4,
+    },
+    overlayTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+        letterSpacing: -0.4,
+        color: '#fff',
+        lineHeight: 28,
+    },
+    overlayDate: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.75)',
+        marginTop: 6,
+    },
+});
+
+// ── Overview Content ──────────────────────────────────────────────────────────
+
+function OverviewContent({
     counts,
     maxCapacity,
-    onCopyLink,
-    onShareLink,
     colors,
+    isDark,
+    isWeb,
     eventId,
     participants,
     customFields,
     ticketOptionSummary,
+    isDesktop = false,
+    onShare,
 }: {
     counts: ParticipantCounts;
     maxCapacity?: number;
-    onCopyLink: () => void;
-    onShareLink: () => void;
     colors: ReturnType<typeof useTheme>['colors'];
+    isDark: boolean;
+    isWeb: boolean;
     eventId: string;
     participants: Participant[];
     customFields: CustomField[];
     ticketOptionSummary: TicketOptionSummary[];
+    isDesktop?: boolean;
+    onShare?: () => void;
 }) {
     const router = useRouter();
     const totalAccepted = counts.accepted;
     const capacityPercent = maxCapacity ? Math.round((totalAccepted / maxCapacity) * 100) : 0;
     const [summaryOpen, setSummaryOpen] = useState(false);
-
-    const handleStatusClick = (status: 'accepted' | 'declined' | 'pending') => {
-        router.push(`/event/${eventId}/guests?status=${status}`);
-    };
 
     const fieldSummaries = customFields.map(field => {
         const valueCounts: Record<string, number> = {};
@@ -236,39 +537,123 @@ function OverviewTab({
         return { field, valueCounts, total };
     }).filter(s => Object.keys(s.valueCounts).length > 0);
 
+    const totalGuests = counts.accepted + counts.declined + counts.pending;
+
     return (
-        <View style={styles.tabContent}>
-            {/* Stats Cards */}
-            <View style={styles.statsRow}>
+        <View style={[styles.tabContent, isDesktop && styles.tabContentDesktop]}>
+            {/* Gast-Statistiken Kachel */}
+            <TouchableOpacity
+                style={[
+                    styles.guestStatsTile,
+                    { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant },
+                    isDesktop && styles.guestStatsTileDesktop,
+                ]}
+                onPress={() => router.push(`/event/${eventId}/guests`)}
+                activeOpacity={0.7}
+            >
+                <View style={styles.guestStatsTileHeader}>
+                    <View>
+                        <Text style={[styles.guestStatsTileLabel, { color: colors.outline }]}>Gast-Statistiken</Text>
+                        <Text style={[styles.guestStatsTileTotal, { color: colors.onSurface }]}>
+                            {totalGuests} {totalGuests === 1 ? 'Gast' : 'Gäste'} insgesamt
+                        </Text>
+                    </View>
+                    <View style={[styles.guestStatsTileChevron, { backgroundColor: colors.surfaceContainerHigh }]}>
+                        <Ionicons name="chevron-forward" size={18} color={colors.onSurfaceVariant} />
+                    </View>
+                </View>
+                <View style={styles.guestStatsMiniRow}>
+                    <View style={styles.guestStatsMiniItem}>
+                        <Text style={[styles.guestStatsMiniNum, isDesktop && styles.guestStatsMiniNumDesktop, { color: colors.tertiary }]}>{counts.accepted}</Text>
+                        <Text style={[styles.guestStatsMiniLabel, { color: colors.outline }]}>Zusagen</Text>
+                    </View>
+                    <View style={[styles.guestStatsDivider, { backgroundColor: colors.outlineVariant }]} />
+                    <View style={styles.guestStatsMiniItem}>
+                        <Text style={[styles.guestStatsMiniNum, isDesktop && styles.guestStatsMiniNumDesktop, { color: colors.error }]}>{counts.declined}</Text>
+                        <Text style={[styles.guestStatsMiniLabel, { color: colors.outline }]}>Absagen</Text>
+                    </View>
+                    <View style={[styles.guestStatsDivider, { backgroundColor: colors.outlineVariant }]} />
+                    <View style={styles.guestStatsMiniItem}>
+                        <Text style={[styles.guestStatsMiniNum, isDesktop && styles.guestStatsMiniNumDesktop, { color: colors.secondary }]}>{counts.pending}</Text>
+                        <Text style={[styles.guestStatsMiniLabel, { color: colors.outline }]}>Unsicher</Text>
+                    </View>
+                </View>
+            </TouchableOpacity>
+
+            {/* Gast-Antworten Placeholder Kachel */}
+            <View
+                style={[
+                    styles.guestStatsTile,
+                    { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, opacity: 0.6 },
+                    isDesktop && styles.guestStatsTileDesktop,
+                ]}
+            >
+                <View style={styles.guestStatsTileHeader}>
+                    <View>
+                        <Text style={[styles.guestStatsTileLabel, { color: colors.outline }]}>Gast-Antworten</Text>
+                        <Text style={[styles.guestStatsTileTotal, { color: colors.onSurface }]}>Kommt bald</Text>
+                    </View>
+                    <View style={[styles.guestStatsTileChevron, { backgroundColor: colors.surfaceContainerHigh }]}>
+                        <Ionicons name="chevron-forward" size={18} color={colors.onSurfaceVariant} />
+                    </View>
+                </View>
+                <Text style={[styles.guestAnswersHint, { color: colors.outline }]}>
+                    Hier werden bald die Antworten deiner Gäste auf Custom Fields angezeigt.
+                </Text>
+            </View>
+
+            {/* Action tiles: Gast-Ansicht, Teilen, Event bearbeiten */}
+            <View style={[styles.actionButtons, { marginBottom: 16 }]}>
                 <TouchableOpacity
                     style={[
-                        styles.statCard,
-                        { backgroundColor: colors.surfaceContainer, borderColor: `${colors.tertiary}33` },
+                        styles.actionButton,
+                        {
+                            borderWidth: 1,
+                            borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+                        },
+                        isWeb
+                            ? { backgroundColor: isDark ? 'rgba(30,31,38,0.6)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any
+                            : { backgroundColor: isDark ? 'rgba(30,31,38,0.85)' : 'rgba(255,255,255,0.85)' },
                     ]}
-                    onPress={() => handleStatusClick('accepted')}
+                    onPress={() => router.push(`/event/${eventId}`)}
+                    activeOpacity={0.75}
                 >
-                    <Text style={[styles.statNumber, { color: colors.tertiary }]}>{counts.accepted}</Text>
-                    <Text style={[styles.statLabel, { color: colors.outline }]}>Zusagen</Text>
+                    <Ionicons name="eye-outline" size={22} color={colors.onSurface} />
+                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Gast-Ansicht</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={[
-                        styles.statCard,
-                        { backgroundColor: colors.surfaceContainer, borderColor: `${colors.error}33` },
+                        styles.actionButton,
+                        {
+                            borderWidth: 1,
+                            borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+                        },
+                        isWeb
+                            ? { backgroundColor: isDark ? 'rgba(30,31,38,0.6)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any
+                            : { backgroundColor: isDark ? 'rgba(30,31,38,0.85)' : 'rgba(255,255,255,0.85)' },
                     ]}
-                    onPress={() => handleStatusClick('declined')}
+                    onPress={onShare}
+                    activeOpacity={0.75}
                 >
-                    <Text style={[styles.statNumber, { color: colors.error }]}>{counts.declined}</Text>
-                    <Text style={[styles.statLabel, { color: colors.outline }]}>Absagen</Text>
+                    <Ionicons name="share-outline" size={22} color={colors.onSurface} />
+                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={[
-                        styles.statCard,
-                        { backgroundColor: colors.surfaceContainer, borderColor: `${colors.secondary}33` },
+                        styles.actionButton,
+                        {
+                            borderWidth: 1,
+                            borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+                        },
+                        isWeb
+                            ? { backgroundColor: isDark ? 'rgba(30,31,38,0.6)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any
+                            : { backgroundColor: isDark ? 'rgba(30,31,38,0.85)' : 'rgba(255,255,255,0.85)' },
                     ]}
-                    onPress={() => handleStatusClick('pending')}
+                    onPress={() => router.push(`/event/${eventId}/edit`)}
+                    activeOpacity={0.75}
                 >
-                    <Text style={[styles.statNumber, { color: colors.secondary }]}>{counts.pending}</Text>
-                    <Text style={[styles.statLabel, { color: colors.outline }]}>Unsicher</Text>
+                    <Ionicons name="pencil-outline" size={22} color={colors.onSurface} />
+                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Bearbeiten</Text>
                 </TouchableOpacity>
             </View>
 
@@ -289,6 +674,12 @@ function OverviewTab({
                             ]}
                         />
                     </View>
+                    {isDesktop && (
+                        <Text style={[styles.capacityHint, { color: colors.onSurfaceVariant }]}>
+                            {Math.min(capacityPercent, 100)}% ausgelastet
+                            {maxCapacity - totalAccepted > 0 ? ` · noch ${maxCapacity - totalAccepted} Plätze frei` : ' · ausgebucht'}
+                        </Text>
+                    )}
                 </View>
             )}
 
@@ -310,83 +701,15 @@ function OverviewTab({
                 </View>
             )}
 
-            {/* Käufer-Liste */}
-            {participants.filter(p => (p.ticket_count ?? 0) > 0).length > 0 && (
-                <View style={[styles.sectionCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-                    <Text style={[styles.sectionTitle, { color: colors.outline }]}>Käufer</Text>
-                    {participants
-                        .filter(p => (p.ticket_count ?? 0) > 0)
-                        .sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0))
-                        .map((p, i, arr) => {
-                            const name = `${p.person.first_name}${p.person.last_name ? ` ${p.person.last_name}` : ''}`;
-                            const opts = p.ticket_options_bought ?? {};
-                            const optLines = Object.entries(opts).map(([n, c]) => `${c}× ${n}`).join(', ');
-                            return (
-                                <View key={p.participation_id} style={[styles.buyerRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant }]}>
-                                    <View style={[styles.buyerAvatar, { backgroundColor: `${colors.primary}22` }]}>
-                                        <Text style={[styles.buyerAvatarText, { color: colors.primary }]}>
-                                            {p.person.first_name[0]}{p.person.last_name?.[0] ?? ''}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.buyerInfo}>
-                                        <Text style={[styles.buyerName, { color: colors.onSurface }]}>{name}</Text>
-                                        {optLines ? <Text style={[styles.buyerOpts, { color: colors.onSurfaceVariant }]}>{optLines}</Text> : null}
-                                    </View>
-                                    <Text style={[styles.buyerCount, { color: colors.primary }]}>{p.ticket_count} Ticket{(p.ticket_count ?? 0) > 1 ? 's' : ''}</Text>
-                                </View>
-                            );
-                        })}
-                </View>
-            )}
-
-            {/* Summary Button */}
+            {/* Antworten-Übersicht Button */}
             {customFields.length > 0 && (
                 <TouchableOpacity
                     style={[styles.summaryButton, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
                     onPress={() => setSummaryOpen(true)}
                 >
                     <Text style={[styles.summaryButtonText, { color: colors.onSurface }]}>Antworten-Übersicht</Text>
-                    <Text style={[styles.summaryButtonArrow, { color: colors.outline }]}>›</Text>
+                    <Ionicons name="chevron-forward" size={18} color={colors.outline} />
                 </TouchableOpacity>
-            )}
-
-            {/* Scan Button */}
-            <TouchableOpacity
-                style={[styles.scanButton, { backgroundColor: colors.primary }]}
-                onPress={() => router.push(`/event/${eventId}/scan`)}
-            >
-                <Text style={[styles.scanButtonText, { color: colors.onPrimary }]}>
-                    Tickets scannen
-                </Text>
-            </TouchableOpacity>
-
-            {/* Invitation Link */}
-            {eventId && (
-                <View style={[styles.linkCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-                    <Text style={[styles.linkLabel, { color: colors.outline }]}>Einladungslink</Text>
-                    <View style={styles.linkRow}>
-                        <TouchableOpacity
-                            style={[styles.linkInput, { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant }]}
-                            onPress={() => Linking.openURL(`https://happin.fun/event/${eventId}`)}
-                        >
-                            <Text style={[styles.linkText, { color: colors.primary }]} numberOfLines={1}>
-                                happin.fun/event/{eventId.slice(0, 8)}...
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.copyBtn, { backgroundColor: colors.primary }]}
-                            onPress={onCopyLink}
-                        >
-                            <Text style={[styles.copyBtnText, { color: colors.onPrimary }]}>Kopieren</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.shareBtn, { backgroundColor: colors.tertiary }]}
-                            onPress={onShareLink}
-                        >
-                            <Text style={[styles.copyBtnText, { color: colors.onTertiary }]}>Teilen</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
             )}
 
             {/* Summary Modal */}
@@ -448,51 +771,158 @@ function OverviewTab({
     );
 }
 
-// ── Styles ──────────────────────────────────────────────────────────────────
+// ── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
     root: { flex: 1 },
     scroll: { flex: 1 },
-    scrollContent: { paddingBottom: 100 },
+    scrollContent: { paddingBottom: 110 },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
     errorText: { fontSize: 16, textAlign: 'center', marginBottom: 16 },
     retryBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
     retryBtnText: { fontSize: 14, fontWeight: '700' },
 
+    backButton: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 50 : 16,
+        left: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 20,
+    },
+
+    // Desktop layout
+    desktopLayout: { flex: 1, flexDirection: 'row' },
+    desktopLeft: { width: '38%', borderRightWidth: StyleSheet.hairlineWidth },
+    desktopRight: { flex: 1, flexDirection: 'column' },
+    desktopScroll: { flex: 1 },
+    desktopScrollContent: { paddingBottom: 24, paddingTop: 24 },
+    desktopStickyBar: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        padding: 16,
+    },
+
+    // Mobile sticky bar
+    mobileStickyBar: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+    },
+
+    // Scan button
+    scanButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        borderRadius: 16,
+        minHeight: 56,
+    },
+    scanButtonText: { fontSize: 16, fontWeight: '700' },
+
+    // Header card
     headerCard: {
-        margin: 16,
+        marginTop: Platform.OS === 'ios' ? 100 : 72,
+        marginHorizontal: 16,
+        marginBottom: 16,
         padding: 16,
         borderRadius: 20,
         borderWidth: 1,
     },
-    headerLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-    headerTitle: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
-    headerDate: { fontSize: 14, marginTop: 6 },
-    guestViewButton: {
-        marginTop: 16,
+    headerTop: { flexDirection: 'row', gap: 12, marginBottom: 14 },
+    headerThumb: { width: 60, height: 60, borderRadius: 12 },
+    headerThumbPlaceholder: {
+        width: 60,
+        height: 60,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerTextBlock: { flex: 1 },
+    headerLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+    headerTitle: { fontSize: 18, fontWeight: '700', letterSpacing: -0.3, lineHeight: 24 },
+    headerDate: { fontSize: 13, marginTop: 4 },
+    headerActions: { flexDirection: 'row', gap: 10 },
+    headerActionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
         paddingVertical: 10,
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
         borderRadius: 12,
         borderWidth: 1,
-        alignItems: 'center',
     },
-    guestViewButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
+    headerActionBtnText: { fontSize: 13, fontWeight: '600' },
+
+    tabContent: { paddingHorizontal: 16, paddingBottom: 16 },
+    tabContentDesktop: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24 },
+
+    // Action buttons — exakt wie EventScreen
+    actionButtons: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 16,
     },
-
-    tabContent: { paddingHorizontal: 16 },
-
-    statsRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-    statCard: {
+    actionButton: {
         flex: 1,
-        padding: 16,
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 12,
+        gap: 4,
+        minHeight: 72,
+    },
+    actionButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+
+    // Gast-Statistiken Kachel
+    guestStatsTile: {
         borderRadius: 20,
         borderWidth: 1,
-        alignItems: 'center',
+        padding: 16,
+        marginBottom: 16,
     },
-    statNumber: { fontSize: 32, fontWeight: '800' },
-    statLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
+    guestStatsTileDesktop: {
+        padding: 24,
+    },
+    guestStatsTileHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    guestStatsTileLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+    guestStatsTileTotal: { fontSize: 16, fontWeight: '700' },
+    guestStatsTileChevron: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    guestStatsMiniRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+    },
+    guestStatsMiniItem: { flex: 1, alignItems: 'center', paddingVertical: 4 },
+    guestStatsMiniNum: { fontSize: 28, fontWeight: '800' },
+    guestStatsMiniNumDesktop: { fontSize: 44 },
+    guestStatsMiniLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 },
+    guestStatsDivider: { width: 1, height: 36 },
+    guestAnswersHint: { fontSize: 13, lineHeight: 18 },
 
     capacityCard: {
         padding: 16,
@@ -509,53 +939,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         backgroundColor: '#FFB3CE',
     },
-
-    scanButton: {
-        paddingVertical: 16,
-        borderRadius: 16,
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    scanButtonText: { fontSize: 16, fontWeight: '700' },
-
-    linkCard: {
-        padding: 16,
-        borderRadius: 20,
-        borderWidth: 1,
-        marginBottom: 16,
-    },
-    linkLabel: { fontSize: 13, fontWeight: '600', marginBottom: 10 },
-    linkRow: { flexDirection: 'row', gap: 10 },
-    linkInput: {
-        flex: 1,
-        padding: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-    },
-    linkText: { fontSize: 13 },
-    copyBtn: {
-        paddingHorizontal: 18,
-        paddingVertical: 12,
-        borderRadius: 12,
-    },
-    shareBtn: {
-        paddingHorizontal: 18,
-        paddingVertical: 12,
-        borderRadius: 12,
-    },
-    copyBtnText: { fontSize: 14, fontWeight: '700' },
-
-    summaryButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        marginBottom: 16,
-    },
-    summaryButtonText: { fontSize: 15, fontWeight: '600' },
-    summaryButtonArrow: { fontSize: 22, fontWeight: '600' },
+    capacityHint: { fontSize: 12, marginTop: 8 },
 
     sectionCard: {
         borderRadius: 20,
@@ -583,25 +967,17 @@ const styles = StyleSheet.create({
     ticketRowRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     ticketRowPrice: { fontSize: 13 },
     ticketRowCount: { fontSize: 16, fontWeight: '700', minWidth: 32, textAlign: 'right' },
-    buyerRow: {
+
+    summaryButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        gap: 12,
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        marginBottom: 16,
     },
-    buyerAvatar: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    buyerAvatarText: { fontSize: 13, fontWeight: '700' },
-    buyerInfo: { flex: 1 },
-    buyerName: { fontSize: 15, fontWeight: '600' },
-    buyerOpts: { fontSize: 12, marginTop: 2 },
-    buyerCount: { fontSize: 13, fontWeight: '700' },
+    summaryButtonText: { fontSize: 15, fontWeight: '600' },
 });
 
 const modalStyles = StyleSheet.create({

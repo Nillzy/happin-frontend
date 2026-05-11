@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -13,18 +13,27 @@ import {
 } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import Navbar from '../components/atoms/Navbar';
+import { Ionicons } from '@expo/vector-icons';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
 import type { Participant } from '../types/host';
 import type { CustomField } from '../types/events';
 
+type StatusFilter = 'accepted' | 'declined' | 'pending';
+
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+    { value: 'accepted', label: 'Zusagen' },
+    { value: 'declined', label: 'Absagen' },
+    { value: 'pending', label: 'Unsicher' },
+];
+
 export default function EventGuestsScreen() {
     const { colors } = useTheme();
     const router = useRouter();
-    const { eventId, status } = useLocalSearchParams<{ eventId: string; status: 'accepted' | 'declined' | 'pending' }>();
+    const { eventId, status: initialStatus } = useLocalSearchParams<{ eventId: string; status: StatusFilter }>();
 
-    const [participants, setParticipants] = useState<Participant[]>([]);
+    const [allParticipants, setAllParticipants] = useState<Participant[]>([]);
+    const [activeFilter, setActiveFilter] = useState<StatusFilter>(initialStatus ?? 'accepted');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -37,6 +46,12 @@ export default function EventGuestsScreen() {
         void loadData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [eventId]);
+
+    // Clear selection when filter changes
+    useEffect(() => {
+        setSelectedIds(new Set());
+        setExpandedId(null);
+    }, [activeFilter]);
 
     const loadData = async () => {
         if (!eventId) return;
@@ -55,16 +70,23 @@ export default function EventGuestsScreen() {
                 api.getEventParticipants(eventId, token),
                 api.getEventById(eventId, token),
             ]);
-            const filtered = participantData.participants.filter(
-                (p: Participant) => p.status.toLowerCase() === status
-            );
-            setParticipants(filtered);
+            setAllParticipants(participantData.participants);
             setCustomFields(eventData.custom_fields ?? []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Fehler beim Laden');
         } finally {
             setLoading(false);
         }
+    };
+
+    const participants = allParticipants.filter(
+        (p) => p.status.toLowerCase() === activeFilter
+    );
+
+    const counts = {
+        accepted: allParticipants.filter(p => p.status.toLowerCase() === 'accepted').length,
+        declined: allParticipants.filter(p => p.status.toLowerCase() === 'declined').length,
+        pending: allParticipants.filter(p => p.status.toLowerCase() === 'pending').length,
     };
 
     const toggleSelection = (id: string) => {
@@ -105,21 +127,11 @@ export default function EventGuestsScreen() {
         }
     };
 
-    const getStatusColor = () => {
-        switch (status) {
+    const getStatusColor = (s: StatusFilter) => {
+        switch (s) {
             case 'accepted': return colors.tertiary;
             case 'declined': return colors.error;
             case 'pending': return colors.secondary;
-            default: return colors.outline;
-        }
-    };
-
-    const getStatusLabel = () => {
-        switch (status) {
-            case 'accepted': return 'Zusagen';
-            case 'declined': return 'Absagen';
-            case 'pending': return 'Unsicher';
-            default: return status;
         }
     };
 
@@ -127,12 +139,6 @@ export default function EventGuestsScreen() {
         const first = person.first_name?.[0] || '';
         const last = person.last_name?.[0] || '';
         return (first + last).toUpperCase() || '?';
-    };
-
-    const maskPhone = (phone?: string) => {
-        if (!phone) return '';
-        if (phone.length < 8) return phone;
-        return phone.slice(0, -4).replace(/./g, (c, i) => (i > 6 ? '•' : c)) + phone.slice(-4);
     };
 
     const getFieldLabel = (fieldId: string): string => {
@@ -145,10 +151,23 @@ export default function EventGuestsScreen() {
         return String(value);
     };
 
+    const handleBack = () => {
+        if (router.canGoBack()) {
+            router.back();
+        } else {
+            router.push('/');
+        }
+    };
+
     if (loading) {
         return (
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                <Navbar showBack />
+                <TouchableOpacity
+                    style={[styles.backButton, { backgroundColor: colors.surfaceContainerHigh }]}
+                    onPress={handleBack}
+                >
+                    <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+                </TouchableOpacity>
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color={colors.primary} />
                 </View>
@@ -159,7 +178,12 @@ export default function EventGuestsScreen() {
     if (error) {
         return (
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                <Navbar showBack />
+                <TouchableOpacity
+                    style={[styles.backButton, { backgroundColor: colors.surfaceContainerHigh }]}
+                    onPress={handleBack}
+                >
+                    <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+                </TouchableOpacity>
                 <View style={styles.centered}>
                     <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
                     <TouchableOpacity onPress={loadData} style={[styles.retryBtn, { backgroundColor: colors.primary }]}>
@@ -170,20 +194,57 @@ export default function EventGuestsScreen() {
         );
     }
 
-    const statusColor = getStatusColor();
+    const activeColor = getStatusColor(activeFilter);
 
     return (
         <View style={[styles.root, { backgroundColor: colors.background }]}>
-            <Navbar showBack />
+            {/* Back button */}
+            <TouchableOpacity
+                style={[styles.backButton, { backgroundColor: colors.surfaceContainerHigh }]}
+                onPress={handleBack}
+            >
+                <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+            </TouchableOpacity>
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-                {/* Header */}
-                <View style={[styles.headerCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-                    <Text style={[styles.headerLabel, { color: colors.outline }]}>Gästeliste</Text>
-                    <Text style={[styles.headerTitle, { color: statusColor }]}>{getStatusLabel()}</Text>
-                    <Text style={[styles.headerSubtitle, { color: colors.onSurfaceVariant }]}>
-                        {participants.length} {participants.length === 1 ? 'Gast' : 'Gäste'}
+                {/* Page header */}
+                <View style={styles.pageHeader}>
+                    <Text style={[styles.pageTitle, { color: colors.onSurface }]}>Gästeliste</Text>
+                    <Text style={[styles.pageSubtitle, { color: colors.onSurfaceVariant }]}>
+                        {allParticipants.length} {allParticipants.length === 1 ? 'Gast' : 'Gäste'} insgesamt
                     </Text>
+                </View>
+
+                {/* Radio filter buttons */}
+                <View style={[styles.filterRow, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                    {STATUS_OPTIONS.map((opt) => {
+                        const isActive = activeFilter === opt.value;
+                        const statusColor = getStatusColor(opt.value);
+                        return (
+                            <TouchableOpacity
+                                key={opt.value}
+                                style={[
+                                    styles.filterBtn,
+                                    isActive && { backgroundColor: statusColor },
+                                ]}
+                                onPress={() => setActiveFilter(opt.value)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[
+                                    styles.filterBtnCount,
+                                    isActive ? { color: '#fff' } : { color: statusColor },
+                                ]}>
+                                    {counts[opt.value]}
+                                </Text>
+                                <Text style={[
+                                    styles.filterBtnLabel,
+                                    isActive ? { color: '#fff' } : { color: colors.onSurfaceVariant },
+                                ]}>
+                                    {opt.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
 
                 {/* Responses Summary */}
@@ -207,11 +268,11 @@ export default function EventGuestsScreen() {
                     return (
                         <View style={[styles.summaryCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
                             <Text style={[styles.summaryTitle, { color: colors.onSurfaceVariant }]}>Zusammenfassung</Text>
-                            {entries.map(([label, counts]) => (
+                            {entries.map(([label, cnts]) => (
                                 <View key={label} style={styles.summaryField}>
                                     <Text style={[styles.summaryFieldLabel, { color: colors.onSurface }]}>{label}</Text>
                                     <View style={styles.summaryChips}>
-                                        {Object.entries(counts)
+                                        {Object.entries(cnts)
                                             .sort(([, a], [, b]) => b - a)
                                             .map(([value, count]) => (
                                                 <View key={value} style={[styles.summaryChip, { backgroundColor: `${colors.primary}15` }]}>
@@ -226,8 +287,8 @@ export default function EventGuestsScreen() {
                     );
                 })()}
 
-                {/* Bulk Action Bar */}
-                {selectedIds.size > 0 && (
+                {/* Bulk Action Bar – only for accepted */}
+                {selectedIds.size > 0 && activeFilter === 'accepted' && (
                     <View style={[styles.bulkBar, { backgroundColor: `${colors.error}15`, borderColor: `${colors.error}30` }]}>
                         <Text style={[styles.bulkText, { color: colors.onSurface }]}>
                             {selectedIds.size} ausgewählt
@@ -282,32 +343,34 @@ export default function EventGuestsScreen() {
                                     style={[
                                         styles.guestRow,
                                         { borderBottomColor: colors.outlineVariant },
-                                        index === participants.length - 1 && !isExpanded && { borderBottomWidth: 0 }
+                                        index === participants.length - 1 && !isExpanded && { borderBottomWidth: 0 },
                                     ]}
                                     onPress={() => setExpandedId(isExpanded ? null : participant.participation_id)}
-                                    onLongPress={() => toggleSelection(participant.participation_id)}
+                                    onLongPress={() => activeFilter === 'accepted' && toggleSelection(participant.participation_id)}
                                     activeOpacity={0.7}
                                 >
-                                    {/* Checkbox */}
-                                    <TouchableOpacity
-                                        onPress={() => toggleSelection(participant.participation_id)}
-                                        hitSlop={8}
-                                    >
-                                        <View
-                                            style={[
-                                                styles.checkbox,
-                                                {
-                                                    backgroundColor: isSelected ? colors.primary : 'transparent',
-                                                    borderColor: isSelected ? colors.primary : colors.outlineVariant,
-                                                },
-                                            ]}
+                                    {/* Checkbox – only for accepted */}
+                                    {activeFilter === 'accepted' && (
+                                        <TouchableOpacity
+                                            onPress={() => toggleSelection(participant.participation_id)}
+                                            hitSlop={8}
                                         >
-                                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                                        </View>
-                                    </TouchableOpacity>
+                                            <View
+                                                style={[
+                                                    styles.checkbox,
+                                                    {
+                                                        backgroundColor: isSelected ? colors.primary : 'transparent',
+                                                        borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                                                    },
+                                                ]}
+                                            >
+                                                {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                                            </View>
+                                        </TouchableOpacity>
+                                    )}
 
                                     {/* Avatar */}
-                                    <View style={[styles.avatar, { backgroundColor: statusColor }]}>
+                                    <View style={[styles.avatar, { backgroundColor: activeColor }]}>
                                         <Text style={styles.avatarText}>{getInitials(participant.person)}</Text>
                                     </View>
 
@@ -334,7 +397,9 @@ export default function EventGuestsScreen() {
 
                                     {/* Expand indicator */}
                                     {hasResponses && (
-                                        <Text style={{ fontSize: 12, color: colors.onSurfaceVariant }}>{isExpanded ? '▲' : '▼'}</Text>
+                                        <Text style={{ fontSize: 12, color: colors.onSurfaceVariant }}>
+                                            {isExpanded ? '▲' : '▼'}
+                                        </Text>
                                     )}
                                 </TouchableOpacity>
 
@@ -444,15 +509,44 @@ const styles = StyleSheet.create({
     retryBtn: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
     retryBtnText: { fontSize: 14, fontWeight: '700' },
 
-    headerCard: {
-        margin: 16,
-        padding: 16,
+    backButton: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 50 : 16,
+        left: 16,
+        width: 40,
+        height: 40,
         borderRadius: 20,
-        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 20,
     },
-    headerLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-    headerTitle: { fontSize: 24, fontWeight: '700', letterSpacing: -0.3 },
-    headerSubtitle: { fontSize: 14, marginTop: 4 },
+
+    pageHeader: {
+        marginTop: Platform.OS === 'ios' ? 106 : 72,
+        marginHorizontal: 16,
+        marginBottom: 16,
+    },
+    pageTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+    pageSubtitle: { fontSize: 14, marginTop: 4 },
+
+    // Radio filter row
+    filterRow: {
+        flexDirection: 'row',
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        padding: 4,
+        gap: 4,
+    },
+    filterBtn: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderRadius: 12,
+    },
+    filterBtnCount: { fontSize: 20, fontWeight: '800' },
+    filterBtnLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 },
 
     bulkBar: {
         flexDirection: 'row',
@@ -501,7 +595,6 @@ const styles = StyleSheet.create({
     avatarText: { color: '#fff', fontSize: 14, fontWeight: '700' },
     guestInfo: { flex: 1 },
     guestName: { fontSize: 15, fontWeight: '600' },
-    guestPhone: { fontSize: 12, marginTop: 2 },
     ticketBadge: {
         paddingHorizontal: 10,
         paddingVertical: 4,
@@ -515,28 +608,12 @@ const styles = StyleSheet.create({
         paddingLeft: 90,
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    responseRow: {
-        marginBottom: 8,
-    },
-    responseLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        marginBottom: 2,
-    },
-    responseValue: {
-        fontSize: 14,
-    },
-    ticketLabel: {
-        fontSize: 12,
-        fontWeight: '700',
-        marginBottom: 6,
-        marginTop: 8,
-    },
+    responseRow: { marginBottom: 8 },
+    responseLabel: { fontSize: 12, fontWeight: '600', marginBottom: 2 },
+    responseValue: { fontSize: 14 },
+    ticketLabel: { fontSize: 12, fontWeight: '700', marginBottom: 6, marginTop: 8 },
     ticketGroup: {},
-    guestSummary: {
-        fontSize: 12,
-        marginTop: 2,
-    },
+    guestSummary: { fontSize: 12, marginTop: 2 },
     summaryCard: {
         marginHorizontal: 16,
         marginBottom: 16,
@@ -551,19 +628,9 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
         marginBottom: 12,
     },
-    summaryField: {
-        marginBottom: 10,
-    },
-    summaryFieldLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        marginBottom: 6,
-    },
-    summaryChips: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 6,
-    },
+    summaryField: { marginBottom: 10 },
+    summaryFieldLabel: { fontSize: 14, fontWeight: '600', marginBottom: 6 },
+    summaryChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     summaryChip: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -572,13 +639,8 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         gap: 4,
     },
-    summaryChipText: {
-        fontSize: 13,
-    },
-    summaryChipCount: {
-        fontSize: 12,
-        fontWeight: '700',
-    },
+    summaryChipText: { fontSize: 13 },
+    summaryChipCount: { fontSize: 12, fontWeight: '700' },
 });
 
 const modalStyles = StyleSheet.create({
@@ -599,10 +661,7 @@ const modalStyles = StyleSheet.create({
         alignSelf: 'center',
         marginBottom: 24,
     },
-    iconContainer: {
-        alignItems: 'center',
-        marginBottom: 16,
-    },
+    iconContainer: { alignItems: 'center', marginBottom: 16 },
     iconCircle: {
         width: 56,
         height: 56,
@@ -610,26 +669,10 @@ const modalStyles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    iconText: {
-        fontSize: 28,
-        fontWeight: '800',
-    },
-    title: {
-        fontSize: 19,
-        fontWeight: '700',
-        textAlign: 'center',
-        marginBottom: 8,
-    },
-    message: {
-        fontSize: 14,
-        textAlign: 'center',
-        lineHeight: 20,
-        marginBottom: 24,
-    },
-    actions: {
-        flexDirection: 'row',
-        gap: 12,
-    },
+    iconText: { fontSize: 28, fontWeight: '800' },
+    title: { fontSize: 19, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
+    message: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+    actions: { flexDirection: 'row', gap: 12 },
     cancelBtn: {
         flex: 1,
         paddingVertical: 14,
@@ -637,21 +680,13 @@ const modalStyles = StyleSheet.create({
         borderWidth: 1.5,
         alignItems: 'center',
     },
-    cancelBtnText: {
-        fontSize: 15,
-        fontWeight: '700',
-    },
+    cancelBtnText: { fontSize: 15, fontWeight: '700' },
     confirmBtn: {
         flex: 1,
         paddingVertical: 14,
         borderRadius: 9999,
         alignItems: 'center',
     },
-    confirmBtnText: {
-        fontSize: 15,
-        fontWeight: '700',
-    },
-    bottomSpacer: {
-        height: Platform.OS === 'ios' ? 34 : 24,
-    },
+    confirmBtnText: { fontSize: 15, fontWeight: '700' },
+    bottomSpacer: { height: Platform.OS === 'ios' ? 34 : 24 },
 });

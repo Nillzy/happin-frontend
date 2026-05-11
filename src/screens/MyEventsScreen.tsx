@@ -17,6 +17,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useRouter } from 'expo-router';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
+import { SkeletonEventCard, SkeletonHostCard, SkeletonTicketCard } from '../components/atoms/SkeletonBox';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
 import { EventListItem, UserTicket } from '../types/events';
@@ -433,8 +434,15 @@ export default function MyEventsScreen() {
             {renderSectionHeader(title, events.length, true, isCollapsed, onToggle)}
             {!isCollapsed && (
                 sectionLoading && events.length === 0 ? (
-                    <View style={styles.emptySection}>
-                        <ActivityIndicator size="small" color={colors.primary} />
+                    <View style={[styles.cardGrid, numColumns > 1 && styles.cardGridMultiCol]}>
+                        {Array.from({ length: 2 }).map((_, i) => (
+                            <View key={i} style={cardWidth != null ? { width: cardWidth } : undefined}>
+                                {title === 'Von dir organisiert'
+                                    ? <SkeletonHostCard />
+                                    : <SkeletonTicketCard />
+                                }
+                            </View>
+                        ))}
                     </View>
                 ) : events.length === 0 ? (
                     <View style={styles.emptySection}>
