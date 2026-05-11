@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     Platform,
     Pressable,
+    Animated,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
@@ -32,6 +33,7 @@ import { useUserCity } from '@/hooks/use-user-city';
 import CityAutocomplete from '../components/atoms/CityAutocomplete';
 import { searchCities } from '../services/geocoding';
 import { api } from '../services/api';
+import { SkeletonBox } from '../components/atoms/SkeletonBox';
 
 // ── Profilbild-Platzhalter ────────────────────────────────────────────────────
 
@@ -99,10 +101,36 @@ const avatarStyles = StyleSheet.create({
 
 // ── Statistik-Kachel ──────────────────────────────────────────────────────────
 
-function StatTile({ label, value, colors }: { label: string; value: string | number; colors: ReturnType<typeof useTheme>['colors'] }) {
+function SkeletonPulse({ colors }: { colors: ReturnType<typeof useTheme>['colors'] }) {
+    const opacity = useRef(new Animated.Value(0.3)).current;
+
+    useEffect(() => {
+        const anim = Animated.loop(
+            Animated.sequence([
+                Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+                Animated.timing(opacity, { toValue: 0.3, duration: 600, useNativeDriver: true }),
+            ])
+        );
+        anim.start();
+        return () => anim.stop();
+    }, [opacity]);
+
+    return (
+        <Animated.View style={[skeletonStyles.bar, { backgroundColor: colors.outlineVariant, opacity }]} />
+    );
+}
+
+const skeletonStyles = StyleSheet.create({
+    bar: { width: 40, height: 22, borderRadius: 6, marginBottom: 4 },
+});
+
+function StatTile({ label, value, loading, colors }: { label: string; value: string | number; loading: boolean; colors: ReturnType<typeof useTheme>['colors'] }) {
     return (
         <View style={[statStyles.tile, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}>
-            <Text style={[statStyles.value, { color: colors.onSurface }]}>{value}</Text>
+            {loading
+                ? <SkeletonPulse colors={colors} />
+                : <Text style={[statStyles.value, { color: colors.onSurface }]}>{value}</Text>
+            }
             <Text style={[statStyles.label, { color: colors.onSurfaceVariant }]}>{label}</Text>
         </View>
     );
@@ -373,10 +401,48 @@ export default function AccountScreen() {
         return (
             <ScreenWithNav>
                 <View style={[s.root, { backgroundColor: colors.background }]}>
-                    {Platform.OS === 'web' && <Navbar showCta={false} />}
-                    <View style={s.centered}>
-                        <ActivityIndicator size="large" color={colors.primary} />
-                    </View>
+                    <Navbar showCta={false} />
+                    <ScrollView
+                        contentContainerStyle={[s.scroll, Platform.OS === 'web' && s.scrollWeb]}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <View style={[s.innerContainer, Platform.OS === 'web' && { maxWidth: 700 }]}>
+                            {/* Profil-Karte Skeleton */}
+                            <View style={[s.profileCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                                <SkeletonBox width={88} height={88} borderRadius={44} />
+                                <View style={{ flex: 1, gap: 10 }}>
+                                    <SkeletonBox height={20} width="60%" borderRadius={7} />
+                                    <SkeletonBox height={12} width="40%" borderRadius={5} />
+                                    <SkeletonBox height={12} width="50%" borderRadius={5} />
+                                    <SkeletonBox height={14} width="45%" borderRadius={5} style={{ marginTop: 4 }} />
+                                </View>
+                            </View>
+                            {/* Übersicht Skeleton */}
+                            <View style={s.section}>
+                                <SkeletonBox height={18} width={80} borderRadius={6} style={{ marginBottom: 12 }} />
+                                <View style={s.statRow}>
+                                    <SkeletonBox height={72} borderRadius={16} style={{ flex: 1 }} />
+                                    <View style={s.statGap} />
+                                    <SkeletonBox height={72} borderRadius={16} style={{ flex: 1 }} />
+                                </View>
+                                <View style={[s.statRow, { marginTop: 8 }]}>
+                                    <SkeletonBox height={72} borderRadius={16} style={{ flex: 1 }} />
+                                    <View style={s.statGap} />
+                                    <SkeletonBox height={72} borderRadius={16} style={{ flex: 1 }} />
+                                </View>
+                            </View>
+                            {/* Einstellungen Skeleton */}
+                            <View style={s.section}>
+                                <SkeletonBox height={18} width={110} borderRadius={6} style={{ marginBottom: 12 }} />
+                                <SkeletonBox height={90} borderRadius={16} />
+                            </View>
+                            {/* Konto Skeleton */}
+                            <View style={s.section}>
+                                <SkeletonBox height={18} width={60} borderRadius={6} style={{ marginBottom: 12 }} />
+                                <SkeletonBox height={150} borderRadius={16} />
+                            </View>
+                        </View>
+                    </ScrollView>
                 </View>
             </ScreenWithNav>
         );
@@ -504,14 +570,14 @@ export default function AccountScreen() {
                 <View style={s.section}>
                     <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Übersicht</Text>
                     <View style={s.statRow}>
-                        <StatTile label="Events besucht" value={stats?.events_attended ?? '—'} colors={colors} />
+                        <StatTile label="Events besucht" value={stats?.events_attended ?? 0} loading={stats === null} colors={colors} />
                         <View style={s.statGap} />
-                        <StatTile label="Events erstellt" value={stats?.events_created ?? '—'} colors={colors} />
+                        <StatTile label="Events erstellt" value={stats?.events_created ?? 0} loading={stats === null} colors={colors} />
                     </View>
                     <View style={[s.statRow, { marginTop: 8 }]}>
-                        <StatTile label="Tickets" value={stats?.tickets_total ?? '—'} colors={colors} />
+                        <StatTile label="Tickets" value={stats?.tickets_total ?? 0} loading={stats === null} colors={colors} />
                         <View style={s.statGap} />
-                        <StatTile label="Teilnehmer" value={stats?.participants_total ?? '—'} colors={colors} />
+                        <StatTile label="Teilnehmer" value={stats?.participants_total ?? 0} loading={stats === null} colors={colors} />
                     </View>
                 </View>
 
