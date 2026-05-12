@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     sheet: {
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        maxHeight: SCREEN_HEIGHT * 0.88,
+        height: SCREEN_HEIGHT * 0.88,
         paddingBottom: Platform.OS === 'ios' ? 34 : 24,
     },
     dragHandle: {
