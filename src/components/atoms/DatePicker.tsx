@@ -316,7 +316,7 @@ export default function DatePicker({
             )}
 
             {open && !useInlinePopover && (
-                <Modal transparent animationType="fade" visible onRequestClose={() => { justClosed.current = true; setOpen(false); }}>
+                <Modal transparent animationType="fade" visible statusBarTranslucent hardwareAccelerated onRequestClose={() => { justClosed.current = true; setOpen(false); }}>
                     <Pressable style={styles.modalBackdrop} onPress={() => { justClosed.current = true; setOpen(false); inputRef.current?.blur(); }}>
                         <Pressable
                             style={[styles.modalPanel, {

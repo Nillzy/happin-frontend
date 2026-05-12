@@ -67,9 +67,10 @@ export default function EditModal({ visible, onClose, title, onSave, children }:
     return (
         <Modal
             visible={visible}
-            // "none" so the backdrop appears instantly without animating alongside the sheet
             animationType="none"
             transparent
+            statusBarTranslucent
+            hardwareAccelerated
             onRequestClose={handleClose}
         >
             {/* Backdrop fills screen immediately — no animation */}

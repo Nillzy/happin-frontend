@@ -457,6 +457,8 @@ export default function EventGuestsScreen() {
                 visible={confirmVisible}
                 animationType="slide"
                 transparent
+                statusBarTranslucent
+                hardwareAccelerated
                 onRequestClose={() => setConfirmVisible(false)}
             >
                 <Pressable style={modalStyles.backdrop} onPress={() => setConfirmVisible(false)} />
