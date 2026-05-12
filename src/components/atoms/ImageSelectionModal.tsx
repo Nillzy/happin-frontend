@@ -81,11 +81,14 @@ export default function ImageSelectionModal({
     ).current;
 
     useEffect(() => {
-        if (visible) {
-            Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
-            if (eventTitle?.trim()) fetchStockPhotos(eventTitle);
+        if (visible && eventTitle?.trim()) {
+            fetchStockPhotos(eventTitle);
         }
     }, [visible, eventTitle]);
+
+    const handleShow = () => {
+        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
+    };
 
     const fetchStockPhotos = async (title: string) => {
         try {
@@ -153,7 +156,7 @@ export default function ImageSelectionModal({
     if (!visible) return null;
 
     return (
-        <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
+        <Modal visible={visible} transparent animationType="none" statusBarTranslucent hardwareAccelerated onRequestClose={handleClose} onShow={handleShow}>
             <View style={styles.modalOverlay}>
                 <Animated.View
                     style={[styles.sheetContainer, { backgroundColor: colors.background, transform: [{ translateY }] }]}

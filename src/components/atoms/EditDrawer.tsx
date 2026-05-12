@@ -75,16 +75,14 @@ export default function EditDrawer({
         })
     ).current;
 
-    React.useEffect(() => {
-        if (visible) {
-            Animated.spring(translateY, {
-                toValue: 0,
-                useNativeDriver: true,
-                tension: 65,
-                friction: 11,
-            }).start();
-        }
-    }, [visible]);
+    const handleShow = useCallback(() => {
+        Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 65,
+            friction: 11,
+        }).start();
+    }, [translateY]);
 
     const handleClose = useCallback(() => {
         if (disableCloseRef.current) return;
@@ -107,7 +105,15 @@ export default function EditDrawer({
     );
 
     return (
-        <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
+        <Modal
+            visible={visible}
+            transparent
+            animationType="none"
+            statusBarTranslucent
+            hardwareAccelerated
+            onRequestClose={handleClose}
+            onShow={handleShow}
+        >
             <KeyboardAvoidingView
                 style={styles.overlay}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
