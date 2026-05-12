@@ -19,6 +19,7 @@ interface DatePickerProps {
     placeholder?: string;
     error?: boolean;
     minDate?: Date;
+    forceInline?: boolean;
 }
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -75,6 +76,7 @@ export default function DatePicker({
     placeholder = 'TT.MM.JJJJ',
     error = false,
     minDate,
+    forceInline = false,
 }: DatePickerProps) {
     const { colors } = useTheme();
     const { width: screenWidth } = useWindowDimensions();
@@ -181,6 +183,7 @@ export default function DatePicker({
     };
 
     const handleFocus = () => {
+        if (forceInline) return;
         if (justClosed.current) {
             justClosed.current = false;
             return;
@@ -193,6 +196,7 @@ export default function DatePicker({
     };
 
     const handleBlur = () => {
+        if (forceInline) return;
         if (useInlinePopover) {
             setTimeout(() => {
                 if (!popoverPressed.current) {
@@ -204,6 +208,15 @@ export default function DatePicker({
     };
 
     const handleTriggerPress = () => {
+        if (forceInline) {
+            if (justClosed.current) { justClosed.current = false; return; }
+            if (!open && value) {
+                setViewYear(Number(value.slice(0, 4)));
+                setViewMonth(Number(value.slice(5, 7)) - 1);
+            }
+            setOpen(prev => !prev);
+            return;
+        }
         if (!useInlinePopover) {
             if (justClosed.current) {
                 justClosed.current = false;
@@ -302,7 +315,7 @@ export default function DatePicker({
                 </View>
             </Pressable>
 
-            {open && useInlinePopover && (
+            {open && !forceInline && useInlinePopover && (
                 <Pressable
                     onPressIn={() => { popoverPressed.current = true; }}
                     onMouseDown={(e: any) => e.preventDefault()}
@@ -329,6 +342,15 @@ export default function DatePicker({
                         </Pressable>
                     </Pressable>
                 </Modal>
+            )}
+
+            {open && forceInline && (
+                <View style={[styles.inlineCalendarPanel, {
+                    backgroundColor: colors.surfaceContainerLow,
+                    borderColor: colors.outlineVariant,
+                }]}>
+                    {calendarContent}
+                </View>
             )}
         </View>
     );
@@ -383,6 +405,12 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 16,
         elevation: 12,
+    },
+    inlineCalendarPanel: {
+        marginTop: 4,
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 12,
     },
     calendarHeader: {
         flexDirection: 'row',

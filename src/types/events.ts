@@ -149,3 +149,14 @@ export interface UserTicketListResponse {
     tickets: UserTicket[];
     total: number;
 }
+
+export type FilterPeriod = 'today' | 'week' | 'month' | 'custom';
+
+export interface EventFilterParams {
+    period?: FilterPeriod;
+    categories?: string[];
+    city?: string;
+    isFree?: boolean;
+    dateFrom?: string;  // YYYY-MM-DD, only used when period === 'custom'
+    dateTo?: string;    // YYYY-MM-DD, only used when period === 'custom'
+}

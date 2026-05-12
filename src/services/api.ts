@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse, CustomField, CustomFieldResponseItem, TicketResponses } from '@/src/types/events';
+import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse, CustomField, CustomFieldResponseItem, TicketResponses, EventFilterParams, FilterPeriod } from '@/src/types/events';
 import type { ParticipantListResponse, RemoveParticipantsResponse, ScanTicketResponse } from '@/src/types/host';
 
 /**
@@ -48,11 +48,63 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     return response.json();
 }
 
+function getPeriodDates(period: Exclude<FilterPeriod, 'custom'>): { dateFrom: string; dateTo: string } {
+    const now = new Date();
+    if (period === 'today') {
+        const start = new Date(now);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(now);
+        end.setHours(23, 59, 59, 999);
+        return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
+    }
+    if (period === 'week') {
+        const day = now.getDay();
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+        monday.setHours(0, 0, 0, 0);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
+        return { dateFrom: monday.toISOString(), dateTo: sunday.toISOString() };
+    }
+    // month
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
+}
+
 export const api = {
-    getPublicEvents: (limit = 50, offset = 0, token?: string) =>
-        request<EventListResponse>(`/api/v1/events/?limit=${limit}&offset=${offset}`, {
+    getPublicEvents: (limit = 50, offset = 0, token?: string, filters?: EventFilterParams) => {
+        const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+        if (filters?.period && filters.period !== 'custom') {
+            const { dateFrom, dateTo } = getPeriodDates(filters.period);
+            params.set('date_from', dateFrom);
+            params.set('date_to', dateTo);
+        } else if (filters?.period === 'custom') {
+            if (filters.dateFrom) {
+                const from = new Date(filters.dateFrom);
+                from.setHours(0, 0, 0, 0);
+                params.set('date_from', from.toISOString());
+            }
+            if (filters.dateTo) {
+                const to = new Date(filters.dateTo);
+                to.setHours(23, 59, 59, 999);
+                params.set('date_to', to.toISOString());
+            }
+        }
+        if (filters?.categories?.length) {
+            params.set('categories', filters.categories.join(','));
+        }
+        if (filters?.city?.trim()) {
+            params.set('city', filters.city.trim());
+        }
+        if (filters?.isFree) {
+            params.set('is_free', 'true');
+        }
+        return request<EventListResponse>(`/api/v1/events/?${params}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }),
+        });
+    },
 
     getEventById: async (eventId: string, token?: string) => {
         const cached = _eventCache.get(eventId);

@@ -13,6 +13,7 @@ import {
     TextInput,
     RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -24,7 +25,8 @@ import { api } from '../services/api';
 import { authorize, getSession } from '../services/supabase';
 import { useSavedEvents } from '../contexts/SavedEventsContext';
 import { getGradientByIndex } from '../constants/gradients';
-import type { EventListItem, EventListResponse } from '../types/events';
+import type { EventListItem, EventListResponse, EventFilterParams } from '../types/events';
+import FilterModal from '../components/atoms/FilterModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -63,6 +65,7 @@ let cachedHasMore = false;
 
 export default function EventListScreen() {
     const { colors } = useTheme();
+    const insets = useSafeAreaInsets();
     const router = useRouter();
     const { period, role } = useLocalSearchParams<{ period?: string; role?: string }>();
     const isOrganizerView = role === 'organizer';
@@ -78,6 +81,17 @@ export default function EventListScreen() {
     const [dimensions, setDimensions] = useState(Dimensions.get('window'));
     const [searchQuery, setSearchQuery] = useState('');
     const [refreshing, setRefreshing] = useState(false);
+    const [filterModalVisible, setFilterModalVisible] = useState(false);
+    const [activeFilters, setActiveFilters] = useState<EventFilterParams>({});
+    const activeFiltersRef = React.useRef<EventFilterParams>({});
+    activeFiltersRef.current = activeFilters;
+
+    const hasActiveFilters = !!(
+        activeFilters.period ||
+        (activeFilters.categories?.length ?? 0) > 0 ||
+        activeFilters.city?.trim() ||
+        activeFilters.isFree
+    );
 
     const loadingMoreRef = React.useRef(false);
     const hasMoreRef = React.useRef(cachedHasMore);
@@ -97,7 +111,7 @@ export default function EventListScreen() {
                 if (!token) { router.replace('/login'); return; }
                 data = await api.getUserEvents(token, eventPeriodRef.current, EVENTS_PER_PAGE, 0, 'organizer');
             } else {
-                data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined);
+                data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined, activeFiltersRef.current);
             }
             const more = data.events.length === EVENTS_PER_PAGE;
             cachedEvents = data.events;
@@ -110,6 +124,32 @@ export default function EventListScreen() {
             setError('Fehler beim Laden der Events');
         } finally {
             setRefreshing(false);
+        }
+    }, []);
+
+    const handleApplyFilters = useCallback(async (filters: EventFilterParams) => {
+        cachedEvents = [];
+        cachedHasMore = false;
+        eventsRef.current = [];
+        hasMoreRef.current = false;
+        activeFiltersRef.current = filters;
+        setActiveFilters(filters);
+        setLoading(true);
+        setError(null);
+        try {
+            const token = await getSession();
+            const data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined, filters);
+            const more = data.events.length === EVENTS_PER_PAGE;
+            cachedEvents = data.events;
+            cachedHasMore = more;
+            eventsRef.current = data.events;
+            hasMoreRef.current = more;
+            setEvents(data.events);
+            setHasMore(more);
+        } catch (e) {
+            setError('Fehler beim Laden der Events');
+        } finally {
+            setLoading(false);
         }
     }, []);
 
@@ -126,7 +166,7 @@ export default function EventListScreen() {
                 if (!token) { router.replace('/login'); return; }
                 data = await api.getUserEvents(token, eventPeriodRef.current, EVENTS_PER_PAGE, offset, 'organizer');
             } else {
-                data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token || undefined);
+                data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token || undefined, activeFiltersRef.current);
             }
             const next = [...eventsRef.current, ...data.events];
             const more = data.events.length === EVENTS_PER_PAGE;
@@ -379,7 +419,7 @@ export default function EventListScreen() {
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 {isWeb && <Navbar showCta={false} />}
 
-                <View style={[styles.searchContainer, { backgroundColor: colors.background, borderBottomColor: colors.outlineVariant }]}>
+                <View style={[styles.searchContainer, { backgroundColor: colors.background, borderBottomColor: colors.outlineVariant, paddingTop: 16 + insets.top }]}>
                     <View style={[styles.searchBar, { backgroundColor: colors.surfaceContainerHigh }]}>
                         <Ionicons name="search" size={20} color={colors.onSurfaceVariant} />
                         <TextInput
@@ -391,9 +431,12 @@ export default function EventListScreen() {
                         />
                         <TouchableOpacity
                             style={styles.filterButton}
-                            onPress={() => console.log('Filter öffnen')}
+                            onPress={() => setFilterModalVisible(true)}
                         >
-                            <Ionicons name="options-outline" size={22} color={colors.onSurface} />
+                            <Ionicons name="options-outline" size={22} color={hasActiveFilters ? colors.primary : colors.onSurface} />
+                            {hasActiveFilters && (
+                                <View style={[styles.filterBadge, { backgroundColor: colors.primary }]} />
+                            )}
                         </TouchableOpacity>
                     </View>
 
@@ -437,6 +480,12 @@ export default function EventListScreen() {
                     isWeb ? renderWebGrid() : renderMobileList()
                 )}
             </View>
+            <FilterModal
+                visible={filterModalVisible}
+                onClose={() => setFilterModalVisible(false)}
+                initialFilters={activeFilters}
+                onApply={handleApplyFilters}
+            />
         </ScreenWithNav>
     );
 }
@@ -473,6 +522,15 @@ const styles = StyleSheet.create({
     },
     filterButton: {
         padding: 4,
+        position: 'relative',
+    },
+    filterBadge: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
     },
     savedButton: {
         paddingHorizontal: 16,
