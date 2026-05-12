@@ -1,15 +1,14 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
-    Modal,
+    Pressable,
     Animated,
     PanResponder,
     Dimensions,
     ScrollView,
-    KeyboardAvoidingView,
     Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,9 +21,7 @@ interface EditDrawerProps {
     onClose: () => void;
     title: string;
     children: React.ReactNode;
-    /** Disable the inner ScrollView (useful when children manage their own scroll) */
     noScroll?: boolean;
-    /** Prevent dismissing via gesture, backdrop tap, or close button */
     disableClose?: boolean;
 }
 
@@ -45,14 +42,39 @@ export default function EditDrawer({
     onCloseRef.current = onClose;
 
     const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+    const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+    // Gleiche Pattern wie TicketDetailScreen: Animation beim Mount, kein Modal
+    useEffect(() => {
+        Animated.parallel([
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                tension: 65,
+                friction: 11,
+            }),
+            Animated.timing(backdropOpacity, {
+                toValue: 1,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, []);
 
     const animateClose = useCallback(() => {
-        Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 300,
-            useNativeDriver: true,
-        }).start(() => onCloseRef.current());
-    }, [translateY]);
+        Animated.parallel([
+            Animated.timing(translateY, {
+                toValue: SCREEN_HEIGHT,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+            Animated.timing(backdropOpacity, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+        ]).start(() => onCloseRef.current());
+    }, [translateY, backdropOpacity]);
 
     const panResponder = useRef(
         PanResponder.create({
@@ -63,26 +85,13 @@ export default function EditDrawer({
             },
             onPanResponderRelease: (_, gs) => {
                 if (gs.dy > 100) {
-                    Animated.timing(translateY, {
-                        toValue: SCREEN_HEIGHT,
-                        duration: 300,
-                        useNativeDriver: true,
-                    }).start(() => onCloseRef.current());
+                    animateClose();
                 } else {
                     Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
                 }
             },
         })
     ).current;
-
-    const handleShow = useCallback(() => {
-        Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 65,
-            friction: 11,
-        }).start();
-    }, [translateY]);
 
     const handleClose = useCallback(() => {
         if (disableCloseRef.current) return;
@@ -105,59 +114,52 @@ export default function EditDrawer({
     );
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="none"
-            statusBarTranslucent
-            hardwareAccelerated
-            onRequestClose={handleClose}
-            onShow={handleShow}
-        >
-            <KeyboardAvoidingView
-                style={styles.overlay}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+            <Animated.View
+                style={[styles.backdrop, { opacity: backdropOpacity }]}
+                pointerEvents="box-none"
             >
-                <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
-                <Animated.View
-                    style={[
-                        styles.sheet,
-                        { backgroundColor: colors.background, transform: [{ translateY }] },
-                    ]}
-                >
-                    <View {...panResponder.panHandlers} style={styles.dragHandle}>
-                        <View style={[styles.dragIndicator, { backgroundColor: colors.outlineVariant }]} />
-                    </View>
+                <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+            </Animated.View>
 
-                    <View style={styles.header}>
-                        <Text style={[styles.headerTitle, { color: colors.onSurface }]}>{title}</Text>
-                        {!disableClose && (
-                            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                                <Ionicons name="close" size={28} color={colors.onSurface} />
-                            </TouchableOpacity>
-                        )}
-                    </View>
+            <Animated.View
+                style={[
+                    styles.sheet,
+                    { backgroundColor: colors.background, transform: [{ translateY }] },
+                ]}
+            >
+                <View {...panResponder.panHandlers} style={styles.dragHandle}>
+                    <View style={[styles.dragIndicator, { backgroundColor: colors.outlineVariant }]} />
+                </View>
 
-                    {content}
-                </Animated.View>
-            </KeyboardAvoidingView>
-        </Modal>
+                <View style={styles.header}>
+                    <Text style={[styles.headerTitle, { color: colors.onSurface }]}>{title}</Text>
+                    {!disableClose && (
+                        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                            <Ionicons name="close" size={28} color={colors.onSurface} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {content}
+            </Animated.View>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
     backdrop: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.5)',
     },
     sheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        height: SCREEN_HEIGHT * 0.88,
+        maxHeight: SCREEN_HEIGHT * 0.88,
         paddingBottom: Platform.OS === 'ios' ? 34 : 24,
     },
     dragHandle: {

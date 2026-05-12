@@ -1,18 +1,19 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
     View,
     Text,
-    Modal,
     Pressable,
     TouchableOpacity,
     StyleSheet,
-    KeyboardAvoidingView,
     Platform,
     ScrollView,
     PanResponder,
     Animated,
+    Dimensions,
 } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface EditModalProps {
     visible: boolean;
@@ -27,7 +28,22 @@ const DISMISS_THRESHOLD = 80;
 
 export default function EditModal({ visible, onClose, title, onSave, children }: EditModalProps) {
     const { colors } = useTheme();
-    const translateY = useRef(new Animated.Value(0)).current;
+    const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+    const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }),
+            Animated.timing(backdropOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+        ]).start();
+    }, []);
+
+    const animateClose = () => {
+        Animated.parallel([
+            Animated.timing(translateY, { toValue: SCREEN_HEIGHT, duration: 300, useNativeDriver: true }),
+            Animated.timing(backdropOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+        ]).start(() => onClose());
+    };
 
     const panResponder = useRef(
         PanResponder.create({
@@ -40,14 +56,7 @@ export default function EditModal({ visible, onClose, title, onSave, children }:
             },
             onPanResponderRelease: (_, gestureState) => {
                 if (gestureState.dy > DISMISS_THRESHOLD) {
-                    Animated.timing(translateY, {
-                        toValue: 600,
-                        duration: 200,
-                        useNativeDriver: true,
-                    }).start(() => {
-                        translateY.setValue(0);
-                        onClose();
-                    });
+                    animateClose();
                 } else {
                     Animated.spring(translateY, {
                         toValue: 0,
@@ -60,78 +69,68 @@ export default function EditModal({ visible, onClose, title, onSave, children }:
     ).current;
 
     const handleClose = () => {
-        translateY.setValue(0);
-        onClose();
+        animateClose();
     };
 
-    return (
-        <Modal
-            visible={visible}
-            animationType="none"
-            transparent
-            statusBarTranslucent
-            hardwareAccelerated
-            onRequestClose={handleClose}
-        >
-            {/* Backdrop fills screen immediately — no animation */}
-            <Pressable style={styles.backdrop} onPress={handleClose} />
+    if (!visible) return null;
 
-            <KeyboardAvoidingView
-                style={styles.sheetWrapper}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    return (
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+            <Animated.View
+                style={[styles.backdrop, { opacity: backdropOpacity }]}
                 pointerEvents="box-none"
             >
-                <Animated.View
-                    style={[
-                        styles.sheet,
-                        { backgroundColor: colors.surfaceContainerLow },
-                        { transform: [{ translateY }] },
-                    ]}
-                >
-                    {/* Drag handle — mobile only, used to pull down and dismiss */}
-                    {!isWeb && (
-                        <View {...panResponder.panHandlers} style={styles.handleArea}>
-                            <View style={[styles.handle, { backgroundColor: colors.outlineVariant }]} />
-                        </View>
-                    )}
+                <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+            </Animated.View>
 
-                    {/* Header: title + close button on web */}
-                    <View style={styles.headerRow}>
-                        <Text style={[styles.title, { color: colors.onSurface }]}>{title}</Text>
-                        {isWeb && (
-                            <TouchableOpacity
-                                onPress={handleClose}
-                                hitSlop={8}
-                                activeOpacity={0.7}
-                                style={styles.closeBtn}
-                            >
-                                <Text style={[styles.closeBtnText, { color: colors.onSurfaceVariant }]}>✕</Text>
-                            </TouchableOpacity>
-                        )}
+            <Animated.View
+                style={[
+                    styles.sheet,
+                    { backgroundColor: colors.surfaceContainerLow },
+                    { transform: [{ translateY }] },
+                ]}
+            >
+                {!isWeb && (
+                    <View {...panResponder.panHandlers} style={styles.handleArea}>
+                        <View style={[styles.handle, { backgroundColor: colors.outlineVariant }]} />
                     </View>
+                )}
 
-                    <ScrollView
-                        style={styles.content}
-                        keyboardShouldPersistTaps="handled"
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {children}
-                    </ScrollView>
-
-                    <View style={styles.footer}>
+                <View style={styles.headerRow}>
+                    <Text style={[styles.title, { color: colors.onSurface }]}>{title}</Text>
+                    {isWeb && (
                         <TouchableOpacity
-                            onPress={onSave}
-                            activeOpacity={0.85}
-                            style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                            onPress={handleClose}
+                            hitSlop={8}
+                            activeOpacity={0.7}
+                            style={styles.closeBtn}
                         >
-                            <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>
-                                Speichern
-                            </Text>
+                            <Text style={[styles.closeBtnText, { color: colors.onSurfaceVariant }]}>✕</Text>
                         </TouchableOpacity>
-                    </View>
-                </Animated.View>
-            </KeyboardAvoidingView>
-        </Modal>
+                    )}
+                </View>
+
+                <ScrollView
+                    style={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    {children}
+                </ScrollView>
+
+                <View style={styles.footer}>
+                    <TouchableOpacity
+                        onPress={onSave}
+                        activeOpacity={0.85}
+                        style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                    >
+                        <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>
+                            Speichern
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </Animated.View>
+        </View>
     );
 }
 
@@ -140,11 +139,11 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.4)',
     },
-    sheetWrapper: {
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
     sheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         paddingTop: 12,

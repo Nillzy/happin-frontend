@@ -13,7 +13,7 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <SavedEventsProvider>
-          <Stack screenOptions={{ headerShown: false }}>
+          <Stack screenOptions={{ headerShown: false }} initialRouteName="index">
             <Stack.Screen
               name="ticket/[eventId]"
               options={{
