@@ -76,33 +76,6 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
     const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
     const bgColor = isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)';
 
-    if (event.is_host) {
-        const tickets = event.ticket_options ?? [];
-        const cheapest = tickets.length ? Math.min(...tickets.map(t => t.price)) : null;
-        const totalAvailable = tickets.reduce((sum, t) => sum + (t.quantity_limit ?? 0), 0);
-        const hasLimits = tickets.some(t => t.quantity_limit != null);
-        return (
-            <View style={[deskBarStyles.bar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
-                <View style={deskBarStyles.info}>
-                    <Text style={[deskBarStyles.price, { color: colors.onSurface }]}>
-                        {isFree ? 'Kostenlos' : cheapest != null ? `ab ${cheapest.toFixed(2)} €` : 'Kostenpflichtig'}
-                    </Text>
-                    <Text style={[deskBarStyles.hint, { color: colors.onSurfaceVariant }]}>
-                        {event.participant_count} Teilnehmer
-                        {!isFree && hasLimits ? ` · ${totalAvailable} Tickets verfügbar` : ' · Dein Event'}
-                    </Text>
-                </View>
-                <TouchableOpacity
-                    style={[deskBarStyles.btn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1, borderColor: colors.outlineVariant }]}
-                    onPress={() => {}}
-                    disabled
-                >
-                    <Text style={[deskBarStyles.btnText, { color: colors.onSurfaceVariant }]}>Veranstalter</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
-
     if (isFree) {
         const btnBg = (event.is_public && rsvpStatus === 'Accepted') ? 'transparent' : colors.primary;
         const btnBorder = (event.is_public && rsvpStatus === 'Accepted') ? colors.outline : 'transparent';
@@ -1065,35 +1038,6 @@ export default function EventScreen() {
 
             {/* Sticky Bottom Bar — mobile only */}
             {!isDesktop && (() => {
-                if (event.is_host) {
-                    const tickets = event.ticket_options ?? [];
-                    const cheapest = tickets.length ? Math.min(...tickets.map(t => t.price)) : null;
-                    const totalAvailable = tickets.reduce((sum, t) => sum + (t.quantity_limit ?? 0), 0);
-                    const hasLimits = tickets.some(t => t.quantity_limit != null);
-                    return (
-                        <View style={[
-                            styles.stickyBar,
-                            { borderTopColor: colors.outlineVariant },
-                            isWeb
-                                ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
-                                : { backgroundColor: colors.surface },
-                        ]}>
-                            <View style={styles.stickyBarInfo}>
-                                <Text style={[styles.stickyBarPrice, { color: colors.onSurface }]}>
-                                    {effectiveIsFree ? 'Kostenlos' : cheapest != null ? `ab ${cheapest.toFixed(2)} €` : 'Kostenpflichtig'}
-                                </Text>
-                                <Text style={[styles.stickyBarHint, { color: colors.onSurfaceVariant }]}>
-                                    {event.participant_count} Teilnehmer
-                                    {!effectiveIsFree && hasLimits ? ` · ${totalAvailable} Tickets verfügbar` : ' · Dein Event'}
-                                </Text>
-                            </View>
-                            <View style={[styles.stickyBarButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1, borderColor: colors.outlineVariant }]}>
-                                <Text style={[styles.stickyBarButtonText, { color: colors.onSurfaceVariant }]}>Veranstalter</Text>
-                            </View>
-                        </View>
-                    );
-                }
-
                 if (effectiveIsFree) {
                     const statusHint = rsvpStatus === 'Accepted' ? 'Du hast zugesagt'
                         : rsvpStatus === 'Declined' ? 'Du hast abgesagt'

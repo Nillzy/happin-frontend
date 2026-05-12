@@ -4,7 +4,7 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    Modal,
+    Pressable,
     Animated,
     PanResponder,
     Dimensions,
@@ -68,6 +68,8 @@ export default function ImageSelectionModal({
     const [uploading, setUploading] = useState(false);
 
     const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+    const backdropOpacity = useRef(new Animated.Value(0)).current;
+
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
@@ -80,15 +82,14 @@ export default function ImageSelectionModal({
         })
     ).current;
 
+    // Gleiche Pattern wie TicketDetailScreen: Animation beim Mount
     useEffect(() => {
-        if (visible && eventTitle?.trim()) {
-            fetchStockPhotos(eventTitle);
-        }
-    }, [visible, eventTitle]);
-
-    const handleShow = () => {
-        Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
-    };
+        Animated.parallel([
+            Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }),
+            Animated.timing(backdropOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+        ]).start();
+        if (eventTitle?.trim()) fetchStockPhotos(eventTitle);
+    }, []);
 
     const fetchStockPhotos = async (title: string) => {
         try {
@@ -139,8 +140,10 @@ export default function ImageSelectionModal({
     };
 
     const handleClose = () => {
-        Animated.timing(translateY, { toValue: SCREEN_HEIGHT, duration: 300, useNativeDriver: true })
-            .start(() => onClose());
+        Animated.parallel([
+            Animated.timing(translateY, { toValue: SCREEN_HEIGHT, duration: 300, useNativeDriver: true }),
+            Animated.timing(backdropOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+        ]).start(() => onClose());
     };
 
     const handleGradientSelect = (id: GradientId) => {
@@ -156,142 +159,148 @@ export default function ImageSelectionModal({
     if (!visible) return null;
 
     return (
-        <Modal visible={visible} transparent animationType="none" statusBarTranslucent hardwareAccelerated onRequestClose={handleClose} onShow={handleShow}>
-            <View style={styles.modalOverlay}>
-                <Animated.View
-                    style={[styles.sheetContainer, { backgroundColor: colors.background, transform: [{ translateY }] }]}
-                    {...panResponder.panHandlers}
-                >
-                    <View>
-                        <View style={styles.dragHandle}>
-                            <View style={[styles.dragIndicator, { backgroundColor: colors.outlineVariant }]} />
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+            <Animated.View
+                style={[styles.backdrop, { opacity: backdropOpacity }]}
+                pointerEvents="box-none"
+            >
+                <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+            </Animated.View>
+
+            <Animated.View
+                style={[styles.sheetContainer, { backgroundColor: colors.background, transform: [{ translateY }] }]}
+                {...panResponder.panHandlers}
+            >
+                <View style={styles.dragHandle}>
+                    <View style={[styles.dragIndicator, { backgroundColor: colors.outlineVariant }]} />
+                </View>
+
+                <View style={styles.header}>
+                    <Text style={[styles.headerTitle, { color: colors.onSurface }]}>Titelbild wählen</Text>
+                    <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                        <Ionicons name="close" size={28} color={colors.onSurface} />
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+                    {/* Eigenes Bild hochladen */}
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Eigenes Bild</Text>
+                        <TouchableOpacity
+                            style={[styles.uploadCard, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}
+                            onPress={handlePickImage}
+                            activeOpacity={0.7}
+                            disabled={uploading}
+                        >
+                            {uploading ? (
+                                <>
+                                    <ActivityIndicator size="large" color={colors.primary} />
+                                    <Text style={[styles.uploadText, { color: colors.onSurface }]}>Wird hochgeladen...</Text>
+                                </>
+                            ) : (
+                                <>
+                                    <Ionicons name="cloud-upload-outline" size={36} color={colors.primary} />
+                                    <Text style={[styles.uploadText, { color: colors.onSurface }]}>Bild hochladen</Text>
+                                    <Text style={[styles.uploadSubtext, { color: colors.onSurfaceVariant }]}>JPG, PNG bis 10 MB</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Stockbilder-Vorschläge */}
+                    {eventTitle?.trim() && (
+                        <View style={styles.section}>
+                            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>{'Vorschläge für „'}{eventTitle}{'"'}</Text>
+                            {stockLoading ? (
+                                <View style={styles.stockLoading}>
+                                    <ActivityIndicator size="small" color={colors.primary} />
+                                </View>
+                            ) : stockPhotos.length > 0 ? (
+                                <>
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stockScroll}>
+                                        {stockPhotos.map((photo, index) => {
+                                            const isSelected = selectedImageUrl === photo.url;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={`stock-${index}`}
+                                                    style={[
+                                                        styles.stockCard,
+                                                        isSelected && { borderColor: colors.primary, borderWidth: 2.5 },
+                                                    ]}
+                                                    onPress={() => handleStockSelect(photo)}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Image
+                                                        source={{ uri: photo.thumbnail }}
+                                                        style={styles.stockImage}
+                                                        resizeMode="cover"
+                                                    />
+                                                    {isSelected && (
+                                                        <View style={[styles.checkmark, styles.stockCheckmark, { backgroundColor: colors.primary }]}>
+                                                            <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
+                                                        </View>
+                                                    )}
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </ScrollView>
+                                    <Text style={[styles.unsplashCredit, { color: colors.onSurfaceVariant }]}>
+                                        Kostenlose Bilder von Unsplash
+                                    </Text>
+                                </>
+                            ) : null}
                         </View>
+                    )}
 
-                        <View style={styles.header}>
-                            <Text style={[styles.headerTitle, { color: colors.onSurface }]}>Titelbild wählen</Text>
-                            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                                <Ionicons name="close" size={28} color={colors.onSurface} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
-                            {/* Eigenes Bild hochladen */}
-                            <View style={styles.section}>
-                                <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Eigenes Bild</Text>
+                    {/* Gradient-Vorlagen */}
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitleSmall, { color: colors.onSurfaceVariant }]}>
+                            Oder eine Farbvorlage wählen
+                        </Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.gradientScroll}>
+                            {GRADIENT_PAIRS.map((gradient, index) => (
                                 <TouchableOpacity
-                                    style={[styles.uploadCard, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}
-                                    onPress={handlePickImage}
-                                    activeOpacity={0.7}
-                                    disabled={uploading}
+                                    key={index}
+                                    style={[
+                                        styles.gradientCard,
+                                        selectedGradientId === index && { borderColor: colors.primary, borderWidth: 2.5 },
+                                    ]}
+                                    onPress={() => handleGradientSelect(index as GradientId)}
+                                    activeOpacity={0.8}
                                 >
-                                    {uploading ? (
-                                        <>
-                                            <ActivityIndicator size="large" color={colors.primary} />
-                                            <Text style={[styles.uploadText, { color: colors.onSurface }]}>Wird hochgeladen...</Text>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Ionicons name="cloud-upload-outline" size={36} color={colors.primary} />
-                                            <Text style={[styles.uploadText, { color: colors.onSurface }]}>Bild hochladen</Text>
-                                            <Text style={[styles.uploadSubtext, { color: colors.onSurfaceVariant }]}>JPG, PNG bis 10 MB</Text>
-                                        </>
+                                    <LinearGradient
+                                        colors={gradient as [string, string]}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={styles.gradientPreview}
+                                    />
+                                    {selectedGradientId === index && (
+                                        <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
+                                            <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
+                                        </View>
                                     )}
                                 </TouchableOpacity>
-                            </View>
-
-                            {/* Stockbilder-Vorschläge */}
-                            {eventTitle?.trim() && (
-                                <View style={styles.section}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>{'Vorschläge für „'}{eventTitle}{'"'}</Text>
-                                    {stockLoading ? (
-                                        <View style={styles.stockLoading}>
-                                            <ActivityIndicator size="small" color={colors.primary} />
-                                        </View>
-                                    ) : stockPhotos.length > 0 ? (
-                                        <>
-                                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stockScroll}>
-                                                {stockPhotos.map((photo, index) => {
-                                                    const isSelected = selectedImageUrl === photo.url;
-                                                    return (
-                                                        <TouchableOpacity
-                                                            key={`stock-${index}`}
-                                                            style={[
-                                                                styles.stockCard,
-                                                                isSelected && { borderColor: colors.primary, borderWidth: 2.5 },
-                                                            ]}
-                                                            onPress={() => handleStockSelect(photo)}
-                                                            activeOpacity={0.8}
-                                                        >
-                                                            <Image
-                                                                source={{ uri: photo.thumbnail }}
-                                                                style={styles.stockImage}
-                                                                resizeMode="cover"
-                                                            />
-                                                            {isSelected && (
-                                                                <View style={[styles.checkmark, styles.stockCheckmark, { backgroundColor: colors.primary }]}>
-                                                                    <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
-                                                                </View>
-                                                            )}
-                                                        </TouchableOpacity>
-                                                    );
-                                                })}
-                                            </ScrollView>
-                                            <Text style={[styles.unsplashCredit, { color: colors.onSurfaceVariant }]}>
-                                                Kostenlose Bilder von Unsplash
-                                            </Text>
-                                        </>
-                                    ) : null}
-                                </View>
-                            )}
-
-                            {/* Gradient-Vorlagen */}
-                            <View style={styles.section}>
-                                <Text style={[styles.sectionTitleSmall, { color: colors.onSurfaceVariant }]}>
-                                    Oder eine Farbvorlage wählen
-                                </Text>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.gradientScroll}>
-                                    {GRADIENT_PAIRS.map((gradient, index) => (
-                                        <TouchableOpacity
-                                            key={index}
-                                            style={[
-                                                styles.gradientCard,
-                                                selectedGradientId === index && { borderColor: colors.primary, borderWidth: 2.5 },
-                                            ]}
-                                            onPress={() => handleGradientSelect(index as GradientId)}
-                                            activeOpacity={0.8}
-                                        >
-                                            <LinearGradient
-                                                colors={gradient as [string, string]}
-                                                start={{ x: 0, y: 0 }}
-                                                end={{ x: 1, y: 1 }}
-                                                style={styles.gradientPreview}
-                                            />
-                                            {selectedGradientId === index && (
-                                                <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
-                                                    <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                            </View>
-
+                            ))}
                         </ScrollView>
                     </View>
-                </Animated.View>
-            </View>
-        </Modal>
+
+                </ScrollView>
+            </Animated.View>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    modalOverlay: {
-        flex: 1,
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
     },
     sheetContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         maxHeight: SCREEN_HEIGHT * 0.85,
@@ -341,8 +350,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginBottom: 12,
     },
-
-    // Upload
     uploadCard: {
         borderRadius: 16,
         borderWidth: 2,
@@ -359,8 +366,6 @@ const styles = StyleSheet.create({
     uploadSubtext: {
         fontSize: 13,
     },
-
-    // Stock photos
     stockScroll: {
         marginHorizontal: -24,
         paddingHorizontal: 24,
@@ -391,8 +396,6 @@ const styles = StyleSheet.create({
         fontSize: 11,
         marginTop: 8,
     },
-
-    // Gradients
     gradientScroll: {
         marginHorizontal: -24,
         paddingHorizontal: 24,

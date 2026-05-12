@@ -47,6 +47,7 @@ export default function ScanTicketScreen() {
     const processingRef = useRef(false);
     const scannedTokens = useRef(new Set<string>());
     const autoResumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const resumedTokenRef = useRef<{ token: string; at: number } | null>(null);
 
     useEffect(() => {
         return () => {
@@ -54,11 +55,14 @@ export default function ScanTicketScreen() {
         };
     }, []);
 
-    const scheduleResume = () => {
+    const scheduleResume = (delay = 2500, completedToken?: string) => {
         autoResumeTimer.current = setTimeout(() => {
             processingRef.current = false;
+            if (completedToken) {
+                resumedTokenRef.current = { token: completedToken, at: Date.now() };
+            }
             setDisplay({ state: 'idle', payload: null, backendResult: null });
-        }, 2500);
+        }, delay);
     };
 
     const handleBarCodeScanned = useCallback(async ({ data }: { data: string }) => {
@@ -67,12 +71,20 @@ export default function ScanTicketScreen() {
         if (autoResumeTimer.current) clearTimeout(autoResumeTimer.current);
 
         if (scannedTokens.current.has(data)) {
-            setDisplay({
-                state: 'invalid',
-                payload: parseTicketPayload(data),
-                backendResult: { valid: false, reason: 'already_used' },
-            });
-            scheduleResume();
+            const resumed = resumedTokenRef.current;
+            const justResumed = resumed?.token === data && Date.now() - resumed.at < 1500;
+            if (justResumed) {
+                autoResumeTimer.current = setTimeout(() => {
+                    processingRef.current = false;
+                }, 500);
+            } else {
+                setDisplay({
+                    state: 'invalid',
+                    payload: parseTicketPayload(data),
+                    backendResult: { valid: false, reason: 'already_used' },
+                });
+                scheduleResume(2500, data);
+            }
             return;
         }
 
@@ -96,7 +108,12 @@ export default function ScanTicketScreen() {
             const response = await api.scanTicket(eventId, data, token);
             setOffline(false);
 
+            let resumeDelay = 2500;
+            let completedToken: string | undefined;
+
             if (response.valid) {
+                resumeDelay = 4000;
+                completedToken = data;
                 setScanCount(c => c + 1);
                 scannedTokens.current.add(data);
                 const timeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -105,6 +122,8 @@ export default function ScanTicketScreen() {
             } else {
                 setDisplay({ state: 'invalid', payload, backendResult: response });
             }
+
+            scheduleResume(resumeDelay, completedToken);
         } catch {
             setOffline(true);
             scannedTokens.current.add(data);
@@ -112,9 +131,8 @@ export default function ScanTicketScreen() {
             const timeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             setHistory(h => [{ name: payload.name, opt: payload.opt, nr: payload.nr, time: timeStr }, ...h]);
             setDisplay({ state: 'offline', payload, backendResult: null });
+            scheduleResume();
         }
-
-        scheduleResume();
     }, [eventId]);
 
     const historyTranslateY = useRef(new Animated.Value(0)).current;
