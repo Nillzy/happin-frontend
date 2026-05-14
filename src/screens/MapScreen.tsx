@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { useTheme } from '@/hooks/use-theme';
 import { useUserCity } from '@/hooks/use-user-city';
 import Navbar from '../components/atoms/Navbar';
@@ -130,6 +131,7 @@ export default function MapScreen() {
 
     return (
         <ScreenWithNav>
+            <Head><title>Karte – Happin</title></Head>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 {Platform.OS === 'web' && <Navbar showCta={false} />}
 

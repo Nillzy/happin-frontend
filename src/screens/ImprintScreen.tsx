@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
@@ -13,6 +14,7 @@ export default function ImprintScreen() {
 
     return (
         <ScreenWithNav>
+            <Head><title>Impressum – Happin</title></Head>
             <Navbar showCta={false} />
             <ScrollView
                 style={{ backgroundColor: colors.background }}

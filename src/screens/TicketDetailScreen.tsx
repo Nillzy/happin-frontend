@@ -14,11 +14,13 @@ import {
     Platform,
     Alert,
     Linking,
+    Image,
     useWindowDimensions,
 } from 'react-native';
 import type { ViewToken } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
@@ -349,19 +351,16 @@ export default function TicketDetailScreen() {
 
                 {/* Add to Google Wallet Button — nur Android + Web */}
                 {Platform.OS !== 'ios' && (
-                    <TouchableOpacity
-                        style={[styles.walletButton, { backgroundColor: colors.surface, borderColor: colors.outlineVariant }]}
+                    <Pressable
                         onPress={handleAddToWallet}
                         disabled={walletLoading}
+                        style={[styles.walletImageWrapper, { opacity: walletLoading ? 0.5 : 1 }]}
                     >
-                        {walletLoading ? (
-                            <ActivityIndicator size="small" color={colors.onSurface} />
-                        ) : (
-                            <Text style={[styles.walletButtonText, { color: colors.onSurface }]}>
-                                Zu Google Wallet hinzufügen
-                            </Text>
+                        <Image source={require('../../assets/images/de_add_to_google_wallet_wallet-button.svg')} style={styles.walletImage} />
+                        {walletLoading && (
+                            <ActivityIndicator size="small" color={colors.onSurface} style={StyleSheet.absoluteFill} />
                         )}
-                    </TouchableOpacity>
+                    </Pressable>
                 )}
 
                 {/* Veranstaltung ansehen Button */}
@@ -385,6 +384,7 @@ export default function TicketDetailScreen() {
 
     return (
         <View style={styles.container}>
+            <Head><title>{event ? `Ticket – ${event.title}` : 'Ticket – Happin'}</title></Head>
             {/* Backdrop */}
             <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
                 <Pressable style={StyleSheet.absoluteFill} onPress={dismissSheet} />
@@ -577,20 +577,14 @@ const styles = StyleSheet.create({
     },
 
     // Wallet Button
-    walletButton: {
-        flexDirection: 'row',
+    walletImageWrapper: {
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 24,
-        borderRadius: 12,
-        borderWidth: 2,
         marginBottom: 24,
         marginHorizontal: 24,
     },
-    walletButtonText: {
-        fontSize: 17,
-        fontWeight: '600',
+    walletImage: {
+        height: 56,
+        resizeMode: 'contain',
     },
 
     // Event Button

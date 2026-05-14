@@ -13,6 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
@@ -208,6 +209,7 @@ export default function SavedEventsScreen() {
 
     return (
         <ScreenWithNav>
+            <Head><title>Gespeicherte Events – Happin</title></Head>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 <Navbar showCta={false} showBack onBackPress={() => router.back()} />
 
