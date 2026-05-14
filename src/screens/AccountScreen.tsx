@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { useTheme } from '@/hooks/use-theme';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
@@ -450,6 +451,7 @@ export default function AccountScreen() {
 
     return (
         <ScreenWithNav>
+            <Head><title>Konto – Happin</title></Head>
             <View style={[s.root, { backgroundColor: colors.background }]}>
                 <Navbar showCta={false} />
                 <ScrollView

@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import { sendOtp, verifyOtp } from '../services/supabase';
@@ -265,6 +266,7 @@ export default function LoginScreen() {
             style={[s.root, { backgroundColor: colors.background }]}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+            <Head><title>Anmelden – Happin</title></Head>
             <Navbar showBack />
             <ScrollView
                 contentContainerStyle={s.scrollContent}

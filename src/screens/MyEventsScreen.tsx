@@ -15,6 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { SkeletonEventCard, SkeletonHostCard, SkeletonTicketCard } from '../components/atoms/SkeletonBox';
@@ -496,6 +497,7 @@ export default function MyEventsScreen() {
 
     return (
         <ScreenWithNav>
+            <Head><title>Meine Events – Happin</title></Head>
             <View style={[styles.container, { backgroundColor: colors.background }]}>
                 <Navbar showCta={false} />
 

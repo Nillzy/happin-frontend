@@ -28,6 +28,7 @@ import Svg, {
 import { MAP_PATHS_PRIMARY, MAP_PATHS_SECONDARY, MAP_PATHS_MINOR } from '@/constants/berlin-map-paths';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import { getTimeBasedSlogan } from '../utils/getTimeBasedSlogan';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
@@ -429,6 +430,7 @@ export default function HomeScreen() {
             contentContainerStyle={styles.container}
             showsVerticalScrollIndicator={false}
         >
+            <Head><title>Happin</title></Head>
             {/* ── Nav ── */}
             <Navbar landingPage showNavItems={false} />
 
