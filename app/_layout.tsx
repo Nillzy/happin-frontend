@@ -14,9 +14,22 @@ export default function RootLayout() {
       <AuthProvider>
         <SavedEventsProvider>
           <Stack screenOptions={{ headerShown: false }} initialRouteName="index">
+            <Stack.Screen name="index" options={{ title: 'Happin' }} />
+            <Stack.Screen name="login" options={{ title: 'Anmelden – Happin' }} />
+            <Stack.Screen name="events/index" options={{ title: 'Events – Happin' }} />
+            <Stack.Screen name="events/create" options={{ title: 'Event erstellen – Happin' }} />
+            <Stack.Screen name="events/create/step-2" options={{ title: 'Event erstellen – Happin' }} />
+            <Stack.Screen name="my-events" options={{ title: 'Meine Events – Happin' }} />
+            <Stack.Screen name="saved-events" options={{ title: 'Gespeicherte Events – Happin' }} />
+            <Stack.Screen name="account" options={{ title: 'Konto – Happin' }} />
+            <Stack.Screen name="map" options={{ title: 'Karte – Happin' }} />
+            <Stack.Screen name="contact" options={{ title: 'Kontakt – Happin' }} />
+            <Stack.Screen name="imprint" options={{ title: 'Impressum – Happin' }} />
+            <Stack.Screen name="privacy" options={{ title: 'Datenschutz – Happin' }} />
             <Stack.Screen
               name="ticket/[eventId]"
               options={{
+                title: 'Ticket – Happin',
                 presentation: 'transparentModal',
                 animation: 'fade',
                 contentStyle: { backgroundColor: 'transparent' },

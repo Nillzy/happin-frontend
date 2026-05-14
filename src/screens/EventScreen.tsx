@@ -26,6 +26,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Calendar from 'expo-calendar';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import EventCategories from '../components/event/EventCategories';
@@ -665,6 +666,7 @@ export default function EventScreen() {
 
     return (
         <ScreenWithNav showBottomNav={false}>
+            <Head><title>{event.title} – Happin</title></Head>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 {/* Blurred background image */}
                 {event.image_url ? (

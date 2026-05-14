@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
@@ -416,6 +417,7 @@ export default function EventListScreen() {
 
     return (
         <ScreenWithNav>
+            <Head><title>Events – Happin</title></Head>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 {isWeb && <Navbar showCta={false} />}
 

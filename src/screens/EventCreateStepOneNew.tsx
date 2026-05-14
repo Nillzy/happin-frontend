@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter } from 'expo-router';
+import Head from 'expo-router/head';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import DatePicker from '../components/atoms/DatePicker';
@@ -102,6 +103,7 @@ export default function EventCreateStepOneNew() {
 
     return (
         <ScreenWithNav>
+            <Head><title>Event erstellen – Happin</title></Head>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 <Navbar showCta={false} showBack onBackPress={handleBack} />
                 {Platform.OS !== 'web' && (
