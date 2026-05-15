@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -10,6 +10,7 @@ import {
     Dimensions,
     ScrollView,
     Platform,
+    Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
@@ -35,6 +36,16 @@ export default function EditDrawer({
 }: EditDrawerProps) {
     const { colors } = useTheme();
 
+    const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+    useEffect(() => {
+        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+        const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+        const show = Keyboard.addListener(showEvent, e => setKeyboardOffset(e.endCoordinates.height));
+        const hide = Keyboard.addListener(hideEvent, () => setKeyboardOffset(0));
+        return () => { show.remove(); hide.remove(); };
+    }, []);
+
     const disableCloseRef = useRef(disableClose);
     disableCloseRef.current = disableClose;
 
@@ -44,8 +55,10 @@ export default function EditDrawer({
     const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-    // Gleiche Pattern wie TicketDetailScreen: Animation beim Mount, kein Modal
     useEffect(() => {
+        if (!visible) return;
+        translateY.setValue(SCREEN_HEIGHT);
+        backdropOpacity.setValue(0);
         Animated.parallel([
             Animated.spring(translateY, {
                 toValue: 0,
@@ -59,7 +72,7 @@ export default function EditDrawer({
                 useNativeDriver: true,
             }),
         ]).start();
-    }, []);
+    }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const animateClose = useCallback(() => {
         Animated.parallel([
@@ -125,7 +138,12 @@ export default function EditDrawer({
             <Animated.View
                 style={[
                     styles.sheet,
-                    { backgroundColor: colors.background, transform: [{ translateY }] },
+                    {
+                        backgroundColor: colors.background,
+                        transform: [{ translateY }],
+                        bottom: keyboardOffset,
+                        paddingBottom: keyboardOffset > 0 ? 8 : (Platform.OS === 'ios' ? 34 : 24),
+                    },
                 ]}
             >
                 <View {...panResponder.panHandlers} style={styles.dragHandle}>
@@ -160,7 +178,6 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         maxHeight: SCREEN_HEIGHT * 0.88,
-        paddingBottom: Platform.OS === 'ios' ? 34 : 24,
     },
     dragHandle: {
         alignItems: 'center',

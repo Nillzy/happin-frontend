@@ -673,6 +673,7 @@ export default function EventScreen() {
                     <Image
                         source={{ uri: event.image_url }}
                         style={[styles.bgImage, isWeb ? { filter: 'blur(60px) saturate(1.8) brightness(0.7)' } as any : {}]}
+                        blurRadius={isWeb ? 0 : 25}
                         resizeMode="cover"
                     />
                 ) : (
