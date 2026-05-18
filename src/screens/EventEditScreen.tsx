@@ -226,8 +226,9 @@ export default function EventEditScreen() {
                 break;
             case 'startDateTime': {
                 const start = new Date(event.starts_at);
-                setDraftStartDate(start.toISOString().slice(0, 10));
-                setDraftStartTime(start.toISOString().slice(11, 16));
+                const pad = (n: number) => String(n).padStart(2, '0');
+                setDraftStartDate(`${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`);
+                setDraftStartTime(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
                 break;
             }
             case 'description':
@@ -299,8 +300,9 @@ export default function EventEditScreen() {
                 setDraftIsPublic(event.is_public ?? true);
                 if (event.ends_at) {
                     const end = new Date(event.ends_at);
-                    setDraftEndDate(end.toISOString().slice(0, 10));
-                    setDraftEndTime(end.toISOString().slice(11, 16));
+                    const pad = (n: number) => String(n).padStart(2, '0');
+                    setDraftEndDate(`${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`);
+                    setDraftEndTime(`${pad(end.getHours())}:${pad(end.getMinutes())}`);
                 } else {
                     setDraftEndDate('');
                     setDraftEndTime('');
