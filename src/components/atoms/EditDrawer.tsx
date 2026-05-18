@@ -37,6 +37,7 @@ export default function EditDrawer({
     const { colors } = useTheme();
 
     const [keyboardOffset, setKeyboardOffset] = useState(0);
+    const [isClosing, setIsClosing] = useState(false);
 
     useEffect(() => {
         const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -57,6 +58,7 @@ export default function EditDrawer({
 
     useEffect(() => {
         if (!visible) return;
+        setIsClosing(false);
         translateY.setValue(SCREEN_HEIGHT);
         backdropOpacity.setValue(0);
         Animated.parallel([
@@ -75,6 +77,7 @@ export default function EditDrawer({
     }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const animateClose = useCallback(() => {
+        setIsClosing(true);
         Animated.parallel([
             Animated.timing(translateY, {
                 toValue: SCREEN_HEIGHT,
@@ -130,7 +133,7 @@ export default function EditDrawer({
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
             <Animated.View
                 style={[styles.backdrop, { opacity: backdropOpacity }]}
-                pointerEvents="box-none"
+                pointerEvents={isClosing ? 'none' : 'box-none'}
             >
                 <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
             </Animated.View>

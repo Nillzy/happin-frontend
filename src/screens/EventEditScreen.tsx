@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import Head from 'expo-router/head';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import EditDrawer from '../components/atoms/EditDrawer';
 import ImageSelectionModal from '../components/atoms/ImageSelectionModal';
@@ -29,7 +30,7 @@ import MapView from '../components/MapView';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
 import { getGradientByIndex, type GradientId } from '../constants/gradients';
-import { geocodeAddress } from '../services/geocoding';
+import { geocodeAddress, reverseGeocode } from '../services/geocoding';
 import type { EventDetailResponse, TicketOption, CustomField, CustomFieldType } from '../types/events';
 import type { AddressSuggestion } from '../services/geocoding';
 
@@ -51,7 +52,7 @@ function localIso(date: string, time: string): string {
     return `${date}T${time}:00${sign}${pad(Math.floor(Math.abs(tzOffset) / 60))}:${pad(Math.abs(tzOffset) % 60)}`;
 }
 
-type DrawerKey = 'image' | 'description' | 'categories' | 'location' | 'tickets' | 'details' | 'gallery' | 'customFields' | null;
+type DrawerKey = 'image' | 'title' | 'startDateTime' | 'description' | 'categories' | 'location' | 'tickets' | 'details' | 'gallery' | 'customFields' | null;
 
 export default function EventEditScreen() {
     const { colors, isDark } = useTheme();
@@ -62,23 +63,32 @@ export default function EventEditScreen() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);    const [error, setError] = useState<string | null>(null);
     const [activeDrawer, setActiveDrawer] = useState<DrawerKey>(null);
-    const [showImageModal, setShowImageModal] = useState(false);
     const [selectedGradientId, setSelectedGradientId] = useState<GradientId | undefined>(undefined);
     const [localImageUrl, setLocalImageUrl] = useState<string | null>(null);
     const [gradientInitialized, setGradientInitialized] = useState(false);
 
     // Draft fields
+    const [draftTitle, setDraftTitle] = useState('');
+    const [draftStartDate, setDraftStartDate] = useState('');
+    const [draftStartTime, setDraftStartTime] = useState('');
     const [draftDescription, setDraftDescription] = useState('');
     const [draftCategories, setDraftCategories] = useState<string[]>([]);
     const [draftAddress, setDraftAddress] = useState<AddressSuggestion | null>(null);
     const [draftMaxCapacity, setDraftMaxCapacity] = useState('');
     const [draftMaxTicketsPerPerson, setDraftMaxTicketsPerPerson] = useState('');
+    const [draftIsPublic, setDraftIsPublic] = useState(true);
     const [draftEndDate, setDraftEndDate] = useState('');
     const [draftEndTime, setDraftEndTime] = useState('');
     const [draftGalleryImages, setDraftGalleryImages] = useState<string[]>([]);
     const [draftTickets, setDraftTickets] = useState<TicketOption[]>([]);
     const [draftCustomFields, setDraftCustomFields] = useState<CustomField[]>([]);
     const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+    // Location-Drawer: einheitlicher Zustand (kein Tab-System)
+    const [draftLocText, setDraftLocText] = useState('');
+    const [draftLocCoords, setDraftLocCoords] = useState<{ lat: number; lng: number } | null>(null);
+    const [draftLocAddressConfirmed, setDraftLocAddressConfirmed] = useState(false);
+    const [locReverseLoading, setLocReverseLoading] = useState(false);
     const pendingSavesRef = useRef(0);
     const mountedRef = useRef(false);
 
@@ -151,7 +161,7 @@ export default function EventEditScreen() {
 
         // Strip fields the backend doesn't support via PATCH
         // Remove keys whose value is null unless they are explicitly nullable fields
-        const nullableFields = new Set(['description', 'category', 'ends_at', 'max_capacity', 'gradient_id', 'media_urls']);
+        const nullableFields = new Set(['title', 'description', 'category', 'starts_at', 'ends_at', 'max_capacity', 'max_tickets_per_person', 'is_public', 'is_free', 'gradient_id', 'media_urls']);
         const cleanPatch = Object.fromEntries(
             Object.entries(patch).filter(([k, v]) => v !== null || nullableFields.has(k))
         );
@@ -211,6 +221,15 @@ export default function EventEditScreen() {
     const openDrawer = (key: DrawerKey) => {
         if (!event) return;
         switch (key) {
+            case 'title':
+                setDraftTitle(event.title || '');
+                break;
+            case 'startDateTime': {
+                const start = new Date(event.starts_at);
+                setDraftStartDate(start.toISOString().slice(0, 10));
+                setDraftStartTime(start.toISOString().slice(11, 16));
+                break;
+            }
             case 'description':
                 setDraftDescription(event.description || '');
                 break;
@@ -228,31 +247,48 @@ export default function EventEditScreen() {
             }
             case 'location': {
                 const loc = event.location;
-                if (loc?.street && loc?.city) {
-                    const addr: AddressSuggestion = {
+                if (loc?.latitude != null && loc?.longitude != null) {
+                    const label = loc.street
+                        ? [loc.street, loc.house_number].filter(Boolean).join(' ') + (loc.city ? `, ${loc.city}` : '')
+                        : `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
+                    setDraftLocText(label);
+                    setDraftLocCoords({ lat: loc.latitude, lng: loc.longitude });
+                    setDraftLocAddressConfirmed(true);
+                    setDraftAddress({
+                        street: loc.street ?? '',
+                        houseNumber: loc.house_number ?? null,
+                        postalCode: loc.postal_code ?? null,
+                        city: loc.city ?? '',
+                        country: loc.country ?? '',
+                        displayLabel: label,
+                        lat: loc.latitude,
+                        lng: loc.longitude,
+                    });
+                } else if (loc?.street) {
+                    const label = [loc.street, loc.house_number].filter(Boolean).join(' ') + (loc.city ? `, ${loc.city}` : '');
+                    setDraftLocText(label);
+                    setDraftLocCoords(null);
+                    setDraftLocAddressConfirmed(false);
+                    setDraftAddress({
                         street: loc.street,
                         houseNumber: loc.house_number ?? null,
                         postalCode: loc.postal_code ?? null,
-                        city: loc.city,
+                        city: loc.city ?? '',
                         country: loc.country ?? 'Deutschland',
-                        displayLabel: [
-                            loc.house_number ? `${loc.street} ${loc.house_number}` : loc.street,
-                            [loc.postal_code, loc.city].filter(Boolean).join(' '),
-                        ].filter(Boolean).join(', '),
+                        displayLabel: label,
                         lat: 0,
                         lng: 0,
-                    };
-                    setDraftAddress(addr);
-                    // Koordinaten nachladen damit die Karte korrekt zentriert ist
+                    });
                     geocodeAddress(
                         loc.house_number ? `${loc.street} ${loc.house_number}` : loc.street,
-                        loc.city,
+                        loc.city ?? null,
                         loc.postal_code ?? null,
                         loc.country ?? null,
-                    ).then((coords) => {
-                        if (coords) setDraftAddress(prev => prev ? { ...prev, lat: coords.lat, lng: coords.lng } : prev);
-                    });
+                    ).then(c => { if (c) setDraftLocCoords(c); });
                 } else {
+                    setDraftLocText('');
+                    setDraftLocCoords(null);
+                    setDraftLocAddressConfirmed(false);
                     setDraftAddress(null);
                 }
                 break;
@@ -260,6 +296,7 @@ export default function EventEditScreen() {
             case 'details':
                 setDraftMaxCapacity(event.max_capacity ? String(event.max_capacity) : '');
                 setDraftMaxTicketsPerPerson(event.max_tickets_per_person && event.max_tickets_per_person > 1 ? String(event.max_tickets_per_person) : '');
+                setDraftIsPublic(event.is_public ?? true);
                 if (event.ends_at) {
                     const end = new Date(event.ends_at);
                     setDraftEndDate(end.toISOString().slice(0, 10));
@@ -283,8 +320,7 @@ export default function EventEditScreen() {
                 setDraftCustomFields(event.custom_fields?.length ? [...event.custom_fields] : []);
                 break;
             case 'image':
-                setShowImageModal(true);
-                return;
+                break;
         }
         setActiveDrawer(key);
     };
@@ -292,6 +328,19 @@ export default function EventEditScreen() {
     const closeDrawer = () => {
         if (!event || !activeDrawer) { setActiveDrawer(null); return; }
         switch (activeDrawer) {
+            case 'image':
+                break;
+            case 'title':
+                if (draftTitle.trim() && draftTitle !== event.title)
+                    saveField({ title: draftTitle.trim() });
+                break;
+            case 'startDateTime':
+                if (draftStartDate && draftStartTime) {
+                    const newStarts = localIso(draftStartDate, draftStartTime);
+                    if (newStarts !== event.starts_at)
+                        saveField({ starts_at: newStarts });
+                }
+                break;
             case 'description':
                 if (draftDescription !== (event.description || ''))
                     saveField({ description: draftDescription || null });
@@ -303,23 +352,30 @@ export default function EventEditScreen() {
                 break;
             }
             case 'location':
-                if (draftAddress) {
+                if (draftLocCoords) {
                     saveField({
                         location: {
-                            city: draftAddress.city,
-                            street: draftAddress.street || undefined,
-                            house_number: draftAddress.houseNumber || undefined,
-                            postal_code: draftAddress.postalCode || undefined,
-                            country: draftAddress.country || undefined,
+                            city: draftAddress?.city || draftLocText || `${draftLocCoords.lat.toFixed(4)}, ${draftLocCoords.lng.toFixed(4)}`,
+                            street: draftAddress?.street || undefined,
+                            house_number: draftAddress?.houseNumber || undefined,
+                            postal_code: draftAddress?.postalCode || undefined,
+                            country: draftAddress?.country || undefined,
+                            latitude: draftLocCoords.lat,
+                            longitude: draftLocCoords.lng,
                         },
                     });
+                    setMapCoords(draftLocCoords);
+                } else if (draftLocText.trim()) {
+                    saveField({ location: { street: draftLocText.trim() } });
+                    setMapCoords(null);
                 }
                 break;
             case 'details': {
                 const patch: Record<string, any> = {};
+                patch.ends_at = (draftEndDate && draftEndTime) ? localIso(draftEndDate, draftEndTime) : null;
                 patch.max_capacity = draftMaxCapacity ? Number(draftMaxCapacity) : null;
                 patch.max_tickets_per_person = draftMaxTicketsPerPerson ? Number(draftMaxTicketsPerPerson) : 1;
-                patch.ends_at = (draftEndDate && draftEndTime) ? localIso(draftEndDate, draftEndTime) : null;
+                patch.is_public = draftIsPublic;
                 saveField(patch);
                 break;
             }
@@ -485,6 +541,7 @@ export default function EventEditScreen() {
 
     return (
         <ScreenWithNav showBottomNav={false}>
+            <Head><title>{event.title} bearbeiten – Happin</title></Head>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 {/* === Blurred background === */}
                 {showImage ? (
@@ -533,8 +590,18 @@ export default function EventEditScreen() {
                         {/* Title Overlay */}
                         <View style={styles.titleOverlay}>
                             <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.titleGradient}>
-                                <Text style={styles.heroTitle}>{event.title}</Text>
-                                <Text style={styles.heroDate}>{formatDateGerman(event.starts_at)}</Text>
+                                <TouchableOpacity onPress={() => openDrawer('title')} activeOpacity={0.8} style={styles.heroEditRow}>
+                                    <Text style={styles.heroTitle}>{event.title}</Text>
+                                    <View style={styles.heroEditIcon}>
+                                        <Ionicons name="pencil" size={13} color="#ffffff" />
+                                    </View>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => openDrawer('startDateTime')} activeOpacity={0.8} style={styles.heroEditRow}>
+                                    <Text style={styles.heroDate}>{formatDateGerman(event.starts_at)}</Text>
+                                    <View style={styles.heroEditIcon}>
+                                        <Ionicons name="pencil" size={11} color="rgba(255,255,255,0.8)" />
+                                    </View>
+                                </TouchableOpacity>
                             </LinearGradient>
                         </View>
 
@@ -601,6 +668,10 @@ export default function EventEditScreen() {
                                                 <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
                                                     {event.location.street && event.location.house_number
                                                         ? `${event.location.street} ${event.location.house_number}`
+                                                        : event.location.street
+                                                        ? event.location.street
+                                                        : (event.location.latitude != null && event.location.longitude != null)
+                                                        ? `${event.location.latitude.toFixed(5)}, ${event.location.longitude.toFixed(5)}`
                                                         : event.location.city || 'Adresse nicht verfügbar'}
                                                 </Text>
                                                 <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
@@ -711,6 +782,12 @@ export default function EventEditScreen() {
                             <View style={[...glassCard, styles.section, { padding: 20, position: 'relative' }]}>
                                 <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Details</Text>
                                 <View style={styles.detailRow}>
+                                    <Ionicons name={event.is_public ? 'globe-outline' : 'lock-closed-outline'} size={18} color={colors.onSurfaceVariant} />
+                                    <Text style={[styles.detailText, { color: colors.onSurface }]}>
+                                        {event.is_public ? 'Öffentlich' : 'Privat'}
+                                    </Text>
+                                </View>
+                                <View style={styles.detailRow}>
                                     <Ionicons name="people-outline" size={18} color={colors.onSurfaceVariant} />
                                     <Text style={[styles.detailText, { color: colors.onSurface }]}>
                                         {event.max_capacity ? `Max. ${event.max_capacity} Teilnehmer` : 'Keine Begrenzung'}
@@ -788,24 +865,46 @@ export default function EventEditScreen() {
                 {/* === DRAWERS === */}
 
                 <ImageSelectionModal
-                    visible={showImageModal}
-                    onClose={() => setShowImageModal(false)}
+                    visible={activeDrawer === 'image'}
+                    onClose={closeDrawer}
                     onSelectGradient={(id) => {
                         setSelectedGradientId(id);
                         setLocalImageUrl(null);
-                        setShowImageModal(false);
+                        closeDrawer();
                         saveField({ gradient_id: id });
                     }}
                     onSelectStockImage={(url, photographer) => {
                         setSelectedGradientId(undefined);
                         setLocalImageUrl(url);
-                        setShowImageModal(false);
+                        closeDrawer();
                         saveField({ image_url: url, gradient_id: null });
                     }}
                     selectedGradientId={selectedGradientId}
                     selectedImageUrl={effectiveImageUrl || undefined}
                     eventTitle={event?.title}
                 />
+
+                <EditDrawer visible={activeDrawer === 'title'} onClose={closeDrawer} title="Titel bearbeiten">
+                    <TextInput
+                        style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant, marginBottom: 0 }]}
+                        value={draftTitle}
+                        onChangeText={setDraftTitle}
+                        placeholder="Eventtitel"
+                        placeholderTextColor={colors.onSurfaceVariant}
+                    />
+                </EditDrawer>
+
+                <EditDrawer visible={activeDrawer === 'startDateTime'} onClose={closeDrawer} title="Startzeit bearbeiten">
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Datum &amp; Uhrzeit</Text>
+                    <View style={[styles.drawerRow, { zIndex: 50 }]}>
+                        <View style={{ flex: 1 }}>
+                            <DatePicker value={draftStartDate} onChange={setDraftStartDate} placeholder="TT.MM.JJJJ" minDate={new Date()} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <TimePicker value={draftStartTime} onChange={setDraftStartTime} placeholder="HH:MM" />
+                        </View>
+                    </View>
+                </EditDrawer>
 
                 <EditDrawer visible={activeDrawer === 'description'} onClose={closeDrawer} title="Beschreibung">
                     <TextInput
@@ -824,28 +923,76 @@ export default function EventEditScreen() {
                 </EditDrawer>
 
                 <EditDrawer visible={activeDrawer === 'location'} onClose={closeDrawer} title="Ort bearbeiten">
-                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Adresse *</Text>
+                    {/* Adressfeld mit Autocomplete */}
                     <AddressAutocomplete
-                        initialSelected={draftAddress}
-                        onSelect={setDraftAddress}
-                        onClear={() => setDraftAddress(null)}
+                        value={draftLocText}
+                        isSelected={draftLocAddressConfirmed}
+                        onSelect={(addr) => {
+                            setDraftAddress(addr);
+                            setDraftLocText(addr.displayLabel);
+                            setDraftLocCoords({ lat: addr.lat, lng: addr.lng });
+                            setDraftLocAddressConfirmed(true);
+                        }}
+                        onClear={() => {
+                            setDraftAddress(null);
+                            setDraftLocText('');
+                            setDraftLocCoords(null);
+                            setDraftLocAddressConfirmed(false);
+                        }}
                     />
-                    {draftAddress && draftAddress.lat !== 0 && draftAddress.lng !== 0 && (
-                        <View style={styles.drawerMap}>
-                            <MapView
-                                markers={[{
-                                    lat: draftAddress.lat,
-                                    lng: draftAddress.lng,
-                                    title: draftAddress.displayLabel,
-                                    eventId: '__preview__',
-                                }]}
-                                centerLat={draftAddress.lat}
-                                centerLng={draftAddress.lng}
-                                zoom={15}
-                                isDark={isDark}
-                                showPopups={false}
-                            />
-                        </View>
+
+                    {/* Kartenbereich */}
+                    <View style={styles.drawerMapWrapper}>
+                        {draftLocCoords ? (
+                            <>
+                                <MapView
+                                    markers={[]}
+                                    centerLat={draftLocCoords.lat}
+                                    centerLng={draftLocCoords.lng}
+                                    zoom={15}
+                                    isDark={isDark}
+                                    showPopups={false}
+                                    onMapMoved={async (lat, lng) => {
+                                        setDraftLocCoords({ lat, lng });
+                                        setDraftLocAddressConfirmed(false);
+                                        setLocReverseLoading(true);
+                                        const addr = await reverseGeocode(lat, lng);
+                                        setLocReverseLoading(false);
+                                        if (addr) {
+                                            setDraftLocText(addr.displayLabel);
+                                            setDraftAddress(addr);
+                                        } else {
+                                            setDraftLocText(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                                            setDraftAddress(null);
+                                        }
+                                    }}
+                                />
+                                {locReverseLoading && (
+                                    <View style={styles.mapReverseLoader}>
+                                        <ActivityIndicator size="small" color={colors.primary} />
+                                    </View>
+                                )}
+                            </>
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.mapPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', borderColor: colors.outlineVariant }]}
+                                activeOpacity={0.7}
+                                onPress={() => setDraftLocCoords({ lat: 52.52, lng: 13.405 })}
+                            >
+                                <Ionicons name="map-outline" size={36} color={colors.onSurfaceVariant} />
+                                <Text style={[styles.mapPlaceholderText, { color: colors.onSurfaceVariant }]}>
+                                    Wähle den Eventort.
+                                </Text>
+                                <Text style={[styles.mapPlaceholderSub, { color: colors.onSurfaceVariant }]}>
+                                    Tippe die Adresse ein oder tippe hier um die Karte zu öffnen
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    {draftLocCoords && (
+                        <Text style={[styles.coordsHint, { color: colors.onSurfaceVariant }]}>
+                            Karte verschieben, um den Ort anzupassen
+                        </Text>
                     )}
                 </EditDrawer>
 
@@ -949,11 +1096,7 @@ export default function EventEditScreen() {
                 </EditDrawer>
 
                 <EditDrawer visible={activeDrawer === 'details'} onClose={closeDrawer} title="Details bearbeiten">
-                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Max. Teilnehmer</Text>
-                    <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxCapacity} onChangeText={setDraftMaxCapacity} placeholder="Keine Begrenzung" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
-                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 4 }]}>Max. Personen pro Gast (inkl. Gast selbst)</Text>
-                    <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxTicketsPerPerson} onChangeText={setDraftMaxTicketsPerPerson} placeholder="1 (keine Begleitpersonen)" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
-                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 16 }]}>Endet am (optional)</Text>
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Endet am (optional)</Text>
                     <View style={[styles.drawerRow, { zIndex: 50 }]}>
                         <View style={{ flex: 1 }}>
                             <DatePicker value={draftEndDate} onChange={setDraftEndDate} placeholder="TT.MM.JJJJ" minDate={new Date()} />
@@ -961,6 +1104,27 @@ export default function EventEditScreen() {
                         <View style={{ flex: 1 }}>
                             <TimePicker value={draftEndTime} onChange={setDraftEndTime} placeholder="HH:MM" />
                         </View>
+                    </View>
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 16 }]}>Max. Teilnehmer</Text>
+                    <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxCapacity} onChangeText={setDraftMaxCapacity} placeholder="Keine Begrenzung" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 4 }]}>Max. Personen pro Gast (inkl. Gast selbst)</Text>
+                    <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxTicketsPerPerson} onChangeText={setDraftMaxTicketsPerPerson} placeholder="1 (keine Begleitpersonen)" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 16 }]}>Sichtbarkeit</Text>
+                    <View style={[styles.segmentControl, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                        <TouchableOpacity
+                            style={[styles.segmentOption, draftIsPublic && styles.segmentOptionActive, draftIsPublic && { backgroundColor: isDark ? colors.surface : '#ffffff' }]}
+                            onPress={() => setDraftIsPublic(true)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[styles.segmentOptionText, { color: draftIsPublic ? colors.onSurface : colors.onSurfaceVariant, fontWeight: draftIsPublic ? '700' : '500' }]}>Öffentlich</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.segmentOption, !draftIsPublic && styles.segmentOptionActive, !draftIsPublic && { backgroundColor: isDark ? colors.surface : '#ffffff' }]}
+                            onPress={() => setDraftIsPublic(false)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[styles.segmentOptionText, { color: !draftIsPublic ? colors.onSurface : colors.onSurfaceVariant, fontWeight: !draftIsPublic ? '700' : '500' }]}>Privat</Text>
+                        </TouchableOpacity>
                     </View>
                 </EditDrawer>
 
@@ -1007,6 +1171,11 @@ const styles = StyleSheet.create({
     titleGradient: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 24, paddingBottom: 24 },
     heroTitle: { fontSize: 32, fontWeight: '700', color: '#ffffff', marginBottom: 8, letterSpacing: -0.5 },
     heroDate: { fontSize: 16, color: 'rgba(255,255,255,0.9)' },
+    heroEditRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    heroEditIcon: {
+        width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+    },
     draftBadge: {
         position: 'absolute', top: Platform.OS === 'ios' ? 52 : 18, alignSelf: 'center',
         backgroundColor: 'rgba(255,180,0,0.9)', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 12,
@@ -1095,7 +1264,6 @@ const styles = StyleSheet.create({
     },
     drawerLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6, letterSpacing: 0.2 },
     drawerRow: { flexDirection: 'row', gap: 12 },
-    drawerMap: { marginTop: 16, height: 200, borderRadius: 14, overflow: 'hidden' },
 
     // Ticket card in drawer
     ticketCard: { borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 14 },
@@ -1104,4 +1272,19 @@ const styles = StyleSheet.create({
     addTicketBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderWidth: 2, borderStyle: 'dashed', borderRadius: 14, marginTop: 4 },
     addTicketText: { fontSize: 15, fontWeight: '600' },
     fieldTypeChip: { borderWidth: 1, borderRadius: 9999, paddingHorizontal: 14, paddingVertical: 8 },
+
+    // Location drawer map
+    drawerMapWrapper: { marginTop: 16, height: 220, borderRadius: 14, overflow: 'hidden', position: 'relative' },
+
+    mapPlaceholder: { flex: 1, borderWidth: 1, borderStyle: 'dashed', borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24 },
+    mapPlaceholderText: { fontSize: 15, fontWeight: '600', textAlign: 'center' },
+    mapPlaceholderSub: { fontSize: 12, textAlign: 'center', opacity: 0.8 },
+    mapReverseLoader: { position: 'absolute', bottom: 10, left: '50%', transform: [{ translateX: -12 }] },
+    coordsHint: { fontSize: 12, marginTop: 8, textAlign: 'center' },
+
+    // Segment control for is_public toggle
+    segmentControl: { flexDirection: 'row', borderRadius: 12, padding: 3, marginTop: 8 },
+    segmentOption: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+    segmentOptionActive: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.12, shadowRadius: 3, elevation: 2 },
+    segmentOptionText: { fontSize: 15 },
 });

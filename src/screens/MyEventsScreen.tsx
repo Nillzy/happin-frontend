@@ -259,7 +259,7 @@ export default function MyEventsScreen() {
                                     {capacityText}
                                 </Text>
                                 <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
-                                    {isPublic && !event.is_free ? 'Tickets' : 'Plätze'}
+                                    {isPublic && !event.is_free ? 'Tickets' : 'Teilnehmer'}
                                 </Text>
                             </View>
                             {waitlist > 0 && (
@@ -316,7 +316,7 @@ export default function MyEventsScreen() {
                                         : `${accepted}`}
                                 </Text>
                                 <Text style={[styles.hostCardStatLabel, { color: colors.onSurfaceVariant }]}>
-                                    Plätze
+                                    Teilnehmer
                                 </Text>
                             </View>
                         </>

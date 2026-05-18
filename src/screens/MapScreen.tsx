@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useTheme } from '@/hooks/use-theme';
@@ -16,10 +16,8 @@ import type { EventListItem } from '../types/events';
 const BERLIN = { lat: 52.52, lng: 13.405 };
 const API_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
 
-const MAP_STYLES = [
-    { label: 'Base Light', url: `https://api.maptiler.com/maps/019dfc91-be68-7eb0-a241-e7a2d1d21b6a/style.json?key=${API_KEY}` },
-    { label: 'Base Dark + Layer', url: `https://api.maptiler.com/maps/019dfca2-7a0c-7ac9-bae7-dfa64252c3f0/style.json?key=${API_KEY}` },
-];
+const MAP_STYLE_LIGHT = `https://api.maptiler.com/maps/019dfc91-be68-7eb0-a241-e7a2d1d21b6a/style.json?key=${API_KEY}`;
+const MAP_STYLE_DARK  = `https://api.maptiler.com/maps/019dfca2-7a0c-7ac9-bae7-dfa64252c3f0/style.json?key=${API_KEY}`;
 
 // Modul-Level Cache — überlebt Tab-Wechsel
 let cachedMarkers: MapMarker[] | null = null;
@@ -35,7 +33,6 @@ export default function MapScreen() {
     const [center, setCenter] = useState(cachedCenter ?? BERLIN);
     const [loading, setLoading] = useState(cachedMarkers === null);
     const [error, setError] = useState(false);
-    const [styleIndex, setStyleIndex] = useState(isDark ? 1 : 0);
 
     const loadingRef = useRef(false);
 
@@ -139,11 +136,6 @@ export default function MapScreen() {
                     <View style={styles.skeletonMap}>
                         {/* Karten-Fläche */}
                         <SkeletonBox height={'100%' as any} borderRadius={0} />
-                        {/* Style-Buttons oben links */}
-                        <View style={styles.skeletonBar}>
-                            <SkeletonBox width={90} height={30} borderRadius={9999} />
-                            <SkeletonBox width={110} height={30} borderRadius={9999} />
-                        </View>
                         {/* Marker-Punkte */}
                         <SkeletonBox width={18} height={18} borderRadius={9} style={{ position: 'absolute', top: '28%', left: '35%' }} />
                         <SkeletonBox width={18} height={18} borderRadius={9} style={{ position: 'absolute', top: '42%', left: '55%' }} />
@@ -159,33 +151,12 @@ export default function MapScreen() {
                     </View>
                 ) : (
                     <View style={styles.mapWrapper}>
-                        <View style={styles.styleBar}>
-                            {MAP_STYLES.map((s, i) => (
-                                <TouchableOpacity
-                                    key={i}
-                                    onPress={() => setStyleIndex(i)}
-                                    style={[
-                                        styles.styleBtn,
-                                        { borderColor: colors.primary },
-                                        styleIndex === i && { backgroundColor: colors.primary },
-                                    ]}
-                                >
-                                    <Text style={[
-                                        styles.styleBtnText,
-                                        { color: styleIndex === i ? colors.onPrimary : colors.primary },
-                                    ]}>
-                                        {s.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-
                         <MapView
                             markers={markers}
                             centerLat={center.lat}
                             centerLng={center.lng}
                             isDark={isDark}
-                            styleUrl={MAP_STYLES[styleIndex].url}
+                            styleUrl={isDark ? MAP_STYLE_DARK : MAP_STYLE_LIGHT}
                             onMarkerPress={(eventId) => router.push(`/event/${eventId}` as any)}
                         />
                     </View>
@@ -200,25 +171,5 @@ const styles = StyleSheet.create({
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
     mapWrapper: { flex: 1 },
     skeletonMap: { flex: 1, position: 'relative', overflow: 'hidden' },
-    skeletonBar: { position: 'absolute', top: 10, left: 10, flexDirection: 'row', gap: 8 },
-    styleBar: {
-        flexDirection: 'row',
-        gap: 8,
-        padding: 10,
-        position: 'absolute',
-        top: 10,
-        left: 10,
-        zIndex: 10,
-    },
-    styleBtn: {
-        borderWidth: 1,
-        borderRadius: 9999,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-    },
-    styleBtnText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
     hint: { fontSize: 14, textAlign: 'center', paddingHorizontal: 24 },
 });
