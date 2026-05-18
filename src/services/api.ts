@@ -74,7 +74,7 @@ function getPeriodDates(period: Exclude<FilterPeriod, 'custom'>): { dateFrom: st
 }
 
 export const api = {
-    getPublicEvents: (limit = 50, offset = 0, token?: string, filters?: EventFilterParams) => {
+    getPublicEvents: (limit = 50, offset = 0, token?: string, filters?: EventFilterParams, search?: string) => {
         const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
         if (filters?.period && filters.period !== 'custom') {
             const { dateFrom, dateTo } = getPeriodDates(filters.period);
@@ -100,6 +100,9 @@ export const api = {
         }
         if (filters?.isFree) {
             params.set('is_free', 'true');
+        }
+        if (search?.trim()) {
+            params.set('search', search.trim());
         }
         return request<EventListResponse>(`/api/v1/events/?${params}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},

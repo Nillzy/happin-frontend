@@ -99,8 +99,11 @@ export default function EventListScreen() {
     const eventsRef = React.useRef<EventListItem[]>(cachedEvents);
     const isOrganizerViewRef = React.useRef(isOrganizerView);
     const eventPeriodRef = React.useRef(eventPeriod);
+    const searchQueryRef = React.useRef(searchQuery);
+    const searchDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     isOrganizerViewRef.current = isOrganizerView;
     eventPeriodRef.current = eventPeriod;
+    searchQueryRef.current = searchQuery;
 
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -112,7 +115,7 @@ export default function EventListScreen() {
                 if (!token) { router.replace('/login'); return; }
                 data = await api.getUserEvents(token, eventPeriodRef.current, EVENTS_PER_PAGE, 0, 'organizer');
             } else {
-                data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined, activeFiltersRef.current);
+                data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined, activeFiltersRef.current, searchQueryRef.current);
             }
             const more = data.events.length === EVENTS_PER_PAGE;
             cachedEvents = data.events;
@@ -139,7 +142,7 @@ export default function EventListScreen() {
         setError(null);
         try {
             const token = await getSession();
-            const data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined, filters);
+            const data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined, filters, searchQueryRef.current);
             const more = data.events.length === EVENTS_PER_PAGE;
             cachedEvents = data.events;
             cachedHasMore = more;
@@ -167,7 +170,7 @@ export default function EventListScreen() {
                 if (!token) { router.replace('/login'); return; }
                 data = await api.getUserEvents(token, eventPeriodRef.current, EVENTS_PER_PAGE, offset, 'organizer');
             } else {
-                data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token || undefined, activeFiltersRef.current);
+                data = await api.getPublicEvents(EVENTS_PER_PAGE, offset, token || undefined, activeFiltersRef.current, searchQueryRef.current);
             }
             const next = [...eventsRef.current, ...data.events];
             const more = data.events.length === EVENTS_PER_PAGE;
@@ -222,6 +225,37 @@ export default function EventListScreen() {
         };
         void loadInitial();
     }, []);
+
+    useEffect(() => {
+        if (isOrganizerView) return;
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = setTimeout(async () => {
+            cachedEvents = [];
+            cachedHasMore = false;
+            eventsRef.current = [];
+            hasMoreRef.current = false;
+            setLoading(true);
+            setError(null);
+            try {
+                const token = await getSession();
+                const data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined, activeFiltersRef.current, searchQuery);
+                const more = data.events.length === EVENTS_PER_PAGE;
+                cachedEvents = data.events;
+                cachedHasMore = more;
+                eventsRef.current = data.events;
+                hasMoreRef.current = more;
+                setEvents(data.events);
+                setHasMore(more);
+            } catch (e) {
+                setError('Fehler beim Laden der Events');
+            } finally {
+                setLoading(false);
+            }
+        }, 300);
+        return () => {
+            if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        };
+    }, [searchQuery]);
 
     useEffect(() => {
         if (!isWeb) return;
