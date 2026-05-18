@@ -14,7 +14,6 @@ import {
     Platform,
     Alert,
     Linking,
-    Image,
     useWindowDimensions,
 } from 'react-native';
 import type { ViewToken } from 'react-native';
@@ -26,6 +25,7 @@ import { getSession } from '../services/supabase';
 import { api } from '../services/api';
 import type { EventDetailResponse, UserTicket } from '../types/events';
 import QRCode from 'react-native-qrcode-svg';
+import WalletButton from '../../assets/images/de_add_to_google_wallet_wallet-button.svg';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAX_SHEET_WIDTH = 480;
@@ -356,7 +356,7 @@ export default function TicketDetailScreen() {
                         disabled={walletLoading}
                         style={[styles.walletImageWrapper, { opacity: walletLoading ? 0.5 : 1 }]}
                     >
-                        <Image source={require('../../assets/images/de_add_to_google_wallet_wallet-button.svg')} style={styles.walletImage} />
+                        <WalletButton width="100%" height={56} />
                         {walletLoading && (
                             <ActivityIndicator size="small" color={colors.onSurface} style={StyleSheet.absoluteFill} />
                         )}
@@ -581,10 +581,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 24,
         marginHorizontal: 24,
-    },
-    walletImage: {
-        height: 56,
-        resizeMode: 'contain',
     },
 
     // Event Button

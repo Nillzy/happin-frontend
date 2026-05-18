@@ -236,7 +236,7 @@ export default function TimePicker({
             {open && useInlinePopover && (
                 <Pressable
                     onPressIn={() => { popoverPressed.current = true; }}
-                    onMouseDown={(e: any) => e.preventDefault()}
+                    {...({ onMouseDown: (e: any) => e.preventDefault() } as any)}
                     style={[styles.inlinePopover, {
                         backgroundColor: colors.surfaceContainerLow,
                         borderColor: colors.outlineVariant,
