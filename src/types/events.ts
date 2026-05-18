@@ -94,6 +94,8 @@ export interface LocationCreate {
     country?: string;
     type?: string;
     description?: string;
+    latitude?: number;
+    longitude?: number;
 }
 
 export interface EventCreateRequest {

@@ -15,6 +15,10 @@ import { type AddressSuggestion, searchAddresses, verifyAddressExists } from '@/
 interface AddressAutocompleteProps {
     onSelect: (address: AddressSuggestion) => void;
     onClear?: () => void;
+    /** Kontrollierter Textwert — überschreibt den internen query-State von außen */
+    value?: string;
+    /** Ob aktuell eine Adresse bestätigt ist (sperrt Eingabe, zeigt ✕) */
+    isSelected?: boolean;
     initialValue?: string;
     initialSelected?: AddressSuggestion | null;
 }
@@ -22,6 +26,8 @@ interface AddressAutocompleteProps {
 export default function AddressAutocomplete({
     onSelect,
     onClear,
+    value,
+    isSelected: isSelectedProp,
     initialValue,
     initialSelected,
 }: AddressAutocompleteProps) {
@@ -31,11 +37,26 @@ export default function AddressAutocomplete({
     const [loading, setLoading] = useState(false);
     const [verifying, setVerifying] = useState(false);
     const [verifyError, setVerifyError] = useState<string | null>(null);
-    const [selected, setSelected] = useState<AddressSuggestion | null>(initialSelected ?? null);
+    const [selected, setSelected] = useState<boolean>(!!initialSelected);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    // Wenn value von außen gesetzt wird (z.B. Reverse-Geocoding), überschreibt es den internen query
+    // und deselektiert falls isSelected=false übergeben wird
     useEffect(() => {
-        if (selected) return;
+        if (value !== undefined) {
+            setQuery(value);
+        }
+    }, [value]);
+
+    useEffect(() => {
+        if (isSelectedProp !== undefined) {
+            setSelected(isSelectedProp);
+            if (!isSelectedProp) setSuggestions([]);
+        }
+    }, [isSelectedProp]);
+
+    useEffect(() => {
+        if (selected) { setSuggestions([]); return; }
         if (debounceRef.current) clearTimeout(debounceRef.current);
 
         if (query.trim().length < 2) {
@@ -46,8 +67,7 @@ export default function AddressAutocomplete({
         debounceRef.current = setTimeout(async () => {
             setLoading(true);
             const results = await searchAddresses(query);
-            // Nur Adressen mit Hausnummer anzeigen
-            setSuggestions(results.filter(r => !!r.houseNumber));
+            setSuggestions(results);
             setLoading(false);
         }, 300);
 
@@ -66,18 +86,25 @@ export default function AddressAutocomplete({
             setVerifyError('Diese Adresse konnte nicht verifiziert werden. Bitte wähle eine andere.');
             return;
         }
-        setSelected(address);
+        setSelected(true);
         setQuery(address.displayLabel);
         onSelect(address);
     };
 
     const handleClear = () => {
-        setSelected(null);
+        setSelected(false);
         setQuery('');
         setSuggestions([]);
         setVerifyError(null);
         onClear?.();
     };
+
+    const handleChangeText = (t: string) => {
+        if (selected) return;
+        setQuery(t);
+        setVerifyError(null);
+    };
+
 
     return (
         <View style={styles.wrapper}>
@@ -92,14 +119,9 @@ export default function AddressAutocomplete({
                         },
                     ]}
                     value={query}
-                    onChangeText={(t) => {
-                        if (!selected) {
-                            setQuery(t);
-                            setVerifyError(null);
-                        }
-                    }}
+                    onChangeText={handleChangeText}
                     editable={!selected && !verifying}
-                    placeholder="z.B. Musterstraße 5, Musterstadt"
+                    placeholder="z.B. Hauptstraße, Berlin"
                     placeholderTextColor={colors.onSurfaceVariant}
                     returnKeyType="search"
                 />

@@ -27,6 +27,7 @@ interface MapViewProps {
     styleUrl?: string;
     showPopups?: boolean;
     interactive?: boolean;
+    onMapMoved?: (lat: number, lng: number) => void;
 }
 
 const DEFAULT_CENTER = { lat: 52.52, lng: 13.405 };
@@ -43,12 +44,14 @@ function buildMapHtml(
     zoom: number,
     isDark: boolean,
     styleUrlOverride?: string,
+    isDraggable?: boolean,
 ): string {
     const tileUrl = styleUrlOverride
         ? styleUrlOverride.replace('/style.json', '/tiles/256/{z}/{x}/{y}.png')
         : `https://api.maptiler.com/maps/${isDark ? '019dfca2-7a0c-7ac9-bae7-dfa64252c3f0' : '019dfc91-be68-7eb0-a241-e7a2d1d21b6a'}/tiles/256/{z}/{x}/{y}.png?key=${apiKey}`;
 
     const markersJson = JSON.stringify(markers);
+    const draggableFlag = isDraggable ? 'true' : 'false';
 
     return `<!DOCTYPE html>
 <html>
@@ -58,7 +61,7 @@ function buildMapHtml(
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #1a1a2e; }
-    #map { width: 100%; height: 100%; position: relative; overflow: hidden; }
+    #map { width: 100%; height: 100%; position: relative; overflow: hidden; touch-action: none; }
     .pin-wrap {
       position: absolute;
       transform: translate(-50%, -100%);
@@ -70,6 +73,18 @@ function buildMapHtml(
     }
     .pin svg {
       width: 28px; height: 34px;
+    }
+    #center-pin {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -100%);
+      pointer-events: none;
+      z-index: 200;
+      transition: transform 0.15s ease;
+      display: none;
+    }
+    #center-pin.dragging {
+      transform: translate(-50%, calc(-100% - 10px)) scale(1.15);
     }
     .event-popup {
       position: absolute;
@@ -103,6 +118,9 @@ function buildMapHtml(
 </head>
 <body>
   <div id="map">
+    <div id="center-pin">
+      <svg width="28" height="34" viewBox="0 0 28 34" fill="none"><path d="M14 1C7.9 1 3 5.9 3 12c0 7.4 11 20 11 20s11-12.6 11-20c0-6.1-4.9-11-11-11z" fill="#b32053" stroke="#fff" stroke-width="2"/><circle cx="14" cy="12" r="4.5" fill="#fff"/></svg>
+    </div>
     <div class="event-popup" id="popup">
       <div class="popup-close" id="popup-close">✕</div>
       <div class="popup-img" id="popup-img"></div>
@@ -173,6 +191,8 @@ function buildMapHtml(
         var img = document.createElement('img');
         img.src = 'https://api.maptiler.com/maps/' + mapId + '/tiles/256/' + zoom + '/' + tx + '/' + ty + '.png?key=' + API_KEY;
         img.style.cssText = 'position:absolute;width:256px;height:256px;left:' + (px.x - 128) + 'px;top:' + (px.y - 128) + 'px;';
+        img.dataset.tx = tx;
+        img.dataset.ty = ty;
         mapEl.insertBefore(img, mapEl.firstChild);
       }
     }
@@ -249,6 +269,129 @@ function buildMapHtml(
       popup.classList.remove('visible');
     });
 
+    // ── draggable center-pin ───────────────────────────────────────────────────
+    var DRAGGABLE = ${draggableFlag};
+    if (DRAGGABLE) {
+      var centerPin = document.getElementById('center-pin');
+      centerPin.style.display = 'block';
+
+      function screenToLatLng(px, py) {
+        var n = Math.pow(2, zoom);
+        var fx = cFracX + (px - W / 2) / 256;
+        var fy = cFracY + (py - H / 2) / 256;
+        var lng2 = fx / n * 360 - 180;
+        var lat2 = Math.atan(Math.sinh(Math.PI * (1 - 2 * fy / n))) * 180 / Math.PI;
+        return { lat: lat2, lng: lng2 };
+      }
+
+      var isDragging = false;
+      var startX = 0;
+      var startY = 0;
+      var startFracX = cFracX;
+      var startFracY = cFracY;
+
+      function sendCoords() {
+        var center = screenToLatLng(W / 2, H / 2);
+        var msg = JSON.stringify({ type: 'coords', lat: center.lat, lng: center.lng });
+        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(msg);
+        else window.parent.postMessage(msg, '*');
+      }
+
+      mapEl.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 1) {
+          isDragging = true;
+          startX = e.touches[0].clientX;
+          startY = e.touches[0].clientY;
+          startFracX = cFracX;
+          startFracY = cFracY;
+          centerPin.classList.add('dragging');
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      mapEl.addEventListener('touchmove', function(e) {
+        if (!isDragging || e.touches.length !== 1) return;
+        var dx = e.touches[0].clientX - startX;
+        var dy = e.touches[0].clientY - startY;
+        cFracX = startFracX - dx / 256;
+        cFracY = startFracY - dy / 256;
+        // reposition all marker pins
+        markersData.forEach(function(m, i) {
+          var pins = mapEl.querySelectorAll('.pin-wrap');
+          var sc = latLngToScreen(m.lat, m.lng);
+          if (pins[i]) {
+            pins[i].style.left = sc.x + 'px';
+            pins[i].style.top  = sc.y + 'px';
+          }
+        });
+        // reposition tiles
+        var allImgs = mapEl.querySelectorAll('img');
+        allImgs.forEach(function(img) {
+          var tx = parseInt(img.dataset.tx || '0');
+          var ty = parseInt(img.dataset.ty || '0');
+          var px = tileToPixel(tx, ty, zoom, Math.floor(cFracX), Math.floor(cFracY),
+                               Math.floor(cFracX) - cFracX + 0.5, Math.floor(cFracY) - cFracY + 0.5);
+          img.style.left = (px.x - 128) + 'px';
+          img.style.top  = (px.y - 128) + 'px';
+        });
+        e.preventDefault();
+      }, { passive: false });
+
+      mapEl.addEventListener('touchend', function() {
+        if (!isDragging) return;
+        isDragging = false;
+        centerPin.classList.remove('dragging');
+        sendCoords();
+      });
+
+      // Mouse support for web preview inside webview
+      mapEl.addEventListener('mousedown', function(e) {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startFracX = cFracX;
+        startFracY = cFracY;
+        centerPin.classList.add('dragging');
+      });
+      mapEl.addEventListener('mousemove', function(e) {
+        if (!isDragging) return;
+        var dx = e.clientX - startX;
+        var dy = e.clientY - startY;
+        cFracX = startFracX - dx / 256;
+        cFracY = startFracY - dy / 256;
+        markersData.forEach(function(m, i) {
+          var pins = mapEl.querySelectorAll('.pin-wrap');
+          var sc = latLngToScreen(m.lat, m.lng);
+          if (pins[i]) {
+            pins[i].style.left = sc.x + 'px';
+            pins[i].style.top  = sc.y + 'px';
+          }
+        });
+        var allImgs = mapEl.querySelectorAll('img');
+        allImgs.forEach(function(img) {
+          var tx = parseInt(img.dataset.tx || '0');
+          var ty = parseInt(img.dataset.ty || '0');
+          var px = tileToPixel(tx, ty, zoom, Math.floor(cFracX), Math.floor(cFracY),
+                               Math.floor(cFracX) - cFracX + 0.5, Math.floor(cFracY) - cFracY + 0.5);
+          img.style.left = (px.x - 128) + 'px';
+          img.style.top  = (px.y - 128) + 'px';
+        });
+      });
+      mapEl.addEventListener('mouseup', function() {
+        if (!isDragging) return;
+        isDragging = false;
+        centerPin.classList.remove('dragging');
+        sendCoords();
+      });
+      mapEl.addEventListener('mouseleave', function() {
+        if (isDragging) {
+          isDragging = false;
+          centerPin.classList.remove('dragging');
+          sendCoords();
+        }
+      });
+    }
+
   </script>
 </body>
 </html>`;
@@ -264,12 +407,20 @@ export default function MapView({
     styleUrl: styleUrlProp,
     showPopups = true,
     interactive = true,
+    onMapMoved,
 }: MapViewProps) {
     const apiKey = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const mapInstanceRef = useRef<any>(null);
+    const centerPinRef = useRef<HTMLDivElement | null>(null);
     const markersRef = useRef(markers);
     markersRef.current = markers;
+    const onMapMovedRef = useRef(onMapMoved);
+    onMapMovedRef.current = onMapMoved;
+    // After a user drag we skip the next external setCenter to avoid fighting the map
+    const skipNextSetCenterRef = useRef(false);
+    // Tracks programmatic setCenter calls so moveend doesn't fire onMapMoved
+    const isProgrammaticMoveRef = useRef(false);
 
     const styleUrl = styleUrlProp ?? `${isDark ? MAP_STYLE_DARK : MAP_STYLE_LIGHT}?key=${apiKey}`;
 
@@ -302,8 +453,8 @@ export default function MapView({
                 center: [centerLng, centerLat],
                 zoom,
                 maptilerLogo: false,
-                interactive,
-                ...(interactive ? {} : {
+                interactive: interactive || !!onMapMovedRef.current,
+                ...((interactive || !!onMapMovedRef.current) ? {} : {
                     scrollZoom: false,
                     boxZoom: false,
                     dragRotate: false,
@@ -389,6 +540,37 @@ export default function MapView({
                 addMarkers(sdk);
                 addPopupMarkers(sdk);
                 updatePopupVisibility();
+
+                // Zentrierte Nadel für Draggable-Modus
+                if (onMapMovedRef.current && mapContainerRef.current) {
+                    const pin = document.createElement('div');
+                    pin.style.cssText =
+                        'position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);' +
+                        'pointer-events:none;z-index:1000;transition:transform 0.15s ease;';
+                    pin.innerHTML = '<svg width="32" height="40" viewBox="0 0 28 34" fill="none"><path d="M14 1C7.9 1 3 5.9 3 12c0 7.4 11 20 11 20s11-12.6 11-20c0-6.1-4.9-11-11-11z" fill="#b32053" stroke="#fff" stroke-width="2"/><circle cx="14" cy="12" r="4.5" fill="#fff"/></svg>';
+                    centerPinRef.current = pin as any;
+                    mapContainerRef.current.style.position = 'relative';
+                    mapContainerRef.current.appendChild(pin);
+
+                    map.on('movestart', () => {
+                        if (centerPinRef.current) {
+                            (centerPinRef.current as HTMLElement).style.transform =
+                                'translate(-50%, calc(-100% - 10px)) scale(1.15)';
+                        }
+                    });
+                    map.on('moveend', () => {
+                        if (centerPinRef.current) {
+                            (centerPinRef.current as HTMLElement).style.transform = 'translate(-50%, -100%)';
+                        }
+                        if (isProgrammaticMoveRef.current) {
+                            isProgrammaticMoveRef.current = false;
+                            return;
+                        }
+                        const c = map.getCenter();
+                        skipNextSetCenterRef.current = true;
+                        onMapMovedRef.current?.(c.lat, c.lng);
+                    });
+                }
             });
 
             function createPopupEl(m: MapMarker): HTMLDivElement {
@@ -508,9 +690,27 @@ export default function MapView({
             if (interval) clearInterval(interval);
             map?.remove();
             mapInstanceRef.current = null;
+            if (centerPinRef.current) {
+                centerPinRef.current.remove();
+                centerPinRef.current = null;
+            }
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [apiKey, styleUrl, centerLat, centerLng, zoom]);
+    }, [apiKey, styleUrl]);
+
+    // Karte auf neue Koordinaten/Zoom zentrieren wenn sich Props ändern
+    useEffect(() => {
+        if (Platform.OS !== 'web') return;
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        if (skipNextSetCenterRef.current) {
+            skipNextSetCenterRef.current = false;
+            return;
+        }
+        isProgrammaticMoveRef.current = true;
+        map.setCenter([centerLng, centerLat]);
+        if (!onMapMoved) map.setZoom(zoom);
+    }, [centerLat, centerLng, zoom, onMapMoved]);
 
     if (Platform.OS === 'web') {
         return (
@@ -521,7 +721,7 @@ export default function MapView({
         );
     }
 
-    const html = buildMapHtml(apiKey, markers, centerLat, centerLng, zoom, isDark, styleUrlProp);
+    const html = buildMapHtml(apiKey, markers, centerLat, centerLng, zoom, isDark, styleUrlProp, !!onMapMoved);
 
     return (
         <View style={styles.container}>
@@ -532,6 +732,7 @@ export default function MapView({
                     try {
                         const msg = JSON.parse(e.nativeEvent.data);
                         if (msg.type === 'navigate') onMarkerPress?.(msg.eventId);
+                        else if (msg.type === 'coords') onMapMoved?.(msg.lat, msg.lng);
                     } catch { /* ignore */ }
                 }}
                 javaScriptEnabled

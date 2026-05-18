@@ -15,6 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
@@ -212,6 +213,7 @@ export default function EventHostScreen() {
 
     return (
         <View style={[styles.root, { backgroundColor: colors.background }]}>
+            <Head><title>{event.title} – Happin</title></Head>
             {/* Back button – always top-left */}
             <TouchableOpacity
                 style={[
