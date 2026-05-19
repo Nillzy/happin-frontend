@@ -37,6 +37,7 @@ export interface EventListItem {
     is_host?: boolean;
     is_deleted?: boolean;
     deleted_at?: string | null;
+    location_is_private?: boolean;
 }
 
 export interface EventListResponse {
@@ -130,6 +131,7 @@ export interface EventUpdateRequest {
     image_url?: string;
     gradient_id?: number | null;
     media_urls?: string[];
+    location_is_private?: boolean;
 }
 
 export interface UserTicket {

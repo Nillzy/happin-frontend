@@ -54,6 +54,7 @@ export default function DarkLightToggle() {
 
   useEffect(() => {
     progress.value = withSpring(isDark ? 1 : 0, { damping: 18, stiffness: 200 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDark]);
 
   const thumbStyle = useAnimatedStyle(() => ({

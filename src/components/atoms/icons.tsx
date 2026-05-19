@@ -67,7 +67,6 @@ export function TicketIcon({ size = 24, color = 'currentColor' }: IconProps) {
 }
 
 export function SmsIcon({ size = 24, color = 'currentColor' }: IconProps) {
-    const scale = size / 16;
     return (
         <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
             <Path

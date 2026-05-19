@@ -36,6 +36,7 @@ export default function EditModal({ visible, onClose, title, onSave, children }:
             Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }),
             Animated.timing(backdropOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
         ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const animateClose = () => {

@@ -53,6 +53,7 @@ function StepView({
             duration: 280,
             easing: Easing.out(Easing.quad),
         });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visible]);
 
     const style = useAnimatedStyle(() => ({
@@ -144,7 +145,7 @@ export default function LoginScreen() {
         if (!loading && session) {
             router.replace('/events');
         }
-    }, [loading, session]);
+    }, [loading, session]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const [step, setStep] = useState<Step>('email');
     const [email, setEmail] = useState('');
@@ -168,6 +169,7 @@ export default function LoginScreen() {
             withTiming(6, { duration: 55 }),
             withTiming(0, { duration: 50 }),
         );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const startResendTimer = useCallback(() => {
