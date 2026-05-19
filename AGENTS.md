@@ -195,3 +195,13 @@ Strict mode is enabled. Path alias `@/*` maps to the repo root (e.g. `@/src/scre
 
 If you make commits, they should always be in german.
 Never push to the main branch. If you start a new topic open a new one.
+
+## Event Soft-Delete
+
+Events können von Hosts soft-gelöscht werden via `DELETE /api/v1/events/{event_id}`.
+
+- `api.deleteEvent(eventId, token)` in `src/services/api.ts` — löscht Event (204 No Content)
+- `EventListItem.is_deleted?: boolean` und `EventListItem.deleted_at?: string | null` in `src/types/events.ts`
+- Delete-Button + Modal in `src/screens/EventHostScreen.tsx` — gesperrt wenn `starts_at - now() < 48h`
+- "Abgesagt"-Badge in `src/screens/MyEventsScreen.tsx` — `opacity: 0.55` bei gelöschten Events
+- Roter Banner in `src/screens/EventScreen.tsx` — bei `is_deleted === true`

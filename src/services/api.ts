@@ -45,6 +45,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         const body = await response.text();
         throw new Error(`API error ${response.status}: ${body}`);
     }
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
+        return undefined as T;
+    }
     return response.json();
 }
 
@@ -134,6 +137,15 @@ export const api = {
         });
         _eventCache.delete(eventId);
         return result;
+    },
+
+    deleteEvent: async (eventId: string, token: string): Promise<void> => {
+        await request<void>(`/api/v1/events/${eventId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        _eventCache.delete(eventId);
+        _userEventsCache.clear();
     },
 
     syncTicketOptions: async (eventId: string, options: TicketOption[], token: string) => {
