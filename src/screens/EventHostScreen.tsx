@@ -69,6 +69,9 @@ export default function EventHostScreen() {
     const [customFields, setCustomFields] = useState<CustomField[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         void loadData();
@@ -200,6 +203,26 @@ export default function EventHostScreen() {
         }
     };
 
+    const handleDelete = async () => {
+        if (!eventId || !deleteConfirmed) return;
+        try {
+            setDeleting(true);
+            const token = await getSession();
+            if (!token) return;
+            await api.deleteEvent(eventId, token);
+            setDeleteModalVisible(false);
+            router.replace('/my-events');
+        } catch (err) {
+            setDeleting(false);
+            setDeleteModalVisible(false);
+            setError('Event konnte nicht gelöscht werden. Bitte versuche es erneut.');
+        }
+    };
+
+    const canDelete = event && !event.is_deleted
+        ? (new Date(event.starts_at).getTime() - Date.now()) >= 48 * 60 * 60 * 1000
+        : false;
+
     const scanButton = (
         <TouchableOpacity
             style={[styles.scanButton, { backgroundColor: colors.primary }]}
@@ -256,6 +279,9 @@ export default function EventHostScreen() {
                                 ticketOptionSummary={ticketOptionSummary}
                                 isDesktop
                                 onShare={handleShare}
+                                onDeletePress={() => setDeleteModalVisible(true)}
+                                canDelete={canDelete}
+                                isDeleted={event.is_deleted === true}
                             />
                         </ScrollView>
                         <View style={[styles.desktopStickyBar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
@@ -282,6 +308,9 @@ export default function EventHostScreen() {
                             customFields={customFields}
                             ticketOptionSummary={ticketOptionSummary}
                             onShare={handleShare}
+                            onDeletePress={() => setDeleteModalVisible(true)}
+                            canDelete={canDelete}
+                            isDeleted={event.is_deleted === true}
                         />
                     </ScrollView>
                     {/* Mobile sticky bottom bar */}
@@ -298,6 +327,72 @@ export default function EventHostScreen() {
                     </View>
                 </>
             )}
+            {/* Delete Confirmation Modal */}
+            <Modal
+                visible={deleteModalVisible}
+                animationType="fade"
+                transparent
+                onRequestClose={() => setDeleteModalVisible(false)}
+            >
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => setDeleteModalVisible(false)}
+                >
+                    <Pressable
+                        style={[styles.deleteModalCard, { backgroundColor: colors.surface }]}
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        <View style={[styles.deleteModalIconWrap, { backgroundColor: 'rgba(255,59,48,0.1)' }]}>
+                            <Ionicons name="trash-outline" size={28} color="#FF3B30" />
+                        </View>
+                        <Text style={[styles.deleteModalTitle, { color: colors.onSurface }]}>
+                            Event löschen?
+                        </Text>
+                        <Text style={[styles.deleteModalBody, { color: colors.onSurfaceVariant }]}>
+                            Diese Aktion kann nicht rückgängig gemacht werden. Teilnehmer sehen das Event noch 48 Stunden lang als abgesagt.
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.deleteModalCheckRow}
+                            onPress={() => setDeleteConfirmed(v => !v)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[
+                                styles.checkbox,
+                                { borderColor: colors.outline },
+                                deleteConfirmed && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
+                            ]}>
+                                {deleteConfirmed && <Ionicons name="checkmark" size={14} color="#fff" />}
+                            </View>
+                            <Text style={[styles.deleteModalCheckLabel, { color: colors.onSurface }]}>
+                                Ich verstehe, dass das Event unwiderruflich gelöscht wird
+                            </Text>
+                        </TouchableOpacity>
+                        <View style={styles.deleteModalActions}>
+                            <TouchableOpacity
+                                style={[styles.deleteModalBtn, { backgroundColor: colors.surfaceContainerHigh }]}
+                                onPress={() => { setDeleteModalVisible(false); setDeleteConfirmed(false); }}
+                            >
+                                <Text style={[styles.deleteModalBtnText, { color: colors.onSurface }]}>
+                                    Abbrechen
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.deleteModalBtn,
+                                    styles.deleteModalBtnDestructive,
+                                    (!deleteConfirmed || deleting) && styles.deleteModalBtnDisabled,
+                                ]}
+                                onPress={handleDelete}
+                                disabled={!deleteConfirmed || deleting}
+                            >
+                                <Text style={[styles.deleteModalBtnText, { color: '#fff' }]}>
+                                    {deleting ? 'Wird gelöscht…' : 'Endgültig löschen'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </View>
     );
 }
@@ -501,6 +596,9 @@ function OverviewContent({
     ticketOptionSummary,
     isDesktop = false,
     onShare,
+    onDeletePress,
+    canDelete,
+    isDeleted = false,
 }: {
     counts: ParticipantCounts;
     maxCapacity?: number;
@@ -513,6 +611,9 @@ function OverviewContent({
     ticketOptionSummary: TicketOptionSummary[];
     isDesktop?: boolean;
     onShare?: () => void;
+    onDeletePress?: () => void;
+    canDelete?: boolean;
+    isDeleted?: boolean;
 }) {
     const router = useRouter();
     const totalAccepted = counts.accepted;
@@ -658,6 +759,40 @@ function OverviewContent({
                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Bearbeiten</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Delete Button */}
+            {isDeleted ? (
+                <View style={[styles.deleteButton, styles.deleteButtonDisabled]}>
+                    <Ionicons name="close-circle-outline" size={18} color={colors.outline} />
+                    <Text style={[styles.deleteButtonText, { color: colors.outline }]}>
+                        Event abgesagt
+                    </Text>
+                </View>
+            ) : (
+                <TouchableOpacity
+                    style={[
+                        styles.deleteButton,
+                        !canDelete && styles.deleteButtonDisabled,
+                    ]}
+                    onPress={canDelete ? onDeletePress : undefined}
+                    activeOpacity={canDelete ? 0.75 : 1}
+                    disabled={!canDelete}
+                >
+                    <Ionicons
+                        name="trash-outline"
+                        size={18}
+                        color={canDelete ? '#FF3B30' : colors.outline}
+                    />
+                    <Text style={[styles.deleteButtonText, { color: canDelete ? '#FF3B30' : colors.outline }]}>
+                        Event löschen
+                    </Text>
+                    {!canDelete && (
+                        <Text style={[styles.deleteButtonHint, { color: colors.outline }]}>
+                            (Beginn in &lt;48h)
+                        </Text>
+                    )}
+                </TouchableOpacity>
+            )}
 
             {/* Capacity Bar */}
             {maxCapacity && (
@@ -980,6 +1115,106 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     summaryButtonText: { fontSize: 15, fontWeight: '600' },
+
+    // Delete button
+    deleteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,59,48,0.3)',
+        backgroundColor: 'rgba(255,59,48,0.06)',
+        marginBottom: 16,
+    },
+    deleteButtonDisabled: {
+        borderColor: 'rgba(0,0,0,0.12)',
+        backgroundColor: 'transparent',
+    },
+    deleteButtonText: {
+        fontSize: 15,
+        fontWeight: '500',
+    },
+    deleteButtonHint: {
+        fontSize: 12,
+        marginLeft: 4,
+    },
+    // Delete modal
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    deleteModalCard: {
+        width: '100%',
+        maxWidth: 400,
+        borderRadius: 20,
+        padding: 24,
+        gap: 16,
+    },
+    deleteModalIconWrap: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        justifyContent: 'center',
+        alignItems: 'center',
+        alignSelf: 'center',
+    },
+    deleteModalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        textAlign: 'center',
+    },
+    deleteModalBody: {
+        fontSize: 14,
+        lineHeight: 20,
+        textAlign: 'center',
+    },
+    deleteModalCheckRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 5,
+        borderWidth: 1.5,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 1,
+        flexShrink: 0,
+    },
+    deleteModalCheckLabel: {
+        flex: 1,
+        fontSize: 13,
+        lineHeight: 19,
+    },
+    deleteModalActions: {
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 4,
+    },
+    deleteModalBtn: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    deleteModalBtnDestructive: {
+        backgroundColor: '#FF3B30',
+    },
+    deleteModalBtnDisabled: {
+        opacity: 0.4,
+    },
+    deleteModalBtnText: {
+        fontSize: 15,
+        fontWeight: '600',
+    },
 });
 
 const modalStyles = StyleSheet.create({

@@ -183,6 +183,7 @@ export default function MyEventsScreen() {
     const renderHostCard = (event: EventListItem, index: number) => {
         const gradient = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
         const isPublic = event.is_public;
+        const isDeleted = event.is_deleted === true;
 
         const accepted = (event as any).rsvp_accepted ?? event.participant_count ?? 0;
         const declined = (event as any).rsvp_declined ?? 0;
@@ -200,7 +201,7 @@ export default function MyEventsScreen() {
         return (
             <TouchableOpacity
                 key={event.event_id}
-                style={[styles.hostCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
+                style={[styles.hostCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }, isDeleted && { opacity: 0.55 }]}
                 onPress={() => router.push(`/event/${event.event_id}/manage`)}
                 activeOpacity={0.85}
             >
@@ -230,13 +231,13 @@ export default function MyEventsScreen() {
 
                     <View style={[
                         styles.hostCardLabel,
-                        { backgroundColor: isPublic ? `${colors.tertiary}18` : `${colors.secondary}18` }
+                        { backgroundColor: isDeleted ? 'rgba(255,59,48,0.12)' : isPublic ? `${colors.tertiary}18` : `${colors.secondary}18` }
                     ]}>
                         <Text style={[
                             styles.hostCardLabelText,
-                            { color: isPublic ? colors.tertiary : colors.secondary }
+                            { color: isDeleted ? '#FF3B30' : isPublic ? colors.tertiary : colors.secondary }
                         ]}>
-                            {isPublic ? 'Öffentlich' : 'Privat'}
+                            {isDeleted ? 'Abgesagt' : isPublic ? 'Öffentlich' : 'Privat'}
                         </Text>
                     </View>
                 </View>
@@ -326,57 +327,69 @@ export default function MyEventsScreen() {
         );
     };
 
-    const renderTicketCard = (event: EventListItem, showQR: boolean = true) => (
-        <TouchableOpacity
-            key={event.event_id}
-            style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
-            onPress={() => router.push(showQR ? `/ticket/${event.event_id}` : `/event/${event.event_id}`)}
-            activeOpacity={0.85}
-        >
-            <View style={styles.cardBodyWithQR}>
-                <View style={styles.cardBodyContent}>
-                    <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2}>
-                        {event.title}
-                    </Text>
+    const renderTicketCard = (event: EventListItem, showQR: boolean = true) => {
+        const isDeleted = event.is_deleted === true;
+        return (
+            <TouchableOpacity
+                key={event.event_id}
+                style={[
+                    styles.card,
+                    { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant },
+                    isDeleted && { opacity: 0.55, borderColor: 'rgba(255,59,48,0.3)' },
+                ]}
+                onPress={() => router.push(showQR ? `/ticket/${event.event_id}` : `/event/${event.event_id}`)}
+                activeOpacity={0.85}
+            >
+                <View style={styles.cardBodyWithQR}>
+                    <View style={styles.cardBodyContent}>
+                        <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2}>
+                            {event.title}
+                        </Text>
+                        {isDeleted && (
+                            <View style={styles.cancelledBadge}>
+                                <Text style={styles.cancelledBadgeText}>Abgesagt</Text>
+                            </View>
+                        )}
 
-                    <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
-                        {formatEventDate(event.starts_at)}
-                        {event.location?.city ? ` · ${event.location.city}` : ''}
-                        {` · ${event.participant_count} Teilnehmer`}
-                    </Text>
+                        <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
+                            {formatEventDate(event.starts_at)}
+                            {event.location?.city ? ` · ${event.location.city}` : ''}
+                            {` · ${event.participant_count} Teilnehmer`}
+                        </Text>
 
-                    {event.category && (
-                        <View style={styles.chipContainer}>
-                            {event.category.split(',').slice(0, 2).map((cat, idx) => (
-                                <View key={idx} style={[styles.chip, { backgroundColor: colors.surfaceContainerHigh }]}>
-                                    <Text style={[styles.chipText, { color: colors.primary }]}>
-                                        {cat.trim()}
-                                    </Text>
-                                </View>
-                            ))}
-                        </View>
-                    )}
-                </View>
-
-                {showQR && (
-                    <View style={styles.qrContainerSmall}>
-                        <QRCode
-                            value={ticketMap[event.event_id]?.qr_token || `happin://ticket/${event.event_id}`}
-                            size={76}
-                            backgroundColor="#FFFFFF"
-                        />
-                        {ticketMap[event.event_id]?.count > 1 && (
-                            <View style={[styles.ticketBadge, { backgroundColor: colors.primary }]}>
-                                <Text style={[styles.ticketBadgeText, { color: colors.onPrimary }]}>
-                                    {ticketMap[event.event_id].count}×
-                                </Text>
+                        {event.category && (
+                            <View style={styles.chipContainer}>
+                                {event.category.split(',').slice(0, 2).map((cat, idx) => (
+                                    <View key={idx} style={[styles.chip, { backgroundColor: colors.surfaceContainerHigh }]}>
+                                        <Text style={[styles.chipText, { color: colors.primary }]}>
+                                            {cat.trim()}
+                                        </Text>
+                                    </View>
+                                ))}
                             </View>
                         )}
                     </View>
-                )}
-            </View>
-        </TouchableOpacity>
-    );
+
+                    {showQR && (
+                        <View style={styles.qrContainerSmall}>
+                            <QRCode
+                                value={ticketMap[event.event_id]?.qr_token || `happin://ticket/${event.event_id}`}
+                                size={76}
+                                backgroundColor="#FFFFFF"
+                            />
+                            {ticketMap[event.event_id]?.count > 1 && (
+                                <View style={[styles.ticketBadge, { backgroundColor: colors.primary }]}>
+                                    <Text style={[styles.ticketBadgeText, { color: colors.onPrimary }]}>
+                                        {ticketMap[event.event_id].count}×
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     const renderEventCard = (event: EventListItem, index: number) => {
         if (event.is_host) return renderHostCard(event, index);
@@ -824,5 +837,20 @@ const styles = StyleSheet.create({
     retryText: {
         fontSize: 15,
         fontWeight: '700',
+    },
+    cancelledBadge: {
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(255,59,48,0.12)',
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        marginTop: 2,
+    },
+    cancelledBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#FF3B30',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
     },
 });

@@ -781,6 +781,16 @@ export default function EventScreen() {
                                 </View>
                             )}
 
+                            {/* Cancelled Banner */}
+                            {event.is_deleted && (
+                                <View style={cancelledBannerStyles.container}>
+                                    <Ionicons name="close-circle" size={20} color="#fff" />
+                                    <Text style={cancelledBannerStyles.text}>
+                                        Dieses Event wurde abgesagt
+                                    </Text>
+                                </View>
+                            )}
+
                             {/* Host Card */}
                             <View style={[...glassCard, styles.hostCard]}>
                                 <View style={styles.hostInfo}>
@@ -929,6 +939,16 @@ export default function EventScreen() {
                                 </LinearGradient>
                             </View>
                         </View>
+
+                        {/* Cancelled Banner */}
+                        {event.is_deleted && (
+                            <View style={cancelledBannerStyles.container}>
+                                <Ionicons name="close-circle" size={20} color="#fff" />
+                                <Text style={cancelledBannerStyles.text}>
+                                    Dieses Event wurde abgesagt
+                                </Text>
+                            </View>
+                        )}
 
                         <View style={styles.content}>
                             <View style={[...glassCard, styles.hostCard]}>
@@ -2218,5 +2238,22 @@ const calendarStyles = StyleSheet.create({
     cancelButtonText: {
         fontSize: 15,
         fontWeight: '500',
+    },
+});
+
+const cancelledBannerStyles = StyleSheet.create({
+    container: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: '#FF3B30',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+    },
+    text: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+        flex: 1,
     },
 });

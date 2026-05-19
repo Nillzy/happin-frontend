@@ -35,6 +35,8 @@ export interface EventListItem {
     location?: EventLocation;
     participant_count: number;
     is_host?: boolean;
+    is_deleted?: boolean;
+    deleted_at?: string | null;
 }
 
 export interface EventListResponse {
