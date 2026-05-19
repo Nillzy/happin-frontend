@@ -337,7 +337,13 @@ export default function EventListScreen() {
 
                     <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
                         {formatDateGerman(item.starts_at)}
-                        {item.location?.city ? ` · ${item.location.city}` : ''}
+                        {item.location?.city
+                            ? ` · ${item.location.city}`
+                            : (item.location?.latitude != null && item.location?.longitude != null)
+                            ? ` · ${item.location.latitude.toFixed(2)}, ${item.location.longitude.toFixed(2)}`
+                            : item.location?.country
+                            ? ` · ${item.location.country}`
+                            : ''}
                         {` · ${item.participant_count} Teilnehmer`}
                     </Text>
 
