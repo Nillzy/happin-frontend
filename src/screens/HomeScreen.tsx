@@ -178,6 +178,7 @@ function PulsingDot({
                 false,
             ),
         );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -185,6 +186,7 @@ function PulsingDot({
             damping: 12,
             stiffness: 180,
         });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isActive]);
 
     const ringStyle = useAnimatedStyle(() => ({
@@ -347,6 +349,7 @@ function CityMap({ mapWidth }: { mapWidth: number }) {
                 timerRef.current = setTimeout(triggerNext, 800);
             }, 420);
         }, 2800);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {

@@ -21,8 +21,6 @@ import {
     KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-// legacy API: required for writeAsStringAsync + cacheDirectory on Expo SDK 54
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Calendar from 'expo-calendar';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -36,16 +34,13 @@ import { getSession, getUserProfile } from '../services/supabase';
 import { api, invalidateTicketsCache } from '../services/api';
 import { geocodeAddress } from '../services/geocoding';
 import { getGradientByIndex } from '../constants/gradients';
-import type { EventDetailResponse, RsvpStatus, CustomFieldResponseItem, TicketResponses } from '../types/events';
+import type { EventDetailResponse, RsvpStatus, CustomFieldResponseItem } from '../types/events';
 import CustomFieldForm from '../components/atoms/CustomFieldForm';
 import { SkeletonBox } from '../components/atoms/SkeletonBox';
 import ConfirmModal from '../components/atoms/ConfirmModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.56; // ~16:9
-
-const GRADIENT_FALLBACK = ['#D4006B', '#8B3DC8'];
-
 
 const RSVP_OPTIONS: { status: RsvpStatus; icon: string; label: string; sublabel: string }[] = [
     { status: 'Accepted', icon: '✓', label: 'Zusagen', sublabel: 'Ich bin dabei' },
@@ -142,6 +137,13 @@ const deskBarStyles = StyleSheet.create({
 });
 
 
+function openInMaps(lat: number, lng: number) {
+    const url = Platform.OS === 'ios'
+        ? `https://maps.apple.com/place?coordinate=${lat},${lng}`
+        : `https://www.google.com/maps/place/${lat},${lng}`;
+    Linking.openURL(url);
+}
+
 export default function EventScreen() {
     const { colors, isDark } = useTheme();
     const router = useRouter();
@@ -194,7 +196,7 @@ export default function EventScreen() {
                 Animated.timing(cfBackdropOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
             ]).start();
         }
-    }, [customFieldsModalOpen]);
+    }, [customFieldsModalOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const dismissCustomFields = useCallback(() => {
         Animated.parallel([
@@ -208,7 +210,7 @@ export default function EventScreen() {
         if (event) {
             handleRsvp('Declined');
         }
-    }, [dismissCustomFields, event]);
+    }, [dismissCustomFields, event]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const tryDismissCustomFields = useCallback(() => {
         if (cfIsFirstSubmissionRef.current && cfHasRequiredFieldsRef.current) {
@@ -265,34 +267,40 @@ export default function EventScreen() {
 
     useEffect(() => {
         loadEvent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
-    const loadEvent = async () => {
+    const loadEvent = async (silent = false) => {
         try {
-            setLoading(true);
-            setError(null);
+            if (!silent) {
+                setLoading(true);
+                setError(null);
+            }
 
             if (!id) {
                 throw new Error('Event-ID fehlt');
             }
-
 
             const token = await getSession();
             const data = await api.getEventById(id, token || undefined);
             setEvent(data);
             setRsvpStatus(data.my_rsvp_status ?? null);
             const loc = data.location;
-            if (loc) {
+            if (loc && loc.latitude != null && loc.longitude != null) {
+                setMapCoords({ lat: loc.latitude, lng: loc.longitude });
+            } else if (loc && !loc.latitude && loc.city) {
                 geocodeAddress(
                     loc.house_number ? `${loc.street} ${loc.house_number}` : loc.street,
                     loc.city, loc.postal_code ?? null, loc.country ?? null,
                 ).then((c) => { if (c) setMapCoords(c); });
+            } else {
+                setMapCoords(null);
             }
         } catch (e) {
             console.error('[EventScreen] Load error:', e);
-            setError(e instanceof Error ? e.message : 'Event konnte nicht geladen werden');
+            if (!silent) setError(e instanceof Error ? e.message : 'Event konnte nicht geladen werden');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -482,6 +490,8 @@ export default function EventScreen() {
             Alert.alert('Fehler', msg);
         } finally {
             setRsvpLoading(false);
+            api.invalidateCaches(id);
+            loadEvent(true);
         }
     };
 
@@ -524,39 +534,6 @@ export default function EventScreen() {
         } finally {
             setCustomFieldsSubmitting(false);
         }
-    };
-
-    const openCustomFieldsModal = async () => {
-        if (!event) return;
-        const token = await getSession();
-        let tickets = event.ticket || [];
-        if (tickets.length === 0 && token) {
-            try {
-                const allTickets = await api.getUserTickets(token);
-                tickets = allTickets.tickets
-                    .filter(t => t.event_id === event.event_id)
-                    .map(t => ({ ticket_id: t.ticket_id, guest_name: t.guest_name }));
-            } catch { /* ignore */ }
-        }
-        const ticketInfos = tickets.map((t, i) => ({
-            ticket_id: t.ticket_id,
-            label: t.guest_name || (tickets.length > 1 ? `Person ${i + 1}` : 'Person 1'),
-        }));
-        setMyTickets(ticketInfos);
-
-        if (token) {
-            try {
-                const data = await api.getMyCustomFieldResponses(event.event_id, token);
-                const mapped: Record<string, CustomFieldResponseItem[]> = {};
-                for (const item of data) {
-                    mapped[item.ticket_id] = item.responses;
-                }
-                setInitialResponses(mapped);
-            } catch {
-                setInitialResponses({});
-            }
-        }
-        setCustomFieldsModalOpen(true);
     };
 
     const handleStickyBarPress = () => {
@@ -858,22 +835,64 @@ export default function EventScreen() {
                                     <View style={[...glassCard, styles.locationCard]}>
                                         <View style={styles.locationHeader}>
                                             <View style={styles.locationTextContainer}>
-                                                <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
-                                                    {event.location.street && event.location.house_number
-                                                        ? `${event.location.street} ${event.location.house_number}`
-                                                        : event.location.city || 'Adresse nicht verfügbar'}
-                                                </Text>
-                                                <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
-                                                    {event.location.city && event.location.country
-                                                        ? `${event.location.city}, ${event.location.country}`
-                                                        : event.location.city || ''}
-                                                </Text>
+                                                {(() => {
+                                                    const loc = event.location!;
+                                                    const isPrivateStripped = event.location_is_private && !loc.street && loc.latitude == null;
+                                                    if (isPrivateStripped) {
+                                                        return (
+                                                            <>
+                                                                <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
+                                                                    {loc.city ?? loc.country ?? 'Ort nicht verfügbar'}
+                                                                </Text>
+                                                                <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
+                                                                    {loc.city && loc.country ? loc.country : ''}
+                                                                </Text>
+                                                            </>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <>
+                                                            <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
+                                                                {loc.street && loc.house_number
+                                                                    ? `${loc.street} ${loc.house_number}`
+                                                                    : loc.street
+                                                                    ? loc.street
+                                                                    : (loc.latitude != null && loc.longitude != null)
+                                                                    ? `${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}`
+                                                                    : loc.city
+                                                                    ? loc.city
+                                                                    : 'Adresse nicht verfügbar'}
+                                                            </Text>
+                                                            <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
+                                                                {loc.street
+                                                                    ? (loc.postal_code && loc.city
+                                                                        ? `${loc.postal_code} ${loc.city}`
+                                                                        : loc.city || '')
+                                                                    : (loc.latitude != null && loc.longitude != null && loc.city)
+                                                                    ? loc.city
+                                                                    : ''}
+                                                            </Text>
+                                                        </>
+                                                    );
+                                                })()}
                                             </View>
                                         </View>
-                                        <View style={styles.mapPreview}>
+                                        {event.location_is_private && !event.location.street && event.location.latitude == null ? (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, gap: 6 }}>
+                                                <Ionicons name="lock-closed-outline" size={14} color={colors.onSurfaceVariant} />
+                                                <Text style={{ color: colors.onSurfaceVariant, fontSize: 13, textAlign: 'center', flexShrink: 1 }}>
+                                                    Der Host hat eingestellt, dass nur zugesagte Gäste den genauen Standort sehen können.
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                        <TouchableOpacity
+                                            activeOpacity={0.85}
+                                            onPress={() => mapCoords && openInMaps(mapCoords.lat, mapCoords.lng)}
+                                            style={styles.mapPreview}
+                                        >
                                             {mapCoords ? (
                                                 <MapView
-                                                    markers={[{ lat: mapCoords.lat, lng: mapCoords.lng, title: event.location?.city ?? '', eventId: '__preview__' }]}
+                                                    markers={[{ lat: mapCoords.lat, lng: mapCoords.lng, title: '', eventId: '__preview__' }]}
                                                     centerLat={mapCoords.lat}
                                                     centerLng={mapCoords.lng}
                                                     zoom={15}
@@ -886,7 +905,8 @@ export default function EventScreen() {
                                                     <Ionicons name="map-outline" size={48} color={colors.onSurfaceVariant} />
                                                 </View>
                                             )}
-                                        </View>
+                                        </TouchableOpacity>
+                                        )}
                                     </View>
                                 </View>
                             )}
@@ -1014,22 +1034,64 @@ export default function EventScreen() {
                                     <View style={[...glassCard, styles.locationCard]}>
                                         <View style={styles.locationHeader}>
                                             <View style={styles.locationTextContainer}>
-                                                <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
-                                                    {event.location.street && event.location.house_number
-                                                        ? `${event.location.street} ${event.location.house_number}`
-                                                        : event.location.city || 'Adresse nicht verfügbar'}
-                                                </Text>
-                                                <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
-                                                    {event.location.city && event.location.country
-                                                        ? `${event.location.city}, ${event.location.country}`
-                                                        : event.location.city || ''}
-                                                </Text>
+                                                {(() => {
+                                                    const loc = event.location!;
+                                                    const isPrivateStripped = event.location_is_private && !loc.street && loc.latitude == null;
+                                                    if (isPrivateStripped) {
+                                                        return (
+                                                            <>
+                                                                <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
+                                                                    {loc.city ?? loc.country ?? 'Ort nicht verfügbar'}
+                                                                </Text>
+                                                                <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
+                                                                    {loc.city && loc.country ? loc.country : ''}
+                                                                </Text>
+                                                            </>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <>
+                                                            <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
+                                                                {loc.street && loc.house_number
+                                                                    ? `${loc.street} ${loc.house_number}`
+                                                                    : loc.street
+                                                                    ? loc.street
+                                                                    : (loc.latitude != null && loc.longitude != null)
+                                                                    ? `${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}`
+                                                                    : loc.city
+                                                                    ? loc.city
+                                                                    : 'Adresse nicht verfügbar'}
+                                                            </Text>
+                                                            <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
+                                                                {loc.street
+                                                                    ? (loc.postal_code && loc.city
+                                                                        ? `${loc.postal_code} ${loc.city}`
+                                                                        : loc.city || '')
+                                                                    : (loc.latitude != null && loc.longitude != null && loc.city)
+                                                                    ? loc.city
+                                                                    : ''}
+                                                            </Text>
+                                                        </>
+                                                    );
+                                                })()}
                                             </View>
                                         </View>
-                                        <View style={styles.mapPreview}>
+                                        {event.location_is_private && !event.location.street && event.location.latitude == null ? (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, gap: 6 }}>
+                                                <Ionicons name="lock-closed-outline" size={14} color={colors.onSurfaceVariant} />
+                                                <Text style={{ color: colors.onSurfaceVariant, fontSize: 13, textAlign: 'center', flexShrink: 1 }}>
+                                                    Der Host hat eingestellt, dass nur zugesagte Gäste den genauen Standort sehen können.
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                        <TouchableOpacity
+                                            activeOpacity={0.85}
+                                            onPress={() => mapCoords && openInMaps(mapCoords.lat, mapCoords.lng)}
+                                            style={styles.mapPreview}
+                                        >
                                             {mapCoords ? (
                                                 <MapView
-                                                    markers={[{ lat: mapCoords.lat, lng: mapCoords.lng, title: event.location?.city ?? '', eventId: '__preview__' }]}
+                                                    markers={[{ lat: mapCoords.lat, lng: mapCoords.lng, title: '', eventId: '__preview__' }]}
                                                     centerLat={mapCoords.lat}
                                                     centerLng={mapCoords.lng}
                                                     zoom={15}
@@ -1042,7 +1104,8 @@ export default function EventScreen() {
                                                     <Ionicons name="map-outline" size={48} color={colors.onSurfaceVariant} />
                                                 </View>
                                             )}
-                                        </View>
+                                        </TouchableOpacity>
+                                        )}
                                     </View>
                                 </View>
                             )}

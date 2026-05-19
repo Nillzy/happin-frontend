@@ -212,7 +212,7 @@ export default function EventHostScreen() {
             await api.deleteEvent(eventId, token);
             setDeleteModalVisible(false);
             router.replace('/my-events');
-        } catch (err) {
+        } catch {
             setDeleting(false);
             setDeleteModalVisible(false);
             setError('Event konnte nicht gelöscht werden. Bitte versuche es erneut.');

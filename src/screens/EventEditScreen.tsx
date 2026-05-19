@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     Dimensions,
     Platform,
+    Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -77,18 +78,23 @@ export default function EventEditScreen() {
     const [draftMaxCapacity, setDraftMaxCapacity] = useState('');
     const [draftMaxTicketsPerPerson, setDraftMaxTicketsPerPerson] = useState('');
     const [draftIsPublic, setDraftIsPublic] = useState(true);
+    const [draftLocationIsPrivate, setDraftLocationIsPrivate] = useState(false);
     const [draftEndDate, setDraftEndDate] = useState('');
     const [draftEndTime, setDraftEndTime] = useState('');
     const [draftGalleryImages, setDraftGalleryImages] = useState<string[]>([]);
     const [draftTickets, setDraftTickets] = useState<TicketOption[]>([]);
     const [draftCustomFields, setDraftCustomFields] = useState<CustomField[]>([]);
     const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
+    const [previewMapKey, setPreviewMapKey] = useState(0);
 
     // Location-Drawer: einheitlicher Zustand (kein Tab-System)
     const [draftLocText, setDraftLocText] = useState('');
     const [draftLocCoords, setDraftLocCoords] = useState<{ lat: number; lng: number } | null>(null);
+    const drawerMapCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+    const [drawerMapKey, setDrawerMapKey] = useState(0);
     const [draftLocAddressConfirmed, setDraftLocAddressConfirmed] = useState(false);
-    const [locReverseLoading, setLocReverseLoading] = useState(false);
+    const [draftLocCity, setDraftLocCity] = useState<string | null>(null);
+    const mapMovedRef = useRef(false);
     const pendingSavesRef = useRef(0);
     const mountedRef = useRef(false);
 
@@ -123,6 +129,7 @@ export default function EventEditScreen() {
         } finally {
             if (!silent) setLoading(false);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [eventId]);
 
     useEffect(() => { loadEvent(); }, [loadEvent]);
@@ -149,7 +156,23 @@ export default function EventEditScreen() {
             const next = { ...prev };
             for (const key of Object.keys(patch)) {
                 if (key === 'location') {
-                    next.location = { ...prev.location, ...patch.location } as any;
+                    const locPatch = patch.location as Record<string, any>;
+                    const isCoordWithoutStreet = locPatch.latitude != null && locPatch.longitude != null
+                        && !locPatch.street;
+                    if (isCoordWithoutStreet) {
+                        next.location = {
+                            ...prev.location,
+                            latitude: locPatch.latitude,
+                            longitude: locPatch.longitude,
+                            city: locPatch.city ?? undefined,
+                            street: undefined,
+                            house_number: undefined,
+                            postal_code: undefined,
+                            country: undefined,
+                        } as any;
+                    } else {
+                        next.location = { ...prev.location, ...locPatch } as any;
+                    }
                 } else if (key === 'category') {
                     (next as any).category = patch.category;
                 } else {
@@ -181,6 +204,10 @@ export default function EventEditScreen() {
                     media_urls: updated.media_urls ?? prev.media_urls ?? [],
                 };
             });
+            if (updated.location?.latitude != null && updated.location?.longitude != null) {
+                setMapCoords({ lat: updated.location.latitude, lng: updated.location.longitude });
+                setPreviewMapKey(k => k + 1);
+            }
         } catch (e) {
             console.error('[saveField] failed:', e);
             // Keep optimistic state on failure to avoid losing user changes
@@ -249,43 +276,26 @@ export default function EventEditScreen() {
             case 'location': {
                 const loc = event.location;
                 if (loc?.latitude != null && loc?.longitude != null) {
-                    const label = loc.street
-                        ? [loc.street, loc.house_number].filter(Boolean).join(' ') + (loc.city ? `, ${loc.city}` : '')
-                        : `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
-                    setDraftLocText(label);
                     setDraftLocCoords({ lat: loc.latitude, lng: loc.longitude });
-                    setDraftLocAddressConfirmed(true);
-                    setDraftAddress({
-                        street: loc.street ?? '',
-                        houseNumber: loc.house_number ?? null,
-                        postalCode: loc.postal_code ?? null,
-                        city: loc.city ?? '',
-                        country: loc.country ?? '',
-                        displayLabel: label,
-                        lat: loc.latitude,
-                        lng: loc.longitude,
-                    });
-                } else if (loc?.street) {
-                    const label = [loc.street, loc.house_number].filter(Boolean).join(' ') + (loc.city ? `, ${loc.city}` : '');
-                    setDraftLocText(label);
-                    setDraftLocCoords(null);
+                    drawerMapCenterRef.current = { lat: loc.latitude, lng: loc.longitude };
+                    setDrawerMapKey(k => k + 1);
+                    setDraftLocText('');
                     setDraftLocAddressConfirmed(false);
-                    setDraftAddress({
-                        street: loc.street,
-                        houseNumber: loc.house_number ?? null,
-                        postalCode: loc.postal_code ?? null,
-                        city: loc.city ?? '',
-                        country: loc.country ?? 'Deutschland',
-                        displayLabel: label,
-                        lat: 0,
-                        lng: 0,
-                    });
+                    setDraftAddress(null);
+                    mapMovedRef.current = false;
+                } else if (loc?.street) {
+                    setDraftLocText('');
+                    setDraftLocCoords(null);
+                    drawerMapCenterRef.current = null;
+                    setDraftLocAddressConfirmed(false);
+                    setDraftAddress(null);
+                    mapMovedRef.current = false;
                     geocodeAddress(
                         loc.house_number ? `${loc.street} ${loc.house_number}` : loc.street,
                         loc.city ?? null,
                         loc.postal_code ?? null,
                         loc.country ?? null,
-                    ).then(c => { if (c) setDraftLocCoords(c); });
+                    ).then(c => { if (c) { setDraftLocCoords(c); drawerMapCenterRef.current = c; setDrawerMapKey(k => k + 1); } });
                 } else {
                     setDraftLocText('');
                     setDraftLocCoords(null);
@@ -298,6 +308,7 @@ export default function EventEditScreen() {
                 setDraftMaxCapacity(event.max_capacity ? String(event.max_capacity) : '');
                 setDraftMaxTicketsPerPerson(event.max_tickets_per_person && event.max_tickets_per_person > 1 ? String(event.max_tickets_per_person) : '');
                 setDraftIsPublic(event.is_public ?? true);
+                setDraftLocationIsPrivate(event.location_is_private ?? false);
                 if (event.ends_at) {
                     const end = new Date(event.ends_at);
                     const pad = (n: number) => String(n).padStart(2, '0');
@@ -354,22 +365,30 @@ export default function EventEditScreen() {
                 break;
             }
             case 'location':
-                if (draftLocCoords) {
+                if (draftAddress) {
+                    // Neue Adresse über Autocomplete gewählt
                     saveField({
                         location: {
-                            city: draftAddress?.city || draftLocText || `${draftLocCoords.lat.toFixed(4)}, ${draftLocCoords.lng.toFixed(4)}`,
-                            street: draftAddress?.street || undefined,
-                            house_number: draftAddress?.houseNumber || undefined,
-                            postal_code: draftAddress?.postalCode || undefined,
-                            country: draftAddress?.country || undefined,
+                            city: draftAddress.city || undefined,
+                            street: draftAddress.street || undefined,
+                            house_number: draftAddress.houseNumber || undefined,
+                            postal_code: draftAddress.postalCode || undefined,
+                            country: draftAddress.country || undefined,
+                            latitude: draftLocCoords?.lat,
+                            longitude: draftLocCoords?.lng,
+                        },
+                    });
+                } else if (mapMovedRef.current && draftLocCoords) {
+                    // Karte manuell verschoben — nur Koordinaten speichern
+                    saveField({
+                        location: {
+                            city: draftLocCity || undefined,
                             latitude: draftLocCoords.lat,
                             longitude: draftLocCoords.lng,
                         },
                     });
-                    setMapCoords(draftLocCoords);
-                } else if (draftLocText.trim()) {
+                } else if (draftLocText.trim() && !draftLocCoords) {
                     saveField({ location: { street: draftLocText.trim() } });
-                    setMapCoords(null);
                 }
                 break;
             case 'details': {
@@ -378,6 +397,7 @@ export default function EventEditScreen() {
                 patch.max_capacity = draftMaxCapacity ? Number(draftMaxCapacity) : null;
                 patch.max_tickets_per_person = draftMaxTicketsPerPerson ? Number(draftMaxTicketsPerPerson) : 1;
                 patch.is_public = draftIsPublic;
+                patch.location_is_private = draftLocationIsPrivate;
                 saveField(patch);
                 break;
             }
@@ -506,20 +526,13 @@ export default function EventEditScreen() {
     // Validation
     const missingFields: string[] = [];
     if (!effectiveImageUrl && selectedGradientId === undefined) missingFields.push('Titelbild');
-    if (!event.location?.city) missingFields.push('Ort');
+    if (!event.location?.city && !(event.location?.latitude != null && event.location?.longitude != null)) missingFields.push('Ort');
 
     const glassCard = [
         styles.glassCard,
         isWeb
             ? { backgroundColor: isDark ? 'rgba(18,19,26,0.55)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
             : { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)' },
-    ];
-    const glassActionBtn = [
-        styles.actionButton,
-        { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' },
-        isWeb
-            ? { backgroundColor: isDark ? 'rgba(30,31,38,0.6)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any
-            : { backgroundColor: isDark ? 'rgba(30,31,38,0.85)' : 'rgba(255,255,255,0.85)' },
     ];
 
     const renderEditOverlay = (onPress: () => void) => (
@@ -661,7 +674,7 @@ export default function EventEditScreen() {
                         )}
 
                         {/* Location Section (same as EventScreen) */}
-                        {event.location?.city ? (
+                        {(event.location?.city || (event.location?.latitude != null && event.location?.longitude != null)) ? (
                             <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('location')}>
                                 <View style={[styles.section, { position: 'relative' }]}>
                                     <View style={[...glassCard, styles.locationCard]}>
@@ -686,6 +699,7 @@ export default function EventEditScreen() {
                                         <View style={styles.mapPreview}>
                                             {mapCoords ? (
                                                 <MapView
+                                                    key={previewMapKey}
                                                     markers={[{
                                                         lat: mapCoords.lat,
                                                         lng: mapCoords.lng,
@@ -933,6 +947,8 @@ export default function EventEditScreen() {
                             setDraftAddress(addr);
                             setDraftLocText(addr.displayLabel);
                             setDraftLocCoords({ lat: addr.lat, lng: addr.lng });
+                            drawerMapCenterRef.current = { lat: addr.lat, lng: addr.lng };
+                            setDrawerMapKey(k => k + 1);
                             setDraftLocAddressConfirmed(true);
                         }}
                         onClear={() => {
@@ -948,38 +964,30 @@ export default function EventEditScreen() {
                         {draftLocCoords ? (
                             <>
                                 <MapView
+                                    key={drawerMapKey}
                                     markers={[]}
-                                    centerLat={draftLocCoords.lat}
-                                    centerLng={draftLocCoords.lng}
+                                    centerLat={drawerMapCenterRef.current?.lat ?? draftLocCoords.lat}
+                                    centerLng={drawerMapCenterRef.current?.lng ?? draftLocCoords.lng}
                                     zoom={15}
                                     isDark={isDark}
                                     showPopups={false}
                                     onMapMoved={async (lat, lng) => {
+                                        mapMovedRef.current = true;
                                         setDraftLocCoords({ lat, lng });
                                         setDraftLocAddressConfirmed(false);
-                                        setLocReverseLoading(true);
+                                        setDraftLocText(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                                        setDraftAddress(null);
+                                        setDraftLocCity(null);
                                         const addr = await reverseGeocode(lat, lng);
-                                        setLocReverseLoading(false);
-                                        if (addr) {
-                                            setDraftLocText(addr.displayLabel);
-                                            setDraftAddress(addr);
-                                        } else {
-                                            setDraftLocText(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-                                            setDraftAddress(null);
-                                        }
+                                        if (addr?.city) setDraftLocCity(addr.city);
                                     }}
                                 />
-                                {locReverseLoading && (
-                                    <View style={styles.mapReverseLoader}>
-                                        <ActivityIndicator size="small" color={colors.primary} />
-                                    </View>
-                                )}
                             </>
                         ) : (
                             <TouchableOpacity
                                 style={[styles.mapPlaceholder, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)', borderColor: colors.outlineVariant }]}
                                 activeOpacity={0.7}
-                                onPress={() => setDraftLocCoords({ lat: 52.52, lng: 13.405 })}
+                                onPress={() => { drawerMapCenterRef.current = { lat: 52.52, lng: 13.405 }; setDrawerMapKey(k => k + 1); setDraftLocCoords({ lat: 52.52, lng: 13.405 }); }}
                             >
                                 <Ionicons name="map-outline" size={36} color={colors.onSurfaceVariant} />
                                 <Text style={[styles.mapPlaceholderText, { color: colors.onSurfaceVariant }]}>
@@ -1128,6 +1136,19 @@ export default function EventEditScreen() {
                             <Text style={[styles.segmentOptionText, { color: !draftIsPublic ? colors.onSurface : colors.onSurfaceVariant, fontWeight: !draftIsPublic ? '700' : '500' }]}>Privat</Text>
                         </TouchableOpacity>
                     </View>
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 16 }]}>Standort</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                        <Text style={{ color: colors.onSurface, fontSize: 15 }}>Standort privat halten</Text>
+                        <Switch
+                            value={draftLocationIsPrivate}
+                            onValueChange={setDraftLocationIsPrivate}
+                            trackColor={{ false: colors.surfaceVariant, true: colors.primary }}
+                            thumbColor={'#ffffff'}
+                        />
+                    </View>
+                    <Text style={{ color: colors.onSurfaceVariant, fontSize: 12, marginTop: 2 }}>
+                        Nur Zugesagte sehen die genaue Adresse
+                    </Text>
                 </EditDrawer>
 
                 <EditDrawer visible={activeDrawer === 'gallery'} onClose={closeDrawer} title="Bildergalerie">
@@ -1281,7 +1302,6 @@ const styles = StyleSheet.create({
     mapPlaceholder: { flex: 1, borderWidth: 1, borderStyle: 'dashed', borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24 },
     mapPlaceholderText: { fontSize: 15, fontWeight: '600', textAlign: 'center' },
     mapPlaceholderSub: { fontSize: 12, textAlign: 'center', opacity: 0.8 },
-    mapReverseLoader: { position: 'absolute', bottom: 10, left: '50%', transform: [{ translateX: -12 }] },
     coordsHint: { fontSize: 12, marginTop: 8, textAlign: 'center' },
 
     // Segment control for is_public toggle

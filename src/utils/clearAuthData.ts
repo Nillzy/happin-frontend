@@ -38,7 +38,7 @@ export async function clearAllAuthData(): Promise<void> {
       try {
         await SecureStore.deleteItemAsync('supabase-session-encryption-key');
         console.log('[ClearAuth] Cleared encryption key from SecureStore');
-      } catch (e) {
+      } catch {
         console.log('[ClearAuth] No encryption key found in SecureStore');
       }
 
@@ -46,7 +46,7 @@ export async function clearAllAuthData(): Promise<void> {
       try {
         await SecureStore.deleteItemAsync('access_token');
         console.log('[ClearAuth] Cleared old access_token from SecureStore');
-      } catch (e) {
+      } catch {
         console.log('[ClearAuth] No old access_token in SecureStore');
       }
     } else {
@@ -54,7 +54,7 @@ export async function clearAllAuthData(): Promise<void> {
       try {
         localStorage.removeItem('supabase-session-encryption-key-web');
         console.log('[ClearAuth] Cleared encryption key from localStorage');
-      } catch (e) {
+      } catch {
         console.log('[ClearAuth] No encryption key found in localStorage');
       }
     }

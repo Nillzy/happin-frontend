@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
 let WebView: any = null;
 if (Platform.OS !== 'web') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     WebView = require('react-native-webview').WebView;
 }
 
@@ -46,10 +47,6 @@ function buildMapHtml(
     styleUrlOverride?: string,
     isDraggable?: boolean,
 ): string {
-    const tileUrl = styleUrlOverride
-        ? styleUrlOverride.replace('/style.json', '/tiles/256/{z}/{x}/{y}.png')
-        : `https://api.maptiler.com/maps/${isDark ? '019dfca2-7a0c-7ac9-bae7-dfa64252c3f0' : '019dfc91-be68-7eb0-a241-e7a2d1d21b6a'}/tiles/256/{z}/{x}/{y}.png?key=${apiKey}`;
-
     const markersJson = JSON.stringify(markers);
     const draggableFlag = isDraggable ? 'true' : 'false';
 
@@ -422,6 +419,13 @@ export default function MapView({
     // Tracks programmatic setCenter calls so moveend doesn't fire onMapMoved
     const isProgrammaticMoveRef = useRef(false);
 
+    // For draggable maps (onMapMoved set), freeze the initial center so that
+    // parent state updates from onMapMoved don't cause the WebView to reload.
+    const initialCenterRef = useRef({ lat: centerLat, lng: centerLng });
+    const isDraggable = !!onMapMoved;
+    const effectiveCenterLat = isDraggable ? initialCenterRef.current.lat : centerLat;
+    const effectiveCenterLng = isDraggable ? initialCenterRef.current.lng : centerLng;
+
     const styleUrl = styleUrlProp ?? `${isDark ? MAP_STYLE_DARK : MAP_STYLE_LIGHT}?key=${apiKey}`;
 
     useEffect(() => {
@@ -450,7 +454,7 @@ export default function MapView({
             map = new sdk.Map({
                 container: mapContainerRef.current,
                 style: styleUrl,
-                center: [centerLng, centerLat],
+                center: [effectiveCenterLng, effectiveCenterLat],
                 zoom,
                 maptilerLogo: false,
                 interactive: interactive || !!onMapMovedRef.current,
@@ -698,19 +702,24 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [apiKey, styleUrl]);
 
-    // Karte auf neue Koordinaten/Zoom zentrieren wenn sich Props ändern
+    // Karte auf neue Koordinaten/Zoom zentrieren wenn sich Props ändern.
+    // Bei draggable Karten (onMapMoved) nicht eingreifen — der Nutzer steuert die Position.
     useEffect(() => {
         if (Platform.OS !== 'web') return;
+        if (isDraggable) return;
         const map = mapInstanceRef.current;
         if (!map) return;
-        if (skipNextSetCenterRef.current) {
-            skipNextSetCenterRef.current = false;
-            return;
-        }
         isProgrammaticMoveRef.current = true;
         map.setCenter([centerLng, centerLat]);
-        if (!onMapMoved) map.setZoom(zoom);
-    }, [centerLat, centerLng, zoom, onMapMoved]);
+        map.setZoom(zoom);
+    }, [centerLat, centerLng, zoom, isDraggable]);
+
+    // Für draggable Karten: HTML einmalig erzeugen und nicht bei State-Updates neu bauen
+    const html = useMemo(
+        () => buildMapHtml(apiKey, markers, effectiveCenterLat, effectiveCenterLng, zoom, isDark, styleUrlProp, isDraggable),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [apiKey, effectiveCenterLat, effectiveCenterLng, zoom, isDark, styleUrlProp, isDraggable],
+    );
 
     if (Platform.OS === 'web') {
         return (
@@ -720,8 +729,6 @@ export default function MapView({
             </View>
         );
     }
-
-    const html = buildMapHtml(apiKey, markers, centerLat, centerLng, zoom, isDark, styleUrlProp, !!onMapMoved);
 
     return (
         <View style={styles.container}>

@@ -124,11 +124,12 @@ export default function EventListScreen() {
             hasMoreRef.current = more;
             setEvents(data.events);
             setHasMore(more);
-        } catch (e) {
+        } catch {
             setError('Fehler beim Laden der Events');
         } finally {
             setRefreshing(false);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleApplyFilters = useCallback(async (filters: EventFilterParams) => {
@@ -150,7 +151,7 @@ export default function EventListScreen() {
             hasMoreRef.current = more;
             setEvents(data.events);
             setHasMore(more);
-        } catch (e) {
+        } catch {
             setError('Fehler beim Laden der Events');
         } finally {
             setLoading(false);
@@ -180,18 +181,20 @@ export default function EventListScreen() {
             hasMoreRef.current = more;
             setEvents(next);
             setHasMore(more);
-        } catch (e) {
+        } catch {
             setError('Fehler beim Laden der Events');
         } finally {
             loadingMoreRef.current = false;
             setLoadingMore(false);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
         authorize().then((isAuthorized) => {
             if (!isAuthorized) router.replace('/login');
         });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -217,13 +220,14 @@ export default function EventListScreen() {
                 hasMoreRef.current = more;
                 setEvents(data.events);
                 setHasMore(more);
-            } catch (e) {
+            } catch {
                 setError('Fehler beim Laden der Events');
             } finally {
                 setLoading(false);
             }
         };
         void loadInitial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -246,7 +250,7 @@ export default function EventListScreen() {
                 hasMoreRef.current = more;
                 setEvents(data.events);
                 setHasMore(more);
-            } catch (e) {
+            } catch {
                 setError('Fehler beim Laden der Events');
             } finally {
                 setLoading(false);
@@ -255,6 +259,7 @@ export default function EventListScreen() {
         return () => {
             if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchQuery]);
 
     useEffect(() => {
@@ -337,7 +342,13 @@ export default function EventListScreen() {
 
                     <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]}>
                         {formatDateGerman(item.starts_at)}
-                        {item.location?.city ? ` · ${item.location.city}` : ''}
+                        {item.location?.city
+                            ? ` · ${item.location.city}`
+                            : (item.location?.latitude != null && item.location?.longitude != null)
+                            ? ` · ${item.location.latitude.toFixed(2)}, ${item.location.longitude.toFixed(2)}`
+                            : item.location?.country
+                            ? ` · ${item.location.country}`
+                            : ''}
                         {` · ${item.participant_count} Teilnehmer`}
                     </Text>
 

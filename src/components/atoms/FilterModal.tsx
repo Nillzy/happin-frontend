@@ -52,6 +52,7 @@ export default function FilterModal({
             setDraft(initialFilters);
             setCitySuggestions([]);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visible]);
 
     useEffect(() => {
