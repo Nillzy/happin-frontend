@@ -129,6 +129,7 @@ export default function EventEditScreen() {
         } finally {
             if (!silent) setLoading(false);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [eventId]);
 
     useEffect(() => { loadEvent(); }, [loadEvent]);
@@ -532,13 +533,6 @@ export default function EventEditScreen() {
         isWeb
             ? { backgroundColor: isDark ? 'rgba(18,19,26,0.55)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
             : { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)' },
-    ];
-    const glassActionBtn = [
-        styles.actionButton,
-        { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' },
-        isWeb
-            ? { backgroundColor: isDark ? 'rgba(30,31,38,0.6)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any
-            : { backgroundColor: isDark ? 'rgba(30,31,38,0.85)' : 'rgba(255,255,255,0.85)' },
     ];
 
     const renderEditOverlay = (onPress: () => void) => (

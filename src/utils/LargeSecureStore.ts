@@ -63,7 +63,7 @@ export class LargeSecureStore {
     const FALLBACK_KEY_NAME = `__fallback_${ENCRYPTION_KEY_NAME}`;
 
     if (forceReset) {
-      try { await SecureStore.deleteItemAsync(ENCRYPTION_KEY_NAME); } catch (_) {}
+      try { await SecureStore.deleteItemAsync(ENCRYPTION_KEY_NAME); } catch {}
       await AsyncStorage.removeItem(FALLBACK_KEY_NAME);
     }
 

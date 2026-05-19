@@ -9,7 +9,7 @@ import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 
 export default function ImprintScreen() {
-    const { colors, isDark } = useTheme();
+    const { colors } = useTheme();
     const router = useRouter();
 
     return (

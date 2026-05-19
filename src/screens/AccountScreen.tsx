@@ -251,6 +251,7 @@ export default function AccountScreen() {
         if (token) {
             api.getUserStats(token).then(setStats).catch(() => {});
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {

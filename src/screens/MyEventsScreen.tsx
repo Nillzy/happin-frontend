@@ -5,7 +5,6 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    ActivityIndicator,
     Image,
     Platform,
     Dimensions,
@@ -18,10 +17,10 @@ import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
-import { SkeletonEventCard, SkeletonHostCard, SkeletonTicketCard } from '../components/atoms/SkeletonBox';
+import { SkeletonHostCard, SkeletonTicketCard } from '../components/atoms/SkeletonBox';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
-import { EventListItem, UserTicket } from '../types/events';
+import { EventListItem } from '../types/events';
 import QRCode from 'react-native-qrcode-svg';
 
 const CONTAINER_MAX_WIDTH = 900;

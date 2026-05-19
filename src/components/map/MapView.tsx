@@ -19,6 +19,7 @@ import { useTheme } from '@/hooks/use-theme';
 let MapTilerSDK: any = null;
 if (Platform.OS === 'web') {
     // @ts-ignore
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     MapTilerSDK = require('@maptiler/sdk');
 }
 
@@ -94,7 +95,7 @@ export default function MapView({
             map.remove();
             mapInstanceRef.current = null;
         };
-    }, [apiKey, isDark, center[0], center[1], zoom]);
+    }, [apiKey, isDark, center[0], center[1], zoom]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Web: Map Container
     if (Platform.OS === 'web') {

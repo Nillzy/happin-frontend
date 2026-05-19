@@ -3,6 +3,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 
 let WebView: any = null;
 if (Platform.OS !== 'web') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     WebView = require('react-native-webview').WebView;
 }
 
@@ -46,10 +47,6 @@ function buildMapHtml(
     styleUrlOverride?: string,
     isDraggable?: boolean,
 ): string {
-    const tileUrl = styleUrlOverride
-        ? styleUrlOverride.replace('/style.json', '/tiles/256/{z}/{x}/{y}.png')
-        : `https://api.maptiler.com/maps/${isDark ? '019dfca2-7a0c-7ac9-bae7-dfa64252c3f0' : '019dfc91-be68-7eb0-a241-e7a2d1d21b6a'}/tiles/256/{z}/{x}/{y}.png?key=${apiKey}`;
-
     const markersJson = JSON.stringify(markers);
     const draggableFlag = isDraggable ? 'true' : 'false';
 
@@ -717,6 +714,13 @@ export default function MapView({
         map.setZoom(zoom);
     }, [centerLat, centerLng, zoom, isDraggable]);
 
+    // Für draggable Karten: HTML einmalig erzeugen und nicht bei State-Updates neu bauen
+    const html = useMemo(
+        () => buildMapHtml(apiKey, markers, effectiveCenterLat, effectiveCenterLng, zoom, isDark, styleUrlProp, isDraggable),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [apiKey, effectiveCenterLat, effectiveCenterLng, zoom, isDark, styleUrlProp, isDraggable],
+    );
+
     if (Platform.OS === 'web') {
         return (
             <View style={styles.container}>
@@ -725,13 +729,6 @@ export default function MapView({
             </View>
         );
     }
-
-    // Für draggable Karten: HTML einmalig erzeugen und nicht bei State-Updates neu bauen
-    const html = useMemo(
-        () => buildMapHtml(apiKey, markers, effectiveCenterLat, effectiveCenterLng, zoom, isDark, styleUrlProp, isDraggable),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [apiKey, effectiveCenterLat, effectiveCenterLng, zoom, isDark, styleUrlProp, isDraggable],
-    );
 
     return (
         <View style={styles.container}>

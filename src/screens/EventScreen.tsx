@@ -21,8 +21,6 @@ import {
     KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-// legacy API: required for writeAsStringAsync + cacheDirectory on Expo SDK 54
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Calendar from 'expo-calendar';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -36,16 +34,13 @@ import { getSession, getUserProfile } from '../services/supabase';
 import { api, invalidateTicketsCache } from '../services/api';
 import { geocodeAddress } from '../services/geocoding';
 import { getGradientByIndex } from '../constants/gradients';
-import type { EventDetailResponse, RsvpStatus, CustomFieldResponseItem, TicketResponses } from '../types/events';
+import type { EventDetailResponse, RsvpStatus, CustomFieldResponseItem } from '../types/events';
 import CustomFieldForm from '../components/atoms/CustomFieldForm';
 import { SkeletonBox } from '../components/atoms/SkeletonBox';
 import ConfirmModal from '../components/atoms/ConfirmModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.56; // ~16:9
-
-const GRADIENT_FALLBACK = ['#D4006B', '#8B3DC8'];
-
 
 const RSVP_OPTIONS: { status: RsvpStatus; icon: string; label: string; sublabel: string }[] = [
     { status: 'Accepted', icon: '✓', label: 'Zusagen', sublabel: 'Ich bin dabei' },
@@ -201,7 +196,7 @@ export default function EventScreen() {
                 Animated.timing(cfBackdropOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
             ]).start();
         }
-    }, [customFieldsModalOpen]);
+    }, [customFieldsModalOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const dismissCustomFields = useCallback(() => {
         Animated.parallel([
@@ -215,7 +210,7 @@ export default function EventScreen() {
         if (event) {
             handleRsvp('Declined');
         }
-    }, [dismissCustomFields, event]);
+    }, [dismissCustomFields, event]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const tryDismissCustomFields = useCallback(() => {
         if (cfIsFirstSubmissionRef.current && cfHasRequiredFieldsRef.current) {
@@ -272,6 +267,7 @@ export default function EventScreen() {
 
     useEffect(() => {
         loadEvent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
     const loadEvent = async (silent = false) => {
@@ -538,39 +534,6 @@ export default function EventScreen() {
         } finally {
             setCustomFieldsSubmitting(false);
         }
-    };
-
-    const openCustomFieldsModal = async () => {
-        if (!event) return;
-        const token = await getSession();
-        let tickets = event.ticket || [];
-        if (tickets.length === 0 && token) {
-            try {
-                const allTickets = await api.getUserTickets(token);
-                tickets = allTickets.tickets
-                    .filter(t => t.event_id === event.event_id)
-                    .map(t => ({ ticket_id: t.ticket_id, guest_name: t.guest_name }));
-            } catch { /* ignore */ }
-        }
-        const ticketInfos = tickets.map((t, i) => ({
-            ticket_id: t.ticket_id,
-            label: t.guest_name || (tickets.length > 1 ? `Person ${i + 1}` : 'Person 1'),
-        }));
-        setMyTickets(ticketInfos);
-
-        if (token) {
-            try {
-                const data = await api.getMyCustomFieldResponses(event.event_id, token);
-                const mapped: Record<string, CustomFieldResponseItem[]> = {};
-                for (const item of data) {
-                    mapped[item.ticket_id] = item.responses;
-                }
-                setInitialResponses(mapped);
-            } catch {
-                setInitialResponses({});
-            }
-        }
-        setCustomFieldsModalOpen(true);
     };
 
     const handleStickyBarPress = () => {
