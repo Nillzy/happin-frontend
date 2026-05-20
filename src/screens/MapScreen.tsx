@@ -10,7 +10,7 @@ import { SkeletonBox } from '../components/atoms/SkeletonBox';
 import MapView, { MapMarker } from '../components/MapView';
 import { api } from '../services/api';
 import { geocodeCity, geocodeAddress } from '../services/geocoding';
-import { getSession } from '../services/supabase';
+import { getSession, authorize } from '../services/supabase';
 import type { EventListItem } from '../types/events';
 
 const BERLIN = { lat: 52.52, lng: 13.405 };
@@ -35,6 +35,13 @@ export default function MapScreen() {
     const [error, setError] = useState(false);
 
     const loadingRef = useRef(false);
+
+    useEffect(() => {
+        authorize().then((isAuthorized) => {
+            if (!isAuthorized) router.replace('/login');
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         if (!cityLoaded) return;
