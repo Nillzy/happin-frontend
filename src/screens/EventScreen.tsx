@@ -434,14 +434,17 @@ export default function EventScreen() {
             await api.rsvpEvent(event.event_id, newStatus, token, ticketCount, names);
             const prevStatus = rsvpStatus;
             setRsvpStatus(newStatus);
-            if (newStatus === 'Accepted' && prevStatus !== 'Accepted') {
-                setEvent({ ...event, participant_count: event.participant_count + ticketCount });
-                const hasCustomFields = event.custom_fields && event.custom_fields.length > 0;
-                if (hasCustomFields) {
-                    const freshToken = await getSession();
-                    api.invalidateCaches(event.event_id);
-                    const freshEvent = await api.getEventById(event.event_id, freshToken || undefined);
-                    setEvent(freshEvent);
+            if (newStatus === 'Accepted') {
+                if (prevStatus !== 'Accepted') {
+                    setEvent({ ...event, participant_count: event.participant_count + ticketCount });
+                }
+                const hasCustomFields = (event.custom_fields?.length ?? 0) > 0;
+                const freshToken = await getSession();
+                api.invalidateCaches(event.event_id);
+                const freshEvent = await api.getEventById(event.event_id, freshToken || undefined);
+                setEvent(freshEvent);
+                const freshHasCustomFields = (freshEvent.custom_fields?.length ?? 0) > 0;
+                if (hasCustomFields || freshHasCustomFields) {
                     let tickets = freshEvent.ticket || [];
                     if (tickets.length === 0 && freshToken) {
                         try {
@@ -470,13 +473,7 @@ export default function EventScreen() {
                     }
                     setCustomFieldsModalOpen(true);
                 }
-            } else if (newStatus === 'Accepted' && prevStatus === 'Accepted') {
-                // Re-accept: names were updated — refresh event so ticket tabs reflect new names
-                const freshToken = await getSession();
-                api.invalidateCaches(event.event_id);
-                const freshEvent = await api.getEventById(event.event_id, freshToken || undefined);
-                setEvent(freshEvent);
-            } else if (newStatus !== 'Accepted' && prevStatus === 'Accepted') {
+            } else if (prevStatus === 'Accepted') {
                 setEvent({ ...event, participant_count: Math.max(0, event.participant_count - 1) });
             }
         } catch (err: unknown) {
@@ -600,7 +597,7 @@ export default function EventScreen() {
                     <Text style={[styles.errorText, { color: colors.error }]}>{error || 'Event nicht gefunden'}</Text>
                     <TouchableOpacity
                         style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                        onPress={loadEvent}
+                        onPress={() => loadEvent()}
                     >
                         <Text style={[styles.retryText, { color: colors.onPrimary }]}>Erneut versuchen</Text>
                     </TouchableOpacity>
