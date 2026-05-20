@@ -690,6 +690,19 @@ export default function EventScreen() {
             : { backgroundColor: isDark ? 'rgba(30,31,38,0.85)' : 'rgba(255,255,255,0.85)' },
     ];
 
+    const hasTicketAccess = effectiveIsFree
+        ? rsvpStatus === 'Accepted'
+        : (event.ticket ?? []).length > 0;
+    const showAngabenAttendee = rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 && !event.is_host;
+    const showAngabenAendernHost = !!event.is_host && (event.custom_fields?.length ?? 0) > 0 && rsvpStatus === 'Accepted';
+    const totalActionButtons =
+        (hasTicketAccess ? 1 : 0) +
+        (showAngabenAttendee ? 1 : 0) +
+        2 + // ICS-Import + Teilen
+        (event.is_host ? 1 : 0) + // Verwalten
+        (showAngabenAendernHost ? 1 : 0);
+    const useMehrMenu = !!event.is_host && totalActionButtons > 4;
+
     return (
         <ScreenWithNav showBottomNav={false}>
             <Head><title>{event.title} – Happin</title></Head>
@@ -885,7 +898,19 @@ export default function EventScreen() {
                                     <Ionicons name="share-outline" size={22} color={colors.onSurface} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
-                                {event.is_host && (
+                                {event.is_host && !useMehrMenu && (
+                                    <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/event/${id}/manage`)}>
+                                        <Ionicons name="settings-outline" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {showAngabenAendernHost && !useMehrMenu && (
+                                    <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
+                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben ändern</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {useMehrMenu && (
                                     <View ref={moreMenuTriggerRef} style={styles.moreMenuWrapper} collapsable={false}>
                                         <TouchableOpacity style={glassActionBtn} onPress={toggleMoreMenu}>
                                             <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
@@ -1116,7 +1141,19 @@ export default function EventScreen() {
                                     <Ionicons name="share-outline" size={22} color={colors.onSurface} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
-                                {event.is_host && (
+                                {event.is_host && !useMehrMenu && (
+                                    <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/event/${id}/manage`)}>
+                                        <Ionicons name="settings-outline" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {showAngabenAendernHost && !useMehrMenu && (
+                                    <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
+                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben ändern</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {useMehrMenu && (
                                     <View ref={moreMenuTriggerRef} style={styles.moreMenuWrapper} collapsable={false}>
                                         <TouchableOpacity style={glassActionBtn} onPress={toggleMoreMenu}>
                                             <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
