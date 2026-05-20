@@ -296,6 +296,12 @@ export const api = {
             headers: { Authorization: `Bearer ${token}` },
         }),
 
+    cancelTicketOrder: (eventId: string, token: string) =>
+        request<{ refunded: boolean; amount_cents: number }>(`/api/v1/events/${eventId}/tickets/cancel`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
     invalidateCaches: (eventId?: string) => {
         if (eventId) _eventCache.delete(eventId);
         _ticketsCache = null;

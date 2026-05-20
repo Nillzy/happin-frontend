@@ -59,7 +59,7 @@ function formatDateGerman(isoDate: string): string {
     }).format(d);
 }
 
-function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoading, onRsvp, onTickets }: {
+function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoading, onRsvp, onTickets, onShowTicket }: {
     event: EventDetailResponse;
     isFree: boolean;
     colors: any;
@@ -68,6 +68,7 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
     rsvpLoading: boolean;
     onRsvp: () => void;
     onTickets: () => void;
+    onShowTicket: () => void;
 }) {
     const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
     const bgColor = isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)';
@@ -98,14 +99,24 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
 
     const tickets = event.ticket_options ?? [];
     const cheapest = Math.min(...tickets.map(t => t.price));
+    const userHasTicket = (event.ticket ?? []).length > 0;
     return (
         <View style={[deskBarStyles.bar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
             <View style={deskBarStyles.info}>
-                <Text style={[deskBarStyles.price, { color: colors.onSurface }]}>{cheapest === 0 ? 'Kostenlos' : `ab ${cheapest.toFixed(2)} €`}</Text>
-                <Text style={[deskBarStyles.hint, { color: colors.onSurfaceVariant }]}>{tickets.length} Ticketoptionen</Text>
+                <Text style={[deskBarStyles.price, { color: colors.onSurface }]}>
+                    {userHasTicket ? 'Ticket vorhanden' : cheapest === 0 ? 'Kostenlos' : `ab ${cheapest.toFixed(2)} €`}
+                </Text>
+                <Text style={[deskBarStyles.hint, { color: colors.onSurfaceVariant }]}>
+                    {userHasTicket ? 'Bezahlt' : `${tickets.length} Ticketoptionen`}
+                </Text>
             </View>
-            <TouchableOpacity style={[deskBarStyles.btn, { backgroundColor: colors.primary }]} onPress={onTickets}>
-                <Text style={[deskBarStyles.btnText, { color: colors.onPrimary }]}>Tickets wählen</Text>
+            <TouchableOpacity
+                style={[deskBarStyles.btn, { backgroundColor: userHasTicket ? colors.tertiary : colors.primary }]}
+                onPress={userHasTicket ? onShowTicket : onTickets}
+            >
+                <Text style={[deskBarStyles.btnText, { color: userHasTicket ? colors.onTertiary : colors.onPrimary }]}>
+                    {userHasTicket ? 'Ticket anzeigen' : 'Tickets wählen'}
+                </Text>
             </TouchableOpacity>
         </View>
     );
@@ -1026,6 +1037,7 @@ export default function EventScreen() {
                                     rsvpLoading={rsvpLoading}
                                     onRsvp={handleStickyBarPress}
                                     onTickets={openDrawer}
+                                    onShowTicket={() => router.push(`/ticket/${event.event_id}`)}
                                 />
                             </View>
 
@@ -1319,6 +1331,7 @@ export default function EventScreen() {
 
                 const tickets = event.ticket_options ?? [];
                 const cheapest = Math.min(...tickets.map(t => t.price));
+                const userHasTicket = (event.ticket ?? []).length > 0;
                 return (
                     <View style={[
                         styles.stickyBar,
@@ -1330,18 +1343,18 @@ export default function EventScreen() {
                     ]} pointerEvents={isPreview ? 'none' : 'auto'}>
                         <View style={styles.stickyBarInfo}>
                             <Text style={[styles.stickyBarPrice, { color: colors.onSurface }]}>
-                                {cheapest === 0 ? 'Kostenlos' : `ab ${cheapest.toFixed(2)} €`}
+                                {userHasTicket ? 'Ticket vorhanden' : cheapest === 0 ? 'Kostenlos' : `ab ${cheapest.toFixed(2)} €`}
                             </Text>
                             <Text style={[styles.stickyBarHint, { color: colors.onSurfaceVariant }]}>
-                                {tickets.length} Ticketoptionen
+                                {userHasTicket ? 'Bezahlt' : `${tickets.length} Ticketoptionen`}
                             </Text>
                         </View>
                         <TouchableOpacity
-                            style={[styles.stickyBarButton, { backgroundColor: colors.primary }]}
-                            onPress={openDrawer}
+                            style={[styles.stickyBarButton, { backgroundColor: userHasTicket ? colors.tertiary : colors.primary }]}
+                            onPress={userHasTicket ? () => router.push(`/ticket/${event.event_id}`) : openDrawer}
                         >
-                            <Text style={[styles.stickyBarButtonText, { color: colors.onPrimary }]}>
-                                Tickets wählen
+                            <Text style={[styles.stickyBarButtonText, { color: userHasTicket ? colors.onTertiary : colors.onPrimary }]}>
+                                {userHasTicket ? 'Ticket anzeigen' : 'Tickets wählen'}
                             </Text>
                         </TouchableOpacity>
                     </View>

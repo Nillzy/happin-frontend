@@ -56,6 +56,7 @@ export default function TicketDetailScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [walletLoading, setWalletLoading] = useState(false);
+    const [cancelLoading, setCancelLoading] = useState(false);
 
     const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -109,6 +110,35 @@ export default function TicketDetailScreen() {
         } finally {
             setWalletLoading(false);
         }
+    };
+
+    const handleCancelTicket = () => {
+        Alert.alert(
+            'Ticket stornieren',
+            'Möchtest du dein Ticket wirklich stornieren? Der Betrag wird dir zurückerstattet.',
+            [
+                { text: 'Abbrechen', style: 'cancel' },
+                {
+                    text: 'Stornieren',
+                    style: 'destructive',
+                    onPress: async () => {
+                        if (!eventId) return;
+                        setCancelLoading(true);
+                        try {
+                            const token = await getSession();
+                            if (!token) return;
+                            await api.cancelTicketOrder(eventId, token);
+                            Alert.alert('Storniert', 'Dein Ticket wurde storniert und der Betrag wird erstattet.');
+                            router.replace(`/event/${eventId}`);
+                        } catch (err: any) {
+                            Alert.alert('Fehler', err?.message ?? 'Stornierung fehlgeschlagen.');
+                        } finally {
+                            setCancelLoading(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const handlePanResponder = useRef(
@@ -373,6 +403,20 @@ export default function TicketDetailScreen() {
                         Veranstaltung ansehen
                     </Text>
                 </TouchableOpacity>
+
+                {/* Ticket stornieren — nur wenn aktiv */}
+                {tickets.length > 0 && tickets.every(t => t.status === 'active') && (
+                    <TouchableOpacity
+                        style={[styles.eventButton, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.error }]}
+                        onPress={handleCancelTicket}
+                        disabled={cancelLoading}
+                    >
+                        <Ionicons name="close-circle-outline" size={20} color={colors.error} style={{ marginRight: 8 }} />
+                        <Text style={[styles.eventButtonText, { color: colors.error }]}>
+                            {cancelLoading ? 'Wird storniert…' : 'Ticket stornieren'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
 
                 {/* Footer Info */}
                 <Text style={[styles.footerText, { color: colors.onSurfaceVariant }]}>
