@@ -8,7 +8,7 @@ import { api, invalidateTicketsCache } from '@/src/services/api';
 export default function CheckoutSuccessScreen() {
     const { colors } = useTheme();
     const router = useRouter();
-    const { session_id } = useLocalSearchParams<{ session_id: string }>();
+    const { session_id, event_id } = useLocalSearchParams<{ session_id: string; event_id: string }>();
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
 
     useEffect(() => {
@@ -19,7 +19,6 @@ export default function CheckoutSuccessScreen() {
                 return;
             }
 
-            // Poll user tickets until the new ticket appears (webhook fulfillment)
             const token = await getSession();
             if (!token) {
                 if (mounted) setStatus('error');
@@ -35,13 +34,15 @@ export default function CheckoutSuccessScreen() {
                 try {
                     invalidateTicketsCache();
                     const tickets = await api.getUserTickets(token);
-                    // If we have any ticket, consider it success (simplistic check)
-                    if (tickets.tickets && tickets.tickets.length > 0) {
+                    // Find ticket matching the purchased event
+                    const matchingTicket = event_id
+                        ? tickets.tickets.find(t => t.event_id === event_id)
+                        : tickets.tickets[0];
+                    if (matchingTicket) {
                         if (mounted) {
                             setStatus('success');
-                            const latestTicket = tickets.tickets[0];
                             setTimeout(() => {
-                                router.replace(`/ticket/${latestTicket.event_id}`);
+                                router.replace(`/ticket/${matchingTicket.event_id}`);
                             }, 1500);
                         }
                         return;
@@ -52,16 +53,17 @@ export default function CheckoutSuccessScreen() {
                 if (attempts < maxAttempts) {
                     setTimeout(check, interval);
                 } else if (mounted) {
-                    // After max attempts, still navigate to events
                     setStatus('success');
-                    setTimeout(() => router.replace('/my-events'), 1500);
+                    setTimeout(() => {
+                        router.replace(event_id ? `/ticket/${event_id}` : '/my-events');
+                    }, 1500);
                 }
             };
             check();
         };
         poll();
         return () => { mounted = false; };
-    }, [session_id]);
+    }, [session_id, event_id]);
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
