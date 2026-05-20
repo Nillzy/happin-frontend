@@ -177,6 +177,24 @@ export default function EventScreen() {
     const [sliderIndex, setSliderIndex] = useState(0);
     const [calendarModalVisible, setCalendarModalVisible] = useState(false);
     const [hostMenuVisible, setHostMenuVisible] = useState(false);
+    const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+    const [moreMenuPosition, setMoreMenuPosition] = useState<{ top: number; right: number } | null>(null);
+    const moreMenuTriggerRef = useRef<View | null>(null);
+
+    const toggleMoreMenu = () => {
+        if (moreMenuVisible) {
+            setMoreMenuVisible(false);
+            return;
+        }
+        moreMenuTriggerRef.current?.measureInWindow((x, y, _width, height) => {
+            const screenWidth = Dimensions.get('window').width;
+            setMoreMenuPosition({
+                top: y + height + 4,
+                right: Math.max(8, screenWidth - (x + _width)),
+            });
+            setMoreMenuVisible(true);
+        });
+    };
 
     // Custom Fields Bottom Sheet (like TicketDetailScreen)
     const CF_SHEET_HEIGHT = SCREEN_HEIGHT * 0.9;
@@ -515,6 +533,39 @@ export default function EventScreen() {
         handleRsvp('Accepted', resolved.length, resolved);
     };
 
+    const openCustomFieldsModal = async () => {
+        if (!event) return;
+        const token = await getSession();
+        let tickets = event.ticket || [];
+        if (tickets.length === 0 && token) {
+            try {
+                const allTickets = await api.getUserTickets(token);
+                tickets = allTickets.tickets
+                    .filter(t => t.event_id === event.event_id)
+                    .map(t => ({ ticket_id: t.ticket_id }));
+            } catch { /* ignore */ }
+        }
+        const ticketInfos = tickets.map((t, i) => ({
+            ticket_id: t.ticket_id,
+            label: tickets.length > 1 ? `Person ${i + 1}` : 'Person 1',
+        }));
+        setMyTickets(ticketInfos);
+
+        if (token) {
+            try {
+                const data = await api.getMyCustomFieldResponses(event.event_id, token);
+                const mapped: Record<string, CustomFieldResponseItem[]> = {};
+                for (const item of data) {
+                    mapped[item.ticket_id] = item.responses;
+                }
+                setInitialResponses(mapped);
+            } catch {
+                setInitialResponses({});
+            }
+        }
+        setCustomFieldsModalOpen(true);
+    };
+
     const handleCustomFieldSubmit = async (responses: Record<string, CustomFieldResponseItem[]>) => {
         if (!event) return;
         const token = await getSession();
@@ -747,7 +798,7 @@ export default function EventScreen() {
                         <ScrollView
                             style={styles.desktopRight}
                             contentContainerStyle={styles.desktopRightContent}
-                            onScrollBeginDrag={() => setHostMenuVisible(false)}
+                            onScrollBeginDrag={() => { setHostMenuVisible(false); setMoreMenuVisible(false); }}
                             showsVerticalScrollIndicator={false}
                         >
                             {/* Preview Badge */}
@@ -820,6 +871,12 @@ export default function EventScreen() {
                                         </TouchableOpacity>
                                     ) : null;
                                 })()}
+                                {rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 && !event.is_host && (
+                                    <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
+                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben</Text>
+                                    </TouchableOpacity>
+                                )}
                                 <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
                                     <Ionicons name="calendar-outline" size={22} color={colors.onSurface} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>ICS-Import</Text>
@@ -829,10 +886,12 @@ export default function EventScreen() {
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
                                 {event.is_host && (
-                                    <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/event/${id}/manage`)}>
-                                        <Ionicons name="settings-outline" size={22} color={colors.onSurface} />
-                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
-                                    </TouchableOpacity>
+                                    <View ref={moreMenuTriggerRef} style={styles.moreMenuWrapper} collapsable={false}>
+                                        <TouchableOpacity style={glassActionBtn} onPress={toggleMoreMenu}>
+                                            <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
+                                            <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 )}
                             </View>
 
@@ -950,7 +1009,7 @@ export default function EventScreen() {
                     </View>
                 ) : (
                     /* ── Mobile: original layout ── */
-                    <ScrollView showsVerticalScrollIndicator={false} onScrollBeginDrag={() => setHostMenuVisible(false)}>
+                    <ScrollView showsVerticalScrollIndicator={false} onScrollBeginDrag={() => { setHostMenuVisible(false); setMoreMenuVisible(false); }}>
                         {/* Hero Image with Title Overlay */}
                         <View style={styles.heroContainer}>
                             {event.image_url ? (
@@ -1043,6 +1102,12 @@ export default function EventScreen() {
                                         </TouchableOpacity>
                                     ) : null;
                                 })()}
+                                {rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 && !event.is_host && (
+                                    <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
+                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben</Text>
+                                    </TouchableOpacity>
+                                )}
                                 <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
                                     <Ionicons name="calendar-outline" size={22} color={colors.onSurface} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>ICS-Import</Text>
@@ -1052,10 +1117,12 @@ export default function EventScreen() {
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
                                 {event.is_host && (
-                                    <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/event/${id}/manage`)}>
-                                        <Ionicons name="settings-outline" size={22} color={colors.onSurface} />
-                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
-                                    </TouchableOpacity>
+                                    <View ref={moreMenuTriggerRef} style={styles.moreMenuWrapper} collapsable={false}>
+                                        <TouchableOpacity style={glassActionBtn} onPress={toggleMoreMenu}>
+                                            <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
+                                            <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 )}
                             </View>
 
@@ -1440,6 +1507,53 @@ export default function EventScreen() {
                     onPress={() => setHostMenuVisible(false)}
                 />
             )}
+
+            {/* More menu (host actions): rendered as Modal so it stacks above all sibling content */}
+            <Modal
+                visible={moreMenuVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setMoreMenuVisible(false)}
+            >
+                <Pressable
+                    style={StyleSheet.absoluteFillObject}
+                    onPress={() => setMoreMenuVisible(false)}
+                />
+                {moreMenuPosition && event && (
+                    <View
+                        style={[
+                            styles.hostMenuDropdown,
+                            {
+                                position: 'absolute',
+                                top: moreMenuPosition.top,
+                                right: moreMenuPosition.right,
+                                backgroundColor: colors.surfaceContainer,
+                                borderColor: colors.outlineVariant,
+                            },
+                        ]}
+                    >
+                        <TouchableOpacity
+                            style={styles.hostMenuItem}
+                            onPress={() => { setMoreMenuVisible(false); router.push(`/event/${id}/manage`); }}
+                        >
+                            <Ionicons name="settings-outline" size={18} color={colors.onSurface} />
+                            <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Verwalten</Text>
+                        </TouchableOpacity>
+                        {(event.custom_fields?.length ?? 0) > 0 && rsvpStatus === 'Accepted' && (
+                            <>
+                                <View style={[styles.hostMenuSeparator, { backgroundColor: colors.outlineVariant }]} />
+                                <TouchableOpacity
+                                    style={styles.hostMenuItem}
+                                    onPress={() => { setMoreMenuVisible(false); openCustomFieldsModal(); }}
+                                >
+                                    <Ionicons name="create-outline" size={18} color={colors.onSurface} />
+                                    <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Angaben ändern</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </View>
+                )}
+            </Modal>
 
             {/* RSVP Modal (for free private events) */}
             <Modal
@@ -1963,12 +2077,24 @@ const styles = StyleSheet.create({
         height: 1,
         marginHorizontal: 12,
     },
+    moreMenuWrapper: {
+        flex: 1,
+        position: 'relative',
+        zIndex: 200,
+    },
+    moreMenuDropdown: {
+        top: 80,
+        zIndex: 200,
+        elevation: 12,
+    },
 
     // Action Buttons Row (Luma-style)
     actionButtons: {
         flexDirection: 'row',
         gap: 8,
         marginBottom: 32,
+        position: 'relative',
+        zIndex: 200,
     },
     actionButton: {
         flex: 1,
