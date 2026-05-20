@@ -24,6 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Calendar from 'expo-calendar';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
@@ -158,7 +159,7 @@ function openInMaps(lat: number, lng: number) {
 export default function EventScreen() {
     const { colors, isDark } = useTheme();
     const router = useRouter();
-    const params = useLocalSearchParams<{ id?: string; eventId?: string; preview?: string }>();
+    const params = useLocalSearchParams<{ id?: string; eventId?: string; preview?: string; openCustomFields?: string }>();
     const id = params.id || params.eventId;
     const isPreview = params.preview === '1';
     const { width: windowWidth } = useWindowDimensions();
@@ -299,6 +300,23 @@ export default function EventScreen() {
         loadEvent();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
+
+    useEffect(() => {
+        if (params.openCustomFields === '1' && event && (event.custom_fields?.length ?? 0) > 0 && !loading) {
+            void openCustomFieldsModal();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [params.openCustomFields, event, loading]);
+
+    useFocusEffect(
+        useCallback(() => {
+            if (id) {
+                api.invalidateCaches(id);
+                loadEvent(true);
+            }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [id])
+    );
 
     const loadEvent = async (silent = false) => {
         try {
@@ -1366,6 +1384,9 @@ export default function EventScreen() {
                 const tickets = event.ticket_options ?? [];
                 const selected = tickets[selectedTicketIdx];
                 const total = (selected?.price ?? 0) * ticketCount;
+                const maxPerPerson = event.max_tickets_per_person ?? 1;
+                const ownedTickets = event.ticket?.length ?? 0;
+                const maxPurchasable = Math.max(0, maxPerPerson - ownedTickets);
 
                 const drawerTranslateY = drawerAnim.interpolate({
                     inputRange: [0, 1],
@@ -1494,11 +1515,17 @@ export default function EventScreen() {
                                     <Text style={[styles.quantityValue, { color: colors.onSurface }]}>{ticketCount}</Text>
                                     <TouchableOpacity
                                         style={[styles.stepperBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
-                                        onPress={() => setTicketCount(c => Math.min(10, c + 1))}
+                                        onPress={() => setTicketCount(c => Math.min(maxPurchasable, c + 1))}
+                                        disabled={ticketCount >= maxPurchasable}
                                     >
                                         <Ionicons name="add" size={20} color={colors.onSurface} />
                                     </TouchableOpacity>
                                 </View>
+                                {maxPurchasable === 0 && (
+                                    <Text style={{ color: colors.onSurfaceVariant, fontSize: 13, marginTop: 8 }}>
+                                        Du hast bereits die maximale Anzahl Tickets für dieses Event.
+                                    </Text>
+                                )}
                             </View>
 
                             {/* Summary + Checkout Button */}
@@ -1513,7 +1540,7 @@ export default function EventScreen() {
                                 </View>
                                 <TouchableOpacity
                                     style={[styles.checkoutButton, { backgroundColor: colors.primary }, checkoutLoading && { opacity: 0.6 }]}
-                                    disabled={checkoutLoading || !selected}
+                                    disabled={checkoutLoading || !selected || maxPurchasable === 0}
                                     onPress={async () => {
                                         if (!selected) return;
                                         setCheckoutLoading(true);
