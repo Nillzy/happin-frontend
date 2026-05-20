@@ -176,6 +176,7 @@ export default function EventScreen() {
     const [buyerDisplayName, setBuyerDisplayName] = useState('');
     const [sliderIndex, setSliderIndex] = useState(0);
     const [calendarModalVisible, setCalendarModalVisible] = useState(false);
+    const [hostMenuVisible, setHostMenuVisible] = useState(false);
 
     // Custom Fields Bottom Sheet (like TicketDetailScreen)
     const CF_SHEET_HEIGHT = SCREEN_HEIGHT * 0.9;
@@ -749,6 +750,7 @@ export default function EventScreen() {
                         <ScrollView
                             style={styles.desktopRight}
                             contentContainerStyle={styles.desktopRightContent}
+                            onScrollBeginDrag={() => setHostMenuVisible(false)}
                             showsVerticalScrollIndicator={false}
                         >
                             {/* Preview Badge */}
@@ -779,9 +781,30 @@ export default function EventScreen() {
                                         <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>hat dich eingeladen</Text>
                                     </View>
                                 </View>
-                                <TouchableOpacity>
-                                    <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurfaceVariant} />
-                                </TouchableOpacity>
+                                <View>
+                                    <TouchableOpacity onPress={() => setHostMenuVisible(!hostMenuVisible)}>
+                                        <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurfaceVariant} />
+                                    </TouchableOpacity>
+                                    {hostMenuVisible && (
+                                        <View style={[styles.hostMenuDropdown, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                                            <TouchableOpacity
+                                                style={styles.hostMenuItem}
+                                                onPress={() => { setHostMenuVisible(false); router.push('/account'); }}
+                                            >
+                                                <Ionicons name="camera-outline" size={18} color={colors.onSurface} />
+                                                <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Profilbild ändern</Text>
+                                            </TouchableOpacity>
+                                            <View style={[styles.hostMenuSeparator, { backgroundColor: colors.outlineVariant }]} />
+                                            <TouchableOpacity
+                                                style={styles.hostMenuItem}
+                                                onPress={() => { setHostMenuVisible(false); router.push('/account'); }}
+                                            >
+                                                <Ionicons name="pencil-outline" size={18} color={colors.onSurface} />
+                                                <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Namen ändern</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
 
                             {/* Action Buttons */}
@@ -930,7 +953,7 @@ export default function EventScreen() {
                     </View>
                 ) : (
                     /* ── Mobile: original layout ── */
-                    <ScrollView showsVerticalScrollIndicator={false}>
+                    <ScrollView showsVerticalScrollIndicator={false} onScrollBeginDrag={() => setHostMenuVisible(false)}>
                         {/* Hero Image with Title Overlay */}
                         <View style={styles.heroContainer}>
                             {event.image_url ? (
@@ -981,9 +1004,30 @@ export default function EventScreen() {
                                         <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>hat dich eingeladen</Text>
                                     </View>
                                 </View>
-                                <TouchableOpacity>
-                                    <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurfaceVariant} />
-                                </TouchableOpacity>
+                                <View>
+                                    <TouchableOpacity onPress={() => setHostMenuVisible(!hostMenuVisible)}>
+                                        <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurfaceVariant} />
+                                    </TouchableOpacity>
+                                    {hostMenuVisible && (
+                                        <View style={[styles.hostMenuDropdown, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                                            <TouchableOpacity
+                                                style={styles.hostMenuItem}
+                                                onPress={() => { setHostMenuVisible(false); router.push('/account'); }}
+                                            >
+                                                <Ionicons name="camera-outline" size={18} color={colors.onSurface} />
+                                                <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Profilbild ändern</Text>
+                                            </TouchableOpacity>
+                                            <View style={[styles.hostMenuSeparator, { backgroundColor: colors.outlineVariant }]} />
+                                            <TouchableOpacity
+                                                style={styles.hostMenuItem}
+                                                onPress={() => { setHostMenuVisible(false); router.push('/account'); }}
+                                            >
+                                                <Ionicons name="pencil-outline" size={18} color={colors.onSurface} />
+                                                <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Namen ändern</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
 
                             {/* Action Buttons */}
@@ -1391,6 +1435,14 @@ export default function EventScreen() {
                     </>
                 );
             })()}
+
+            {/* Host menu backdrop */}
+            {hostMenuVisible && (
+                <Pressable
+                    style={StyleSheet.absoluteFillObject}
+                    onPress={() => setHostMenuVisible(false)}
+                />
+            )}
 
             {/* RSVP Modal (for free private events) */}
             <Modal
@@ -1883,6 +1935,36 @@ const styles = StyleSheet.create({
     },
     hostSubtitle: {
         fontSize: 14,
+    },
+    hostMenuDropdown: {
+        position: 'absolute',
+        top: 32,
+        right: 0,
+        minWidth: 180,
+        borderRadius: 12,
+        borderWidth: 1,
+        paddingVertical: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+        zIndex: 100,
+    },
+    hostMenuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        gap: 10,
+    },
+    hostMenuItemText: {
+        fontSize: 15,
+        fontWeight: '500',
+    },
+    hostMenuSeparator: {
+        height: 1,
+        marginHorizontal: 12,
     },
 
     // Action Buttons Row (Luma-style)
