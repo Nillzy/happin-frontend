@@ -26,44 +26,52 @@ export default function CheckoutSuccessScreen() {
             }
 
             let attempts = 0;
-            const maxAttempts = 10;
+            const maxAttempts = 15;
             const interval = 2000;
 
             const check = async () => {
                 attempts++;
                 try {
                     invalidateTicketsCache();
-                    const tickets = await api.getUserTickets(token);
-                    // Find ticket matching the purchased event
-                    const matchingTicket = event_id
-                        ? tickets.tickets.find(t => t.event_id === event_id)
-                        : tickets.tickets[0];
-                    if (matchingTicket) {
+                    if (event_id) api.invalidateCaches(event_id);
+
+                    const orderStatus = await api.getCheckoutOrderStatus(session_id, token);
+                    if (orderStatus.fulfilled) {
                         if (mounted) {
                             setStatus('success');
-                            setTimeout(() => {
-                                router.replace(`/ticket/${matchingTicket.event_id}`);
-                            }, 1500);
+                            setTimeout(async () => {
+                                try {
+                                    const eventData = await api.getEventById(orderStatus.event_id, token);
+                                    if ((eventData.custom_fields?.length ?? 0) > 0) {
+                                        router.replace(`/event/${orderStatus.event_id}?openCustomFields=1`);
+                                        return;
+                                    }
+                                } catch {
+                                    // fall through to ticket view
+                                }
+                                router.replace(`/ticket/${orderStatus.event_id}`);
+                            }, 800);
                         }
                         return;
                     }
+                    if (orderStatus.order_status === 'failed' || orderStatus.order_status === 'expired') {
+                        if (mounted) setStatus('error');
+                        return;
+                    }
                 } catch {
-                    // ignore, retry
+                    // retry until webhook fulfills
                 }
                 if (attempts < maxAttempts) {
                     setTimeout(check, interval);
                 } else if (mounted) {
-                    setStatus('success');
-                    setTimeout(() => {
-                        router.replace(event_id ? `/ticket/${event_id}` : '/my-events');
-                    }, 1500);
+                    setStatus('error');
                 }
             };
             check();
         };
         poll();
         return () => { mounted = false; };
-    }, [session_id, event_id]);
+    }, [session_id, event_id, router]);
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>

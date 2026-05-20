@@ -22,7 +22,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import { getSession } from '../services/supabase';
-import { api } from '../services/api';
+import { api, invalidateTicketsCache } from '../services/api';
 import type { EventDetailResponse, UserTicket } from '../types/events';
 import QRCode from 'react-native-qrcode-svg';
 import WalletButton from '../../assets/images/de_add_to_google_wallet_wallet-button.svg';
@@ -46,7 +46,8 @@ function formatDateGerman(isoDate: string): string {
 export default function TicketDetailScreen() {
     const { colors } = useTheme();
     const router = useRouter();
-    const { eventId } = useLocalSearchParams<{ eventId: string }>();
+    const { eventId: eventIdParam } = useLocalSearchParams<{ eventId: string | string[] }>();
+    const eventId = Array.isArray(eventIdParam) ? eventIdParam[0] : eventIdParam;
     const { width: windowWidth } = useWindowDimensions();
     const effectiveWidth = Math.min(windowWidth, MAX_SHEET_WIDTH);
 
@@ -187,6 +188,8 @@ export default function TicketDetailScreen() {
     }, [effectiveWidth]);
 
     useEffect(() => {
+        let cancelled = false;
+
         const loadData = async () => {
             if (!eventId) {
                 setError('Keine Event-ID');
@@ -202,26 +205,44 @@ export default function TicketDetailScreen() {
                     return;
                 }
 
+                invalidateTicketsCache();
+                api.invalidateCaches(eventId);
+
                 const eventData = await api.getEventById(eventId, token);
+                if (cancelled) return;
                 setEvent(eventData);
 
-                try {
-                    const ticketData = await api.getUserTickets(token);
-                    const matchingTickets = ticketData.tickets
-                        .filter(t => t.event_id === eventId);
-                    setTickets(matchingTickets);
-                } catch {
-                    // Ticket-Laden fehlgeschlagen
+                const maxAttempts = 15;
+                const pollIntervalMs = 2000;
+                for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                    if (cancelled) return;
+                    try {
+                        invalidateTicketsCache();
+                        const ticketData = await api.getUserTickets(token);
+                        const matchingTickets = ticketData.tickets.filter(
+                            t => t.event_id === eventId && t.qr_token && t.status === 'active'
+                        );
+                        if (matchingTickets.length > 0) {
+                            setTickets(matchingTickets);
+                            break;
+                        }
+                    } catch {
+                        // retry
+                    }
+                    if (attempt < maxAttempts - 1) {
+                        await new Promise(r => setTimeout(r, pollIntervalMs));
+                    }
                 }
             } catch (err) {
                 console.error('Failed to load event:', err);
-                setError('Event konnte nicht geladen werden');
+                if (!cancelled) setError('Event konnte nicht geladen werden');
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
 
         void loadData();
+        return () => { cancelled = true; };
     }, [eventId, router]);
 
     const renderQRCard = ({ item }: { item: UserTicket }) => (

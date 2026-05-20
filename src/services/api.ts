@@ -296,6 +296,16 @@ export const api = {
             headers: { Authorization: `Bearer ${token}` },
         }),
 
+    getCheckoutOrderStatus: (sessionId: string, token: string) =>
+        request<{
+            order_status: string;
+            fulfilled: boolean;
+            event_id: string;
+            ticket_order_id: string;
+        }>(`/api/v1/checkout/orders/status?session_id=${encodeURIComponent(sessionId)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
     cancelTicketOrder: (eventId: string, token: string) =>
         request<{ refunded: boolean; amount_cents: number }>(`/api/v1/events/${eventId}/tickets/cancel`, {
             method: 'POST',
