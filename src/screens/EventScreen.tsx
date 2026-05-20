@@ -1472,16 +1472,29 @@ export default function EventScreen() {
                                         try {
                                             const token = await getSession();
                                             if (!token) { Alert.alert('Fehler', 'Bitte melde dich an.'); return; }
-                                            await api.createTickets(
-                                                event.event_id,
-                                                purchasedOptionId ?? null,
-                                                purchasedCount,
-                                                token
-                                            );
-                                            invalidateTicketsCache();
-                                            api.invalidateCaches(event.event_id);
-                                            closeDrawer();
-                                            await silentRefresh(purchasedOptionId, purchasedCount);
+                                            if (total > 0 && purchasedOptionId) {
+                                                // Paid ticket → Stripe Checkout
+                                                const { checkout_url } = await api.createCheckoutSession(
+                                                    event.event_id,
+                                                    purchasedOptionId,
+                                                    purchasedCount,
+                                                    token
+                                                );
+                                                closeDrawer();
+                                                Linking.openURL(checkout_url);
+                                            } else {
+                                                // Free ticket → direct booking
+                                                await api.createTickets(
+                                                    event.event_id,
+                                                    purchasedOptionId ?? null,
+                                                    purchasedCount,
+                                                    token
+                                                );
+                                                invalidateTicketsCache();
+                                                api.invalidateCaches(event.event_id);
+                                                closeDrawer();
+                                                await silentRefresh(purchasedOptionId, purchasedCount);
+                                            }
                                         } catch (err: any) {
                                             Alert.alert('Fehler', err?.message ?? 'Ticket konnte nicht gebucht werden.');
                                         } finally {

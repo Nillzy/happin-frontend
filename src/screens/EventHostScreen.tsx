@@ -11,6 +11,8 @@ import {
     Pressable,
     Image,
     useWindowDimensions,
+    Linking,
+    Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/hooks/use-theme';
@@ -582,6 +584,222 @@ const mobileHeroStyles = StyleSheet.create({
     },
 });
 
+// ── Stripe Connect Section ───────────────────────────────────────────────────
+
+function StripeConnectSection({ eventId, colors, isDark, isDesktop }: {
+    eventId: string;
+    colors: ReturnType<typeof useTheme>['colors'];
+    isDark: boolean;
+    isDesktop?: boolean;
+}) {
+    const [status, setStatus] = useState<{
+        has_account: boolean; charges_enabled: boolean; payouts_enabled: boolean; onboarding_complete: boolean;
+    } | null>(null);
+    const [summary, setSummary] = useState<{
+        gross_cents: number; platform_fee_cents: number; net_cents: number; paid_orders: number;
+    } | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        void loadStatus();
+    }, []);
+
+    const loadStatus = async () => {
+        const token = await getSession();
+        if (!token) return;
+        try {
+            const [s, p] = await Promise.all([
+                api.getConnectStatus(token),
+                api.getPaymentSummary(eventId, token).catch(() => null),
+            ]);
+            setStatus(s);
+            if (p) setSummary(p);
+        } catch { /* ignore */ }
+    };
+
+    const handleOnboarding = async () => {
+        setLoading(true);
+        try {
+            const token = await getSession();
+            if (!token) return;
+            const { url } = await api.createOnboardingLink(token, eventId);
+            Linking.openURL(url);
+        } catch (err: any) {
+            Alert.alert('Fehler', err?.message ?? 'Onboarding konnte nicht gestartet werden.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDashboard = async () => {
+        try {
+            const token = await getSession();
+            if (!token) return;
+            const { url } = await api.createDashboardLink(token);
+            Linking.openURL(url);
+        } catch (err: any) {
+            Alert.alert('Fehler', err?.message ?? 'Dashboard nicht verfügbar.');
+        }
+    };
+
+    const handlePayout = async () => {
+        setLoading(true);
+        try {
+            const token = await getSession();
+            if (!token) return;
+            const result = await api.requestPayout(eventId, token);
+            Alert.alert('Auszahlung', `${(result.amount_cents / 100).toFixed(2)} € wird ausgezahlt.`);
+            void loadStatus();
+        } catch (err: any) {
+            Alert.alert('Fehler', err?.message ?? 'Auszahlung fehlgeschlagen.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!status) return null;
+
+    const formatEur = (cents: number) => (cents / 100).toFixed(2).replace('.', ',') + ' €';
+
+    return (
+        <View style={[
+            connectStyles.container,
+            { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant },
+            isDesktop && { padding: 20 },
+        ]}>
+            <Text style={[connectStyles.title, { color: colors.onSurface }]}>Zahlungen</Text>
+
+            {!status.has_account || !status.charges_enabled ? (
+                <>
+                    <Text style={[connectStyles.hint, { color: colors.outline }]}>
+                        Richte dein Zahlungskonto ein, um Ticketeinnahmen zu erhalten.
+                    </Text>
+                    <TouchableOpacity
+                        style={[connectStyles.button, { backgroundColor: colors.primary }]}
+                        onPress={handleOnboarding}
+                        disabled={loading}
+                    >
+                        <Ionicons name="card-outline" size={18} color={colors.onPrimary} style={{ marginRight: 8 }} />
+                        <Text style={[connectStyles.buttonText, { color: colors.onPrimary }]}>
+                            {loading ? 'Wird geladen…' : 'Zahlungen einrichten'}
+                        </Text>
+                    </TouchableOpacity>
+                </>
+            ) : (
+                <>
+                    {summary && summary.paid_orders > 0 && (
+                        <View style={connectStyles.summaryRow}>
+                            <View style={connectStyles.summaryItem}>
+                                <Text style={[connectStyles.summaryValue, { color: colors.tertiary }]}>
+                                    {formatEur(summary.gross_cents)}
+                                </Text>
+                                <Text style={[connectStyles.summaryLabel, { color: colors.outline }]}>Brutto</Text>
+                            </View>
+                            <View style={connectStyles.summaryItem}>
+                                <Text style={[connectStyles.summaryValue, { color: colors.onSurface }]}>
+                                    {formatEur(summary.net_cents)}
+                                </Text>
+                                <Text style={[connectStyles.summaryLabel, { color: colors.outline }]}>Netto</Text>
+                            </View>
+                            <View style={connectStyles.summaryItem}>
+                                <Text style={[connectStyles.summaryValue, { color: colors.onSurface }]}>
+                                    {summary.paid_orders}
+                                </Text>
+                                <Text style={[connectStyles.summaryLabel, { color: colors.outline }]}>Verkäufe</Text>
+                            </View>
+                        </View>
+                    )}
+                    <View style={connectStyles.buttonRow}>
+                        <TouchableOpacity
+                            style={[connectStyles.buttonSmall, { borderColor: colors.outlineVariant }]}
+                            onPress={handleDashboard}
+                        >
+                            <Ionicons name="open-outline" size={16} color={colors.onSurface} style={{ marginRight: 6 }} />
+                            <Text style={[connectStyles.buttonSmallText, { color: colors.onSurface }]}>Stripe-Konto</Text>
+                        </TouchableOpacity>
+                        {status.payouts_enabled && (
+                            <TouchableOpacity
+                                style={[connectStyles.buttonSmall, { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
+                                onPress={handlePayout}
+                                disabled={loading}
+                            >
+                                <Ionicons name="wallet-outline" size={16} color={colors.primary} style={{ marginRight: 6 }} />
+                                <Text style={[connectStyles.buttonSmallText, { color: colors.primary }]}>
+                                    {loading ? '…' : 'Auszahlung'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </>
+            )}
+        </View>
+    );
+}
+
+const connectStyles = StyleSheet.create({
+    container: {
+        borderRadius: 16,
+        borderWidth: 1,
+        padding: 16,
+        marginBottom: 12,
+    },
+    title: {
+        fontSize: 15,
+        fontWeight: '700',
+        marginBottom: 8,
+    },
+    hint: {
+        fontSize: 13,
+        marginBottom: 12,
+        lineHeight: 18,
+    },
+    button: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+    },
+    buttonText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        marginBottom: 12,
+        gap: 12,
+    },
+    summaryItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    summaryValue: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    summaryLabel: {
+        fontSize: 11,
+        marginTop: 2,
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    buttonSmall: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+    },
+    buttonSmallText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+});
+
 // ── Overview Content ──────────────────────────────────────────────────────────
 
 function OverviewContent({
@@ -704,6 +922,9 @@ function OverviewContent({
                     Hier werden bald die Antworten deiner Gäste auf Custom Fields angezeigt.
                 </Text>
             </View>
+
+            {/* Stripe Connect / Payment Management */}
+            <StripeConnectSection eventId={eventId} colors={colors} isDark={isDark} isDesktop={isDesktop} />
 
             {/* Action tiles: Gast-Ansicht, Teilen, Event bearbeiten */}
             <View style={[styles.actionButtons, { marginBottom: 16 }]}>

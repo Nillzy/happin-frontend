@@ -254,6 +254,48 @@ export const api = {
             headers: { Authorization: `Bearer ${token}` },
         }),
 
+    // ── Stripe Connect / Payments ──────────────────────────────────────────
+
+    createCheckoutSession: (eventId: string, ticketOptionId: string, quantity: number, token: string) =>
+        request<{ checkout_url: string; ticket_order_id: string }>(`/api/v1/events/${eventId}/checkout-session`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ ticket_option_id: ticketOptionId, quantity }),
+        }),
+
+    getConnectStatus: (token: string) =>
+        request<{ has_account: boolean; charges_enabled: boolean; payouts_enabled: boolean; onboarding_complete: boolean }>(
+            '/api/v1/connect/status',
+            { headers: { Authorization: `Bearer ${token}` } }
+        ),
+
+    createOnboardingLink: (token: string, eventId?: string) =>
+        request<{ url: string; account_id: string }>(
+            `/api/v1/connect/onboarding-link${eventId ? `?event_id=${eventId}` : ''}`,
+            {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            },
+        ),
+
+    createDashboardLink: (token: string) =>
+        request<{ url: string }>('/api/v1/connect/dashboard-link', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
+    getPaymentSummary: (eventId: string, token: string) =>
+        request<{ gross_cents: number; platform_fee_cents: number; net_cents: number; paid_orders: number }>(
+            `/api/v1/events/${eventId}/payments/summary`,
+            { headers: { Authorization: `Bearer ${token}` } }
+        ),
+
+    requestPayout: (eventId: string, token: string) =>
+        request<{ payout_id: string; amount_cents: number; currency: string }>(`/api/v1/events/${eventId}/payout`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
     invalidateCaches: (eventId?: string) => {
         if (eventId) _eventCache.delete(eventId);
         _ticketsCache = null;
