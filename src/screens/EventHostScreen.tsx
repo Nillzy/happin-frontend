@@ -669,7 +669,7 @@ function StripeConnectSection({ eventId, colors, isDark, isDesktop }: {
         ]}>
             <Text style={[connectStyles.title, { color: colors.onSurface }]}>Zahlungen</Text>
 
-            {!status.has_account || !status.charges_enabled ? (
+            {!status.has_account ? (
                 <>
                     <Text style={[connectStyles.hint, { color: colors.outline }]}>
                         Richte dein Zahlungskonto ein, um Ticketeinnahmen zu erhalten.
@@ -685,8 +685,35 @@ function StripeConnectSection({ eventId, colors, isDark, isDesktop }: {
                         </Text>
                     </TouchableOpacity>
                 </>
+            ) : !status.charges_enabled ? (
+                <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <Ionicons name="time-outline" size={18} color={colors.tertiary} style={{ marginRight: 8 }} />
+                        <Text style={[connectStyles.hint, { color: colors.tertiary, marginBottom: 0 }]}>
+                            Konto verbunden – Verifizierung ausstehend
+                        </Text>
+                    </View>
+                    <Text style={[connectStyles.hint, { color: colors.outline, fontSize: 13 }]}>
+                        Stripe prüft deine Angaben. Dies kann wenige Minuten dauern.
+                    </Text>
+                    <TouchableOpacity
+                        style={[connectStyles.button, { backgroundColor: colors.surfaceContainerHigh || colors.surface }]}
+                        onPress={loadStatus}
+                    >
+                        <Ionicons name="refresh-outline" size={18} color={colors.onSurface} style={{ marginRight: 8 }} />
+                        <Text style={[connectStyles.buttonText, { color: colors.onSurface }]}>
+                            Status aktualisieren
+                        </Text>
+                    </TouchableOpacity>
+                </>
             ) : (
                 <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={{ marginRight: 8 }} />
+                        <Text style={[connectStyles.hint, { color: '#4CAF50', marginBottom: 0, fontWeight: '600' }]}>
+                            Stripe-Konto erfolgreich verbunden
+                        </Text>
+                    </View>
                     {summary && summary.paid_orders > 0 && (
                         <View style={connectStyles.summaryRow}>
                             <View style={connectStyles.summaryItem}>
