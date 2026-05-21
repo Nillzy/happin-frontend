@@ -21,6 +21,7 @@ import { SkeletonHostCard, SkeletonTicketCard } from '../components/atoms/Skelet
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
 import { EventListItem } from '../types/events';
+import { useReminderSettings } from '@/src/contexts/ReminderSettingsContext';
 import QRCode from 'react-native-qrcode-svg';
 
 const CONTAINER_MAX_WIDTH = 900;
@@ -94,6 +95,7 @@ export default function MyEventsScreen() {
     const [pastLoading, setPastLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const { refresh: refreshReminders } = useReminderSettings();
 
     useEffect(() => {
         if (!isWeb) return;
@@ -163,7 +165,8 @@ export default function MyEventsScreen() {
         if (failures === 3) {
             setError('Events konnten nicht geladen werden');
         }
-    }, [router]);
+        refreshReminders().catch(() => {});
+    }, [router, refreshReminders]);
 
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);

@@ -20,6 +20,7 @@ import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import DarkLightToggle from '../components/atoms/DarkLightToggle';
+import ReminderSettingsSection from '../components/atoms/ReminderSettingsSection';
 import { PersonIcon, EditIcon, LogoutIcon, TrashIcon, ChevronRightIcon, MailIcon, GpsIcon } from '../components/atoms/icons';
 import {
     getUserProfile,
@@ -629,6 +630,7 @@ export default function AccountScreen() {
                                 </View>
                             )}
                         </View>
+                        <ReminderSettingsSection />
                         <View style={[actionStyles.row, { borderBottomWidth: 0 }]}>
                             <View style={actionStyles.left}>
                                 <Text style={[actionStyles.label, { color: colors.onSurface }]}>Design</Text>

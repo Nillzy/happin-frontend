@@ -52,6 +52,13 @@
         {
           "cameraPermission": "Happin benötigt Zugriff auf die Kamera, um Tickets zu scannen."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#ffffff",
+          "defaultChannel": "default"
+        }
       ]
     ],
     "experiments": {
