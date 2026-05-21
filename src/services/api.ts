@@ -312,6 +312,47 @@ export const api = {
             headers: { Authorization: `Bearer ${token}` },
         }),
 
+    // ── Reminders / K4 ─────────────────────────────────────────────────────
+
+    getReminderPreferences: (token: string) =>
+        request<{ enabled: boolean; lead_time_minutes: number }>(
+            '/api/v1/users/me/reminder-preferences',
+            { headers: { Authorization: `Bearer ${token}` } },
+        ),
+
+    updateReminderPreferences: (
+        token: string,
+        body: { enabled?: boolean; lead_time_minutes?: number },
+    ) =>
+        request<{ enabled: boolean; lead_time_minutes: number }>(
+            '/api/v1/users/me/reminder-preferences',
+            {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify(body),
+            },
+        ),
+
+    registerWebPushSubscription: (
+        token: string,
+        body: { endpoint: string; keys: { p256dh: string; auth: string }; user_agent?: string },
+    ) =>
+        request<void>('/api/v1/users/me/web-push-subscriptions', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify(body),
+        }),
+
+    unregisterWebPushSubscription: (token: string, endpoint: string) =>
+        request<void>('/api/v1/users/me/web-push-subscriptions', {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ endpoint }),
+        }),
+
+    getVapidPublicKey: () =>
+        request<{ public_key: string | null }>('/api/v1/users/vapid-public-key'),
+
     invalidateCaches: (eventId?: string) => {
         if (eventId) _eventCache.delete(eventId);
         _ticketsCache = null;

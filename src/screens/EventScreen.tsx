@@ -39,6 +39,7 @@ import type { EventDetailResponse, RsvpStatus, CustomFieldResponseItem } from '.
 import CustomFieldForm from '../components/atoms/CustomFieldForm';
 import { SkeletonBox } from '../components/atoms/SkeletonBox';
 import ConfirmModal from '../components/atoms/ConfirmModal';
+import { useReminderSettings } from '@/src/contexts/ReminderSettingsContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.56; // ~16:9
@@ -181,6 +182,7 @@ export default function EventScreen() {
     const [rsvpStatus, setRsvpStatus] = useState<RsvpStatus | null>(null);
     const [rsvpMenuVisible, setRsvpMenuVisible] = useState(false);
     const [rsvpLoading, setRsvpLoading] = useState(false);
+    const { refresh: refreshReminders } = useReminderSettings();
     const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
     const [customFieldsSubmitting, setCustomFieldsSubmitting] = useState(false);
     const [cfConfirmVisible, setCfConfirmVisible] = useState(false);
@@ -540,6 +542,7 @@ export default function EventScreen() {
             setRsvpLoading(false);
             api.invalidateCaches(id);
             loadEvent(true);
+            refreshReminders().catch(() => {});
         }
     };
 

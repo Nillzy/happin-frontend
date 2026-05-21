@@ -4,6 +4,7 @@ import { useColorScheme } from 'react-native';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/src/contexts/AuthContext';
 import { SavedEventsProvider } from '@/src/contexts/SavedEventsContext';
+import { ReminderSettingsProvider } from '@/src/contexts/ReminderSettingsContext';
 
 export default function RootLayout() {
   const scheme = useColorScheme();
@@ -13,6 +14,7 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <SavedEventsProvider>
+          <ReminderSettingsProvider>
           <Stack screenOptions={{ headerShown: false }} initialRouteName="index">
             <Stack.Screen name="index" options={{ title: 'Happin' }} />
             <Stack.Screen name="login" options={{ title: 'Anmelden – Happin' }} />
@@ -37,6 +39,7 @@ export default function RootLayout() {
             />
           </Stack>
           <StatusBar style={isDark ? 'light' : 'dark'} />
+          </ReminderSettingsProvider>
         </SavedEventsProvider>
       </AuthProvider>
     </ThemeProvider>
