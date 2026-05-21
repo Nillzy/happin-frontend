@@ -32,6 +32,8 @@ export interface EventListItem {
     status: string;
     image_url?: string;
     gradient_id?: number | null;
+    accent_color_primary?: string | null;
+    accent_color_secondary?: string | null;
     location?: EventLocation;
     participant_count: number;
     is_host?: boolean;
@@ -130,6 +132,8 @@ export interface EventUpdateRequest {
     location?: Partial<LocationCreate>;
     image_url?: string;
     gradient_id?: number | null;
+    accent_color_primary?: string | null;
+    accent_color_secondary?: string | null;
     media_urls?: string[];
     location_is_private?: boolean;
 }

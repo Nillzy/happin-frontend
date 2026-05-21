@@ -60,7 +60,7 @@ function formatDateGerman(isoDate: string): string {
     }).format(d);
 }
 
-function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoading, onRsvp, onTickets, onShowTicket }: {
+function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoading, onRsvp, onTickets, onShowTicket, effectivePrimary, effectiveOnPrimary }: {
     event: EventDetailResponse;
     isFree: boolean;
     colors: any;
@@ -70,14 +70,16 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
     onRsvp: () => void;
     onTickets: () => void;
     onShowTicket: () => void;
+    effectivePrimary: string;
+    effectiveOnPrimary: string;
 }) {
     const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
     const bgColor = isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)';
 
     if (isFree) {
-        const btnBg = (event.is_public && rsvpStatus === 'Accepted') ? 'transparent' : colors.primary;
+        const btnBg = (event.is_public && rsvpStatus === 'Accepted') ? 'transparent' : effectivePrimary;
         const btnBorder = (event.is_public && rsvpStatus === 'Accepted') ? colors.outline : 'transparent';
-        const btnTextColor = (event.is_public && rsvpStatus === 'Accepted') ? colors.onSurface : colors.onPrimary;
+        const btnTextColor = (event.is_public && rsvpStatus === 'Accepted') ? colors.onSurface : effectiveOnPrimary;
         return (
             <View style={[deskBarStyles.bar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
                 <View style={deskBarStyles.info}>
@@ -112,10 +114,10 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
                 </Text>
             </View>
             <TouchableOpacity
-                style={[deskBarStyles.btn, { backgroundColor: userHasTicket ? colors.tertiary : colors.primary }]}
+                style={[deskBarStyles.btn, { backgroundColor: userHasTicket ? colors.tertiary : effectivePrimary }]}
                 onPress={userHasTicket ? onShowTicket : onTickets}
             >
-                <Text style={[deskBarStyles.btnText, { color: userHasTicket ? colors.onTertiary : colors.onPrimary }]}>
+                <Text style={[deskBarStyles.btnText, { color: userHasTicket ? colors.onTertiary : effectiveOnPrimary }]}>
                     {userHasTicket ? 'Ticket anzeigen' : 'Tickets wählen'}
                 </Text>
             </TouchableOpacity>
@@ -690,6 +692,9 @@ export default function EventScreen() {
     const hostInitial = event.host_name?.charAt(0).toUpperCase() || 'H';
     const categories = event.category ? event.category.split(',').map(c => c.trim()) : [];
 
+    const effectivePrimary = event.accent_color_primary ?? colors.primary;
+    const effectiveOnPrimary = event.accent_color_primary ? '#ffffff' : colors.onPrimary;
+
     // Ein Event gilt als kostenpflichtig sobald mind. eine Ticketoption mit Preis > 0 existiert
     const hasPaidTickets = (event.ticket_options ?? []).some(t => t.price > 0);
     const effectiveIsFree = event.is_free && !hasPaidTickets;
@@ -863,8 +868,8 @@ export default function EventScreen() {
                             {/* Host Card */}
                             <View style={[...glassCard, styles.hostCard]}>
                                 <View style={styles.hostInfo}>
-                                    <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
-                                        <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>{hostInitial}</Text>
+                                    <View style={[styles.hostAvatar, { backgroundColor: effectivePrimary }]}>
+                                        <Text style={[styles.hostAvatarText, { color: effectiveOnPrimary }]}>{hostInitial}</Text>
                                     </View>
                                     <View style={styles.hostTextContainer}>
                                         <Text style={[styles.hostName, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
@@ -951,7 +956,7 @@ export default function EventScreen() {
 
                             {/* Categories */}
                             {categories.length > 0 && (
-                                <EventCategories categories={categories} editMode={false} />
+                                <EventCategories categories={categories} editMode={false} accentColor={event.accent_color_primary} />
                             )}
 
                             {/* About */}
@@ -1056,6 +1061,8 @@ export default function EventScreen() {
                                     onRsvp={handleStickyBarPress}
                                     onTickets={openDrawer}
                                     onShowTicket={() => router.push(`/ticket/${event.event_id}`)}
+                                    effectivePrimary={effectivePrimary}
+                                    effectiveOnPrimary={effectiveOnPrimary}
                                 />
                             </View>
 
@@ -1107,8 +1114,8 @@ export default function EventScreen() {
                         <View style={styles.content}>
                             <View style={[...glassCard, styles.hostCard]}>
                                 <View style={styles.hostInfo}>
-                                    <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
-                                        <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>{hostInitial}</Text>
+                                    <View style={[styles.hostAvatar, { backgroundColor: effectivePrimary }]}>
+                                        <Text style={[styles.hostAvatarText, { color: effectiveOnPrimary }]}>{hostInitial}</Text>
                                     </View>
                                     <View style={styles.hostTextContainer}>
                                         <Text style={[styles.hostName, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
@@ -1194,7 +1201,7 @@ export default function EventScreen() {
                             </View>
 
                             {categories.length > 0 && (
-                                <EventCategories categories={categories} editMode={false} />
+                                <EventCategories categories={categories} editMode={false} accentColor={event.accent_color_primary} />
                             )}
 
                             {event.description && (
@@ -1310,13 +1317,13 @@ export default function EventScreen() {
                             : 'RSVP';
                     const btnBg = (event.is_public && rsvpStatus === 'Accepted')
                         ? 'transparent'
-                        : colors.primary;
+                        : effectivePrimary;
                     const btnBorder = (event.is_public && rsvpStatus === 'Accepted')
                         ? colors.outline
                         : 'transparent';
                     const btnTextColor = (event.is_public && rsvpStatus === 'Accepted')
                         ? colors.onSurface
-                        : colors.onPrimary;
+                        : effectiveOnPrimary;
                     return (
                         <View style={[
                             styles.stickyBar,
@@ -1368,10 +1375,10 @@ export default function EventScreen() {
                             </Text>
                         </View>
                         <TouchableOpacity
-                            style={[styles.stickyBarButton, { backgroundColor: userHasTicket ? colors.tertiary : colors.primary }]}
+                            style={[styles.stickyBarButton, { backgroundColor: userHasTicket ? colors.tertiary : effectivePrimary }]}
                             onPress={userHasTicket ? () => router.push(`/ticket/${event.event_id}`) : openDrawer}
                         >
-                            <Text style={[styles.stickyBarButtonText, { color: userHasTicket ? colors.onTertiary : colors.onPrimary }]}>
+                            <Text style={[styles.stickyBarButtonText, { color: userHasTicket ? colors.onTertiary : effectiveOnPrimary }]}>
                                 {userHasTicket ? 'Ticket anzeigen' : 'Tickets wählen'}
                             </Text>
                         </TouchableOpacity>
@@ -1445,7 +1452,7 @@ export default function EventScreen() {
                                             style={[
                                                 styles.ticketOption,
                                                 {
-                                                    borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                                                    borderColor: isSelected ? effectivePrimary : colors.outlineVariant,
                                                     borderWidth: isSelected ? 2 : 1,
                                                     backgroundColor: isSoldOut
                                                         ? (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)')
@@ -1460,12 +1467,12 @@ export default function EventScreen() {
                                             <View style={[
                                                 styles.ticketRadio,
                                                 {
-                                                    borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                                                    borderColor: isSelected ? effectivePrimary : colors.outlineVariant,
                                                     borderWidth: isSelected ? 2 : 1.5,
                                                 },
                                             ]}>
                                                 {isSelected && (
-                                                    <View style={[styles.ticketRadioDot, { backgroundColor: colors.primary }]} />
+                                                    <View style={[styles.ticketRadioDot, { backgroundColor: effectivePrimary }]} />
                                                 )}
                                             </View>
 
@@ -1539,7 +1546,7 @@ export default function EventScreen() {
                                     </Text>
                                 </View>
                                 <TouchableOpacity
-                                    style={[styles.checkoutButton, { backgroundColor: colors.primary }, checkoutLoading && { opacity: 0.6 }]}
+                                    style={[styles.checkoutButton, { backgroundColor: effectivePrimary }, checkoutLoading && { opacity: 0.6 }]}
                                     disabled={checkoutLoading || !selected || maxPurchasable === 0}
                                     onPress={async () => {
                                         if (!selected) return;
@@ -1579,8 +1586,8 @@ export default function EventScreen() {
                                         }
                                     }}
                                 >
-                                    <Ionicons name="cart-outline" size={20} color={colors.onPrimary} style={{ marginRight: 8 }} />
-                                    <Text style={[styles.checkoutButtonText, { color: colors.onPrimary }]}>
+                                    <Ionicons name="cart-outline" size={20} color={effectiveOnPrimary} style={{ marginRight: 8 }} />
+                                    <Text style={[styles.checkoutButtonText, { color: effectiveOnPrimary }]}>
                                         {checkoutLoading ? 'Wird gebucht…' : total === 0 ? 'Kostenlos buchen' : 'Zur Kasse'}
                                     </Text>
                                 </TouchableOpacity>
@@ -1670,16 +1677,16 @@ export default function EventScreen() {
                                     style={[
                                         rsvpStyles.optionRow,
                                         {
-                                            backgroundColor: isActive ? `${colors.primary}14` : 'transparent',
-                                            borderColor: isActive ? `${colors.primary}28` : 'transparent',
+                                            backgroundColor: isActive ? `${effectivePrimary}14` : 'transparent',
+                                            borderColor: isActive ? `${effectivePrimary}28` : 'transparent',
                                         },
                                     ]}
                                 >
                                     <View style={[
                                         rsvpStyles.iconBadge,
-                                        { backgroundColor: isActive ? `${colors.primary}22` : colors.surfaceContainer },
+                                        { backgroundColor: isActive ? `${effectivePrimary}22` : colors.surfaceContainer },
                                     ]}>
-                                        <Text style={[rsvpStyles.iconText, { color: isActive ? colors.primary : colors.onSurfaceVariant }]}>
+                                        <Text style={[rsvpStyles.iconText, { color: isActive ? effectivePrimary : colors.onSurfaceVariant }]}>
                                             {opt.icon}
                                         </Text>
                                     </View>
@@ -1688,7 +1695,7 @@ export default function EventScreen() {
                                         <Text style={[rsvpStyles.optionSublabel, { color: colors.onSurfaceVariant }]}>{opt.sublabel}</Text>
                                     </View>
                                     {isActive && (
-                                        <Text style={[rsvpStyles.checkmark, { color: colors.primary }]}>✓</Text>
+                                        <Text style={[rsvpStyles.checkmark, { color: effectivePrimary }]}>✓</Text>
                                     )}
                                 </TouchableOpacity>
                                 {idx < RSVP_OPTIONS.length - 1 && (
@@ -1714,7 +1721,7 @@ export default function EventScreen() {
                     <View style={[rsvpStyles.handle, { backgroundColor: colors.outlineVariant }]} />
 
                     <View style={calendarStyles.titleRow}>
-                        <Ionicons name="calendar" size={22} color={colors.primary} style={{ marginRight: 8 }} />
+                        <Ionicons name="calendar" size={22} color={effectivePrimary} style={{ marginRight: 8 }} />
                         <Text style={[rsvpStyles.title, { color: colors.onSurface, marginBottom: 0 }]}>
                             Zum Kalender hinzufügen
                         </Text>
@@ -1738,10 +1745,10 @@ export default function EventScreen() {
 
                     <View style={calendarStyles.actions}>
                         <TouchableOpacity
-                            style={[calendarStyles.confirmButton, { backgroundColor: colors.primary }]}
+                            style={[calendarStyles.confirmButton, { backgroundColor: effectivePrimary }]}
                             onPress={handleCalendarConfirm}
                         >
-                            <Text style={[calendarStyles.confirmButtonText, { color: colors.onPrimary }]}>
+                            <Text style={[calendarStyles.confirmButtonText, { color: effectiveOnPrimary }]}>
                                 Hinzufügen
                             </Text>
                         </TouchableOpacity>
@@ -1824,15 +1831,15 @@ export default function EventScreen() {
                                 opacity: attendeeNames.length >= (event?.max_tickets_per_person ?? 1) ? 0.35 : 1,
                             }}
                         >
-                            <Ionicons name="add" size={20} color={colors.primary} />
-                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>Teilnehmer hinzufügen</Text>
+                            <Ionicons name="add" size={20} color={effectivePrimary} />
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: effectivePrimary }}>Teilnehmer hinzufügen</Text>
                         </TouchableOpacity>
                         <View style={{ paddingHorizontal: 20, paddingBottom: 30 }}>
                             <TouchableOpacity
-                                style={{ backgroundColor: colors.primary, borderRadius: 9999, paddingVertical: 16, alignItems: 'center' }}
+                                style={{ backgroundColor: effectivePrimary, borderRadius: 9999, paddingVertical: 16, alignItems: 'center' }}
                                 onPress={confirmTicketCount}
                             >
-                                <Text style={{ color: colors.onPrimary, fontSize: 15, fontWeight: '600' }}>Zusagen</Text>
+                                <Text style={{ color: effectiveOnPrimary, fontSize: 15, fontWeight: '600' }}>Zusagen</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

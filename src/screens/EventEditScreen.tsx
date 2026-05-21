@@ -30,13 +30,19 @@ import AddressAutocomplete from '../components/atoms/AddressAutocomplete';
 import MapView from '../components/MapView';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
-import { getGradientByIndex, type GradientId } from '../constants/gradients';
+import { getGradientByIndex, GRADIENT_PAIRS, type GradientId } from '../constants/gradients';
 import { geocodeAddress, reverseGeocode } from '../services/geocoding';
 import type { EventDetailResponse, TicketOption, CustomField, CustomFieldType } from '../types/events';
 import type { AddressSuggestion } from '../services/geocoding';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.75;
+
+const BRAND_COLOR_SWATCHES = [
+    '#D4006B', '#8B3DC8', '#42dae2', '#00677f',
+    '#FF6FA8', '#FF6B35', '#2ECC71', '#F64F59',
+    '#1A1A2E', '#FFB300', '#191c1d', '#FFFFFF',
+];
 
 function formatDateGerman(isoDate: string): string {
     const d = new Date(isoDate);
@@ -53,7 +59,7 @@ function localIso(date: string, time: string): string {
     return `${date}T${time}:00${sign}${pad(Math.floor(Math.abs(tzOffset) / 60))}:${pad(Math.abs(tzOffset) % 60)}`;
 }
 
-type DrawerKey = 'image' | 'title' | 'startDateTime' | 'description' | 'categories' | 'location' | 'tickets' | 'details' | 'gallery' | 'customFields' | null;
+type DrawerKey = 'image' | 'title' | 'startDateTime' | 'description' | 'categories' | 'location' | 'tickets' | 'details' | 'gallery' | 'customFields' | 'branding' | null;
 
 export default function EventEditScreen() {
     const { colors, isDark } = useTheme();
@@ -84,6 +90,10 @@ export default function EventEditScreen() {
     const [draftGalleryImages, setDraftGalleryImages] = useState<string[]>([]);
     const [draftTickets, setDraftTickets] = useState<TicketOption[]>([]);
     const [draftCustomFields, setDraftCustomFields] = useState<CustomField[]>([]);
+    const [draftPrimaryColor, setDraftPrimaryColor] = useState('');
+    const [draftSecondaryColor, setDraftSecondaryColor] = useState('');
+    const [draftBrandingGradientId, setDraftBrandingGradientId] = useState<GradientId | undefined>(undefined);
+    const [draftBrandingUseImage, setDraftBrandingUseImage] = useState(false);
     const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
     const [previewMapKey, setPreviewMapKey] = useState(0);
 
@@ -184,7 +194,7 @@ export default function EventEditScreen() {
 
         // Strip fields the backend doesn't support via PATCH
         // Remove keys whose value is null unless they are explicitly nullable fields
-        const nullableFields = new Set(['title', 'description', 'category', 'starts_at', 'ends_at', 'max_capacity', 'max_tickets_per_person', 'is_public', 'is_free', 'gradient_id', 'media_urls']);
+        const nullableFields = new Set(['title', 'description', 'category', 'starts_at', 'ends_at', 'max_capacity', 'max_tickets_per_person', 'is_public', 'is_free', 'gradient_id', 'media_urls', 'accent_color_primary', 'accent_color_secondary']);
         const cleanPatch = Object.fromEntries(
             Object.entries(patch).filter(([k, v]) => v !== null || nullableFields.has(k))
         );
@@ -332,6 +342,12 @@ export default function EventEditScreen() {
             case 'customFields':
                 setDraftCustomFields(event.custom_fields?.length ? [...event.custom_fields] : []);
                 break;
+            case 'branding':
+                setDraftPrimaryColor(event.accent_color_primary ?? '');
+                setDraftSecondaryColor(event.accent_color_secondary ?? '');
+                setDraftBrandingGradientId(selectedGradientId);
+                setDraftBrandingUseImage(!!effectiveImageUrl && selectedGradientId === undefined);
+                break;
             case 'image':
                 break;
         }
@@ -417,6 +433,26 @@ export default function EventEditScreen() {
             case 'customFields':
                 saveCustomFields(draftCustomFields);
                 break;
+            case 'branding': {
+                const hexRe = /^#[0-9A-Fa-f]{6}$/;
+                const patch: Record<string, any> = {
+                    accent_color_primary: hexRe.test(draftPrimaryColor) ? draftPrimaryColor : null,
+                    accent_color_secondary: hexRe.test(draftSecondaryColor) ? draftSecondaryColor : null,
+                };
+                if (draftBrandingUseImage) {
+                    // Zurück zum Bild: Gradient löschen falls vorher einer aktiv war
+                    if (event.gradient_id != null) patch.gradient_id = null;
+                    setSelectedGradientId(undefined);
+                } else if (draftBrandingGradientId !== undefined && draftBrandingGradientId !== event.gradient_id) {
+                    patch.gradient_id = draftBrandingGradientId;
+                }
+                const changed =
+                    patch.accent_color_primary !== (event.accent_color_primary ?? null) ||
+                    patch.accent_color_secondary !== (event.accent_color_secondary ?? null) ||
+                    'gradient_id' in patch;
+                if (changed) saveField(patch);
+                break;
+            }
         }
         setActiveDrawer(null);
     };
@@ -522,6 +558,7 @@ export default function EventEditScreen() {
     const heroGradient = selectedGradientId !== undefined ? getGradientByIndex(selectedGradientId) : getGradientByIndex(0);
     const effectiveImageUrl = localImageUrl ?? event.image_url;
     const showImage = effectiveImageUrl && selectedGradientId === undefined;
+    const effectivePrimaryEdit = event.accent_color_primary ?? colors.primary;
 
     // Validation
     const missingFields: string[] = [];
@@ -634,8 +671,8 @@ export default function EventEditScreen() {
                         {/* Host Card (same as EventScreen) */}
                         <View style={[...glassCard, styles.hostCard]}>
                             <View style={styles.hostInfo}>
-                                <View style={[styles.hostAvatar, { backgroundColor: colors.primary }]}>
-                                    <Text style={[styles.hostAvatarText, { color: colors.onPrimary }]}>{hostInitial}</Text>
+                                <View style={[styles.hostAvatar, { backgroundColor: effectivePrimaryEdit }]}>
+                                    <Text style={[styles.hostAvatarText, { color: '#ffffff' }]}>{hostInitial}</Text>
                                 </View>
                                 <View style={styles.hostTextContainer}>
                                     <Text style={[styles.hostName, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
@@ -648,7 +685,7 @@ export default function EventEditScreen() {
                         {categories.length > 0 ? (
                             <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('categories')}>
                                 <View style={{ position: 'relative' }}>
-                                    <EventCategories categories={categories} editMode={false} />
+                                    <EventCategories categories={categories} editMode={false} accentColor={event.accent_color_primary} />
                                     {renderEditOverlay(() => openDrawer('categories'))}
                                 </View>
                             </TouchableOpacity>
@@ -829,6 +866,44 @@ export default function EventEditScreen() {
                                     </View>
                                 )}
                                 {renderEditOverlay(() => openDrawer('details'))}
+                            </View>
+                        </TouchableOpacity>
+
+                        {/* Branding Section */}
+                        <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('branding')}>
+                            <View style={[...glassCard, styles.section, { padding: 20, position: 'relative' }]}>
+                                <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Design</Text>
+                                <View style={styles.detailRow}>
+                                    <Ionicons name="color-palette-outline" size={18} color={colors.onSurfaceVariant} />
+                                    <Text style={[styles.detailText, { color: colors.onSurface }]}>
+                                        {event.accent_color_primary
+                                            ? `Primärfarbe: ${event.accent_color_primary}`
+                                            : 'Primärfarbe: App-Standard'}
+                                    </Text>
+                                    {event.accent_color_primary && (
+                                        <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: event.accent_color_primary, marginLeft: 6 }} />
+                                    )}
+                                </View>
+                                <View style={styles.detailRow}>
+                                    <Ionicons name="color-palette-outline" size={18} color={colors.onSurfaceVariant} />
+                                    <Text style={[styles.detailText, { color: colors.onSurface }]}>
+                                        {event.accent_color_secondary
+                                            ? `Sekundärfarbe: ${event.accent_color_secondary}`
+                                            : 'Sekundärfarbe: App-Standard'}
+                                    </Text>
+                                    {event.accent_color_secondary && (
+                                        <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: event.accent_color_secondary, marginLeft: 6 }} />
+                                    )}
+                                </View>
+                                <View style={styles.detailRow}>
+                                    <Ionicons name="image-outline" size={18} color={colors.onSurfaceVariant} />
+                                    <Text style={[styles.detailText, { color: colors.onSurface }]}>
+                                        {selectedGradientId !== undefined
+                                            ? `Farbverlauf: Vorlage ${(selectedGradientId as number) + 1}`
+                                            : 'Farbverlauf: Kein'}
+                                    </Text>
+                                </View>
+                                {renderEditOverlay(() => openDrawer('branding'))}
                             </View>
                         </TouchableOpacity>
 
@@ -1155,6 +1230,128 @@ export default function EventEditScreen() {
                     <ImageGalleryUploader images={draftGalleryImages} onChange={setDraftGalleryImages} maxImages={10} />
                 </EditDrawer>
 
+                <EditDrawer visible={activeDrawer === 'branding'} onClose={closeDrawer} title="Design & Branding">
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Farbverlauf (Hintergrund)</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                        style={{ marginHorizontal: -24, paddingHorizontal: 24, marginBottom: 24 }}>
+                        {/* Aktuelles Titelbild als erste Option (nur wenn vorhanden) */}
+                        {effectiveImageUrl && (
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setDraftBrandingUseImage(true);
+                                    setDraftBrandingGradientId(undefined);
+                                    setSelectedGradientId(undefined);
+                                }}
+                                style={{
+                                    width: 80, height: 56, borderRadius: 12, overflow: 'hidden',
+                                    marginRight: 10, borderWidth: 2.5,
+                                    borderColor: draftBrandingUseImage ? colors.primary : 'transparent',
+                                }}
+                            >
+                                <Image source={{ uri: effectiveImageUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                                {draftBrandingUseImage && (
+                                    <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
+                                        <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
+                                    </View>
+                                )}
+                                <View style={{
+                                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                                    backgroundColor: 'rgba(0,0,0,0.45)', paddingVertical: 3,
+                                    alignItems: 'center',
+                                }}>
+                                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '600' }}>Bild</Text>
+                                </View>
+                            </TouchableOpacity>
+                        )}
+                        {GRADIENT_PAIRS.map((gradient, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                onPress={() => {
+                                    setDraftBrandingGradientId(index as GradientId);
+                                    setDraftBrandingUseImage(false);
+                                    setSelectedGradientId(index as GradientId);
+                                    setLocalImageUrl(null);
+                                }}
+                                style={{
+                                    width: 80, height: 56, borderRadius: 12, overflow: 'hidden',
+                                    marginRight: 10, borderWidth: 2.5,
+                                    borderColor: !draftBrandingUseImage && draftBrandingGradientId === index ? colors.primary : 'transparent',
+                                }}
+                            >
+                                <LinearGradient
+                                    colors={gradient as [string, string]}
+                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                    style={{ flex: 1 }}
+                                />
+                                {!draftBrandingUseImage && draftBrandingGradientId === index && (
+                                    <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
+                                        <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Primärfarbe</Text>
+                    <Text style={{ fontSize: 12, color: colors.onSurfaceVariant, marginBottom: 10 }}>
+                        Schaltflächen, Avatar-Hintergrund, Highlights
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                        {BRAND_COLOR_SWATCHES.map((hex) => (
+                            <TouchableOpacity
+                                key={hex}
+                                onPress={() => setDraftPrimaryColor(hex)}
+                                style={{
+                                    width: 36, height: 36, borderRadius: 18,
+                                    backgroundColor: hex,
+                                    borderWidth: draftPrimaryColor === hex ? 3 : 1,
+                                    borderColor: draftPrimaryColor === hex ? colors.onSurface : colors.outlineVariant,
+                                }}
+                            />
+                        ))}
+                    </View>
+                    <TextInput
+                        style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]}
+                        value={draftPrimaryColor}
+                        onChangeText={setDraftPrimaryColor}
+                        placeholder="#D4006B"
+                        placeholderTextColor={colors.onSurfaceVariant}
+                        autoCapitalize="characters"
+                        maxLength={7}
+                    />
+
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 16 }]}>Sekundärfarbe</Text>
+                    <Text style={{ fontSize: 12, color: colors.onSurfaceVariant, marginBottom: 10 }}>
+                        Sekundäre Aktionen, Akzente
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                        {BRAND_COLOR_SWATCHES.map((hex) => (
+                            <TouchableOpacity
+                                key={hex}
+                                onPress={() => setDraftSecondaryColor(hex)}
+                                style={{
+                                    width: 36, height: 36, borderRadius: 18,
+                                    backgroundColor: hex,
+                                    borderWidth: draftSecondaryColor === hex ? 3 : 1,
+                                    borderColor: draftSecondaryColor === hex ? colors.onSurface : colors.outlineVariant,
+                                }}
+                            />
+                        ))}
+                    </View>
+                    <TextInput
+                        style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]}
+                        value={draftSecondaryColor}
+                        onChangeText={setDraftSecondaryColor}
+                        placeholder="#8B3DC8"
+                        placeholderTextColor={colors.onSurfaceVariant}
+                        autoCapitalize="characters"
+                        maxLength={7}
+                    />
+                    <Text style={{ fontSize: 12, color: colors.onSurfaceVariant, marginTop: 8 }}>
+                        Farben werden nach dem Schließen gespeichert und in der Vorschau übernommen.
+                    </Text>
+                </EditDrawer>
+
             </View>
         </ScreenWithNav>
     );
@@ -1309,4 +1506,9 @@ const styles = StyleSheet.create({
     segmentOption: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
     segmentOptionActive: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.12, shadowRadius: 3, elevation: 2 },
     segmentOptionText: { fontSize: 15 },
+    checkmark: {
+        position: 'absolute', top: 4, right: 4,
+        width: 22, height: 22, borderRadius: 11,
+        justifyContent: 'center', alignItems: 'center',
+    },
 });

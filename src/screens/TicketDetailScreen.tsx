@@ -380,10 +380,9 @@ export default function TicketDetailScreen() {
                             </Text>
                             <Text style={[styles.infoValue, { color: colors.onSurface }]}>
                                 {[
-                                    event.location.street,
-                                    event.location.house_number,
-                                    event.location.city
-                                ].filter(Boolean).join(' ')}
+                                    [event.location.street, event.location.house_number].filter(Boolean).join(' '),
+                                    [event.location.postal_code, event.location.city].filter(Boolean).join(' '),
+                                ].filter(Boolean).join(', ')}
                             </Text>
                         </View>
                     )}

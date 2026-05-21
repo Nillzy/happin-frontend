@@ -38,6 +38,7 @@ This is the central index for all project documentation in the `documentation/` 
 | [30-google-wallet-frontend.md](./29-google-wallet-frontend.md) | **Google Wallet Integration Frontend**: `getWalletUrl` in api.ts, Handler im TicketDetailScreen, Platform-Split (nur Android + Web), Fehlerbehandlung. |
 | [30-explore-filter.md](./30-explore-filter.md) | **Explore Page: Filter UI** — FilterModal component, filter categories (Zeitraum, Kategorie, Standort, Kostenlos), state management, badge indicator. |
 | [31-event-soft-delete.md](31-event-soft-delete.md) | Event Soft-Delete Frontend: Delete-Button im EventHostScreen, Bestätigungsmodal, "Abgesagt"-Badge, roter Banner. |
+| [32-event-branding.md](./32-event-branding.md) | **Event-Branding**: Individuelle Primär-/Sekundärfarbe + 8 Gradient-Vorlagen, Design-Drawer im EventEditScreen, Live-Vorschau, Backend-Felder `accent_color_primary`/`accent_color_secondary`. |
 | [CLAUDE_PROMPT_BACKEND_INTEGRATION.md](./CLAUDE_PROMPT_BACKEND_INTEGRATION.md) | **Claude-Prompt für Backend-Integration**: Priorisierte TODO-Liste aller offenen Backend-Aufgaben (Draft-Flow, Bild-Upload, Unsplash-Proxy, Permissions, MyEvents-Daten). |
 | [CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md](./CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md) | Vollständiger Claude-Prompt für Event-Creation UI Redesign & Feature-Implementierung (Phasen 1-3). |
 | [EVENT_CREATION_UX_ANALYSIS.md](./EVENT_CREATION_UX_ANALYSIS.md) | UX-Analyse des bestehenden Event-Creation Flows mit identifizierten Problemen und Verbesserungsvorschlägen. |
