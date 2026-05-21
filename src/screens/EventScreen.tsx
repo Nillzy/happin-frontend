@@ -73,13 +73,14 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
 }) {
     const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
     const bgColor = isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)';
+    const glassStyle = { backgroundColor: bgColor, backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any;
 
     if (isFree) {
         const btnBg = (event.is_public && rsvpStatus === 'Accepted') ? 'transparent' : colors.primary;
         const btnBorder = (event.is_public && rsvpStatus === 'Accepted') ? colors.outline : 'transparent';
         const btnTextColor = (event.is_public && rsvpStatus === 'Accepted') ? colors.onSurface : colors.onPrimary;
         return (
-            <View style={[deskBarStyles.bar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
+            <View style={[deskBarStyles.bar, { borderTopColor: borderColor }, glassStyle]}>
                 <View style={deskBarStyles.info}>
                     <Text style={[deskBarStyles.price, { color: colors.onSurface }]}>Kostenlos</Text>
                     <Text style={[deskBarStyles.hint, { color: colors.onSurfaceVariant }]}>{event.participant_count} Teilnehmer</Text>
@@ -131,7 +132,7 @@ const deskBarStyles = StyleSheet.create({
         borderTopWidth: StyleSheet.hairlineWidth,
         paddingVertical: 16,
         paddingHorizontal: 16,
-        marginTop: 24,
+        marginTop: 32,
         borderRadius: 12,
     },
     info: { flex: 1, marginRight: 16 },
@@ -898,7 +899,7 @@ export default function EventScreen() {
                             </View>
 
                             {/* Action Buttons */}
-                            <View style={[styles.actionButtons, { marginBottom: 32 }, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
+                            <View style={[styles.actionButtons, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
                                 {(() => {
                                     const hasAccess = effectiveIsFree
                                         ? rsvpStatus === 'Accepted'
@@ -1044,6 +1045,12 @@ export default function EventScreen() {
                                 </View>
                             )}
 
+                            {event.media_urls && event.media_urls.length > 0 && (
+                                <View style={styles.section}>
+                                    <EventImageGallery images={event.media_urls} />
+                                </View>
+                            )}
+
                             {/* Desktop sticky bar inline at bottom of scroll */}
                             <View style={isPreview ? { opacity: 0.4 } : undefined} pointerEvents={isPreview ? 'none' : 'auto'}>
                                 <DesktopStickyBar
@@ -1142,7 +1149,7 @@ export default function EventScreen() {
                             </View>
 
                             {/* Action Buttons */}
-                            <View style={[styles.actionButtons, { marginBottom: 32 }, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
+                            <View style={[styles.actionButtons, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
                                 {(() => {
                                     const hasAccess = effectiveIsFree
                                         ? rsvpStatus === 'Accepted'
@@ -1291,7 +1298,7 @@ export default function EventScreen() {
                                 </View>
                             )}
 
-                            <View style={{ height: 100 }} />
+                            <View style={{ height: 68 }} />
                         </View>
                     </ScrollView>
                 )}
@@ -1323,7 +1330,7 @@ export default function EventScreen() {
                             { borderTopColor: colors.outlineVariant },
                             isWeb
                                 ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
-                                : { backgroundColor: colors.surface },
+                                : { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)' },
                             isPreview && { opacity: 0.4 },
                         ]} pointerEvents={isPreview ? 'none' : 'auto'}>
                             <View style={styles.stickyBarInfo}>
@@ -1356,7 +1363,7 @@ export default function EventScreen() {
                         { borderTopColor: colors.outlineVariant },
                         isWeb
                             ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
-                            : { backgroundColor: colors.surface },
+                            : { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)' },
                         isPreview && { opacity: 0.4 },
                     ]} pointerEvents={isPreview ? 'none' : 'auto'}>
                         <View style={styles.stickyBarInfo}>
@@ -2108,7 +2115,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: 16,
-        marginBottom: 16,
+        marginBottom: 32,
     },
     hostInfo: {
         flexDirection: 'row',
