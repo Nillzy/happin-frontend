@@ -9,6 +9,7 @@ interface EventCategoriesProps {
     editMode?: boolean;
     edited?: boolean;
     onEdit?: () => void;
+    accentColor?: string | null;
 }
 
 function resolveLabel(idOrLabel: string): string {
@@ -16,11 +17,14 @@ function resolveLabel(idOrLabel: string): string {
     return found ? found.label : idOrLabel;
 }
 
-export default function EventCategories({ categories, editMode = false, edited = false, onEdit }: EventCategoriesProps) {
+export default function EventCategories({ categories, editMode = false, edited = false, onEdit, accentColor }: EventCategoriesProps) {
     const { colors, isDark } = useTheme();
     const isWeb = Platform.OS === 'web';
 
     if (categories.length === 0 && !editMode) return null;
+
+    const chipBg = accentColor ?? colors.primary;
+    const chipText = accentColor ? '#ffffff' : colors.onPrimary;
 
     const cardStyle = [
         styles.card,
@@ -42,9 +46,9 @@ export default function EventCategories({ categories, editMode = false, edited =
                         {categories.map((cat) => (
                             <View
                                 key={cat}
-                                style={[styles.chip, { backgroundColor: colors.primary }]}
+                                style={[styles.chip, { backgroundColor: chipBg }]}
                             >
-                                <Text style={[styles.chipText, { color: colors.onPrimary }]}>{resolveLabel(cat).toUpperCase()}</Text>
+                                <Text style={[styles.chipText, { color: chipText }]}>{resolveLabel(cat).toUpperCase()}</Text>
                             </View>
                         ))}
                     </View>
