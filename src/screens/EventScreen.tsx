@@ -61,7 +61,7 @@ function formatDateGerman(isoDate: string): string {
     }).format(d);
 }
 
-function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoading, onRsvp, onTickets, onShowTicket, effectivePrimary, effectiveOnPrimary }: {
+function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoading, onRsvp, onTickets, onShowTicket, effectivePrimary, effectiveOnPrimary, effectiveSecondary, effectiveOnSecondary }: {
     event: EventDetailResponse;
     isFree: boolean;
     colors: any;
@@ -73,6 +73,8 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
     onShowTicket: () => void;
     effectivePrimary: string;
     effectiveOnPrimary: string;
+    effectiveSecondary: string;
+    effectiveOnSecondary: string;
 }) {
     const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
     const bgColor = isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)';
@@ -116,10 +118,10 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
                 </Text>
             </View>
             <TouchableOpacity
-                style={[deskBarStyles.btn, { backgroundColor: userHasTicket ? colors.tertiary : effectivePrimary }]}
+                style={[deskBarStyles.btn, { backgroundColor: userHasTicket ? effectiveSecondary : effectivePrimary }]}
                 onPress={userHasTicket ? onShowTicket : onTickets}
             >
-                <Text style={[deskBarStyles.btnText, { color: userHasTicket ? colors.onTertiary : effectiveOnPrimary }]}>
+                <Text style={[deskBarStyles.btnText, { color: userHasTicket ? effectiveOnSecondary : effectiveOnPrimary }]}>
                     {userHasTicket ? 'Ticket anzeigen' : 'Tickets wählen'}
                 </Text>
             </TouchableOpacity>
@@ -698,6 +700,8 @@ export default function EventScreen() {
 
     const effectivePrimary = event.accent_color_primary ?? colors.primary;
     const effectiveOnPrimary = event.accent_color_primary ? '#ffffff' : colors.onPrimary;
+    const effectiveSecondary = event.accent_color_secondary ?? colors.tertiary;
+    const effectiveOnSecondary = event.accent_color_secondary ? '#ffffff' : colors.onTertiary;
 
     // Ein Event gilt als kostenpflichtig sobald mind. eine Ticketoption mit Preis > 0 existiert
     const hasPaidTickets = (event.ticket_options ?? []).some(t => t.price > 0);
@@ -745,8 +749,15 @@ export default function EventScreen() {
         <ScreenWithNav showBottomNav={false}>
             <Head><title>{event.title} – Happin</title></Head>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                {/* Blurred background image */}
-                {event.image_url ? (
+                {/* Blurred background: gradient when set, otherwise blurred cover image */}
+                {event.gradient_id != null ? (
+                    <LinearGradient
+                        colors={getGradientByIndex(event.gradient_id)}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.bgImage}
+                    />
+                ) : event.image_url ? (
                     <Image
                         source={{ uri: event.image_url }}
                         style={[styles.bgImage, isWeb ? { filter: 'blur(60px) saturate(1.8) brightness(0.7)' } as any : {}]}
@@ -755,7 +766,7 @@ export default function EventScreen() {
                     />
                 ) : (
                     <LinearGradient
-                        colors={getGradientByIndex(event.gradient_id ?? 0)}
+                        colors={getGradientByIndex(0)}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.bgImage}
@@ -877,7 +888,7 @@ export default function EventScreen() {
                                     </View>
                                     <View style={styles.hostTextContainer}>
                                         <Text style={[styles.hostName, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
-                                        <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>hat dich eingeladen</Text>
+                                        <Text style={[styles.hostSubtitle, { color: effectiveSecondary }]}>hat dich eingeladen</Text>
                                     </View>
                                 </View>
                                 <View>
@@ -917,41 +928,41 @@ export default function EventScreen() {
                                             style={glassActionBtn}
                                             onPress={() => router.push(`/ticket/${id}`)}
                                         >
-                                            <Ionicons name="qr-code-outline" size={22} color={colors.onSurface} />
+                                            <Ionicons name="qr-code-outline" size={22} color={effectivePrimary} />
                                             <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Ticket</Text>
                                         </TouchableOpacity>
                                     ) : null;
                                 })()}
                                 {rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 && !event.is_host && (
                                     <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
-                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
+                                        <Ionicons name="create-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben</Text>
                                     </TouchableOpacity>
                                 )}
                                 <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
-                                    <Ionicons name="calendar-outline" size={22} color={colors.onSurface} />
+                                    <Ionicons name="calendar-outline" size={22} color={effectivePrimary} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>ICS-Import</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
-                                    <Ionicons name="share-outline" size={22} color={colors.onSurface} />
+                                    <Ionicons name="share-outline" size={22} color={effectivePrimary} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
                                 {event.is_host && !useMehrMenu && (
                                     <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/event/${id}/manage`)}>
-                                        <Ionicons name="settings-outline" size={22} color={colors.onSurface} />
+                                        <Ionicons name="settings-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
                                     </TouchableOpacity>
                                 )}
                                 {showAngabenAendernHost && !useMehrMenu && (
                                     <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
-                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
+                                        <Ionicons name="create-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben ändern</Text>
                                     </TouchableOpacity>
                                 )}
                                 {useMehrMenu && (
                                     <View ref={moreMenuTriggerRef} style={styles.moreMenuWrapper} collapsable={false}>
                                         <TouchableOpacity style={glassActionBtn} onPress={toggleMoreMenu}>
-                                            <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
+                                            <Ionicons name="ellipsis-horizontal" size={22} color={effectivePrimary} />
                                             <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
                                         </TouchableOpacity>
                                     </View>
@@ -960,13 +971,13 @@ export default function EventScreen() {
 
                             {/* Categories */}
                             {categories.length > 0 && (
-                                <EventCategories categories={categories} editMode={false} accentColor={event.accent_color_primary} />
+                                <EventCategories categories={categories} editMode={false} accentColor={effectivePrimary} />
                             )}
 
                             {/* About */}
                             {event.description && (
                                 <View style={[...glassCard, styles.section, { padding: 20 }]}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Beschreibung</Text>
+                                    <Text style={[styles.sectionTitle, { color: effectivePrimary }]}>Beschreibung</Text>
                                     <Text style={[styles.description, { color: colors.onSurface }]}>{event.description}</Text>
                                 </View>
                             )}
@@ -1073,6 +1084,8 @@ export default function EventScreen() {
                                     onShowTicket={() => router.push(`/ticket/${event.event_id}`)}
                                     effectivePrimary={effectivePrimary}
                                     effectiveOnPrimary={effectiveOnPrimary}
+                                    effectiveSecondary={effectiveSecondary}
+                                    effectiveOnSecondary={effectiveOnSecondary}
                                 />
                             </View>
 
@@ -1129,7 +1142,7 @@ export default function EventScreen() {
                                     </View>
                                     <View style={styles.hostTextContainer}>
                                         <Text style={[styles.hostName, { color: colors.onSurface }]}>{event.host_name || 'Host'}</Text>
-                                        <Text style={[styles.hostSubtitle, { color: colors.onSurfaceVariant }]}>hat dich eingeladen</Text>
+                                        <Text style={[styles.hostSubtitle, { color: effectiveSecondary }]}>hat dich eingeladen</Text>
                                     </View>
                                 </View>
                                 <View>
@@ -1169,41 +1182,41 @@ export default function EventScreen() {
                                             style={glassActionBtn}
                                             onPress={() => router.push(`/ticket/${id}`)}
                                         >
-                                            <Ionicons name="qr-code-outline" size={22} color={colors.onSurface} />
+                                            <Ionicons name="qr-code-outline" size={22} color={effectivePrimary} />
                                             <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Ticket</Text>
                                         </TouchableOpacity>
                                     ) : null;
                                 })()}
                                 {rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 && !event.is_host && (
                                     <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
-                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
+                                        <Ionicons name="create-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben</Text>
                                     </TouchableOpacity>
                                 )}
                                 <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
-                                    <Ionicons name="calendar-outline" size={22} color={colors.onSurface} />
+                                    <Ionicons name="calendar-outline" size={22} color={effectivePrimary} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>ICS-Import</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
-                                    <Ionicons name="share-outline" size={22} color={colors.onSurface} />
+                                    <Ionicons name="share-outline" size={22} color={effectivePrimary} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
                                 {event.is_host && !useMehrMenu && (
                                     <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/event/${id}/manage`)}>
-                                        <Ionicons name="settings-outline" size={22} color={colors.onSurface} />
+                                        <Ionicons name="settings-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
                                     </TouchableOpacity>
                                 )}
                                 {showAngabenAendernHost && !useMehrMenu && (
                                     <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
-                                        <Ionicons name="create-outline" size={22} color={colors.onSurface} />
+                                        <Ionicons name="create-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben ändern</Text>
                                     </TouchableOpacity>
                                 )}
                                 {useMehrMenu && (
                                     <View ref={moreMenuTriggerRef} style={styles.moreMenuWrapper} collapsable={false}>
                                         <TouchableOpacity style={glassActionBtn} onPress={toggleMoreMenu}>
-                                            <Ionicons name="ellipsis-horizontal" size={22} color={colors.onSurface} />
+                                            <Ionicons name="ellipsis-horizontal" size={22} color={effectivePrimary} />
                                             <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Mehr</Text>
                                         </TouchableOpacity>
                                     </View>
@@ -1211,12 +1224,12 @@ export default function EventScreen() {
                             </View>
 
                             {categories.length > 0 && (
-                                <EventCategories categories={categories} editMode={false} accentColor={event.accent_color_primary} />
+                                <EventCategories categories={categories} editMode={false} accentColor={effectivePrimary} />
                             )}
 
                             {event.description && (
                                 <View style={[...glassCard, styles.section, { padding: 20 }]}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Beschreibung</Text>
+                                    <Text style={[styles.sectionTitle, { color: effectivePrimary }]}>Beschreibung</Text>
                                     <Text style={[styles.description, { color: colors.onSurface }]}>{event.description}</Text>
                                 </View>
                             )}
@@ -1385,10 +1398,10 @@ export default function EventScreen() {
                             </Text>
                         </View>
                         <TouchableOpacity
-                            style={[styles.stickyBarButton, { backgroundColor: userHasTicket ? colors.tertiary : effectivePrimary }]}
+                            style={[styles.stickyBarButton, { backgroundColor: userHasTicket ? effectiveSecondary : effectivePrimary }]}
                             onPress={userHasTicket ? () => router.push(`/ticket/${event.event_id}`) : openDrawer}
                         >
-                            <Text style={[styles.stickyBarButtonText, { color: userHasTicket ? colors.onTertiary : effectiveOnPrimary }]}>
+                            <Text style={[styles.stickyBarButtonText, { color: userHasTicket ? effectiveOnSecondary : effectiveOnPrimary }]}>
                                 {userHasTicket ? 'Ticket anzeigen' : 'Tickets wählen'}
                             </Text>
                         </TouchableOpacity>
