@@ -863,27 +863,6 @@ function OverviewContent({
     const router = useRouter();
     const totalAccepted = counts.accepted;
     const capacityPercent = maxCapacity ? Math.round((totalAccepted / maxCapacity) * 100) : 0;
-    const [summaryOpen, setSummaryOpen] = useState(false);
-
-    const fieldSummaries = customFields.map(field => {
-        const valueCounts: Record<string, number> = {};
-        let total = 0;
-        for (const p of participants) {
-            const ticketResponses = p.ticket_responses || [];
-            for (const tr of ticketResponses) {
-                const resp = tr.responses.find(r => r.custom_field_id === field.custom_field_id);
-                if (!resp) continue;
-                const vals = Array.isArray(resp.value) ? resp.value : [resp.value];
-                for (const v of vals) {
-                    if (v) {
-                        valueCounts[v] = (valueCounts[v] || 0) + 1;
-                        total++;
-                    }
-                }
-            }
-        }
-        return { field, valueCounts, total };
-    }).filter(s => Object.keys(s.valueCounts).length > 0);
 
     const totalGuests = counts.accepted + counts.declined + counts.pending;
 
@@ -928,27 +907,40 @@ function OverviewContent({
                 </View>
             </TouchableOpacity>
 
-            {/* Gast-Antworten Placeholder Kachel */}
-            <View
+            {/* Gast-Antworten Kachel — Navigation zur RSVP-Detail-Seite */}
+            <TouchableOpacity
                 style={[
                     styles.guestStatsTile,
-                    { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, opacity: 0.6 },
+                    {
+                        backgroundColor: colors.surfaceContainer,
+                        borderColor: colors.outlineVariant,
+                        opacity: customFields.length === 0 ? 0.55 : 1,
+                    },
                     isDesktop && styles.guestStatsTileDesktop,
                 ]}
+                onPress={() => router.push(`/event/${eventId}/rsvp`)}
+                activeOpacity={0.7}
+                disabled={customFields.length === 0}
             >
                 <View style={styles.guestStatsTileHeader}>
-                    <View>
+                    <View style={{ flex: 1, paddingRight: 12 }}>
                         <Text style={[styles.guestStatsTileLabel, { color: colors.outline }]}>Gast-Antworten</Text>
-                        <Text style={[styles.guestStatsTileTotal, { color: colors.onSurface }]}>Kommt bald</Text>
+                        <Text style={[styles.guestStatsTileTotal, { color: colors.onSurface }]}>
+                            {customFields.length === 0
+                                ? 'Keine Custom Fields'
+                                : 'Alle Antworten ansehen'}
+                        </Text>
                     </View>
                     <View style={[styles.guestStatsTileChevron, { backgroundColor: colors.surfaceContainerHigh }]}>
                         <Ionicons name="chevron-forward" size={18} color={colors.onSurfaceVariant} />
                     </View>
                 </View>
-                <Text style={[styles.guestAnswersHint, { color: colors.outline }]}>
-                    Hier werden bald die Antworten deiner Gäste auf Custom Fields angezeigt.
-                </Text>
-            </View>
+                {customFields.length === 0 && (
+                    <Text style={[styles.guestAnswersHint, { color: colors.outline }]}>
+                        Lege beim Erstellen oder Bearbeiten Custom Fields an, um Antworten zu sammeln.
+                    </Text>
+                )}
+            </TouchableOpacity>
 
             {/* Stripe Connect / Payment Management */}
             <StripeConnectSection eventId={eventId} colors={colors} isDark={isDark} isDesktop={isDesktop} />
@@ -1085,73 +1077,6 @@ function OverviewContent({
                     ))}
                 </View>
             )}
-
-            {/* Antworten-Übersicht Button */}
-            {customFields.length > 0 && (
-                <TouchableOpacity
-                    style={[styles.summaryButton, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
-                    onPress={() => setSummaryOpen(true)}
-                >
-                    <Text style={[styles.summaryButtonText, { color: colors.onSurface }]}>Antworten-Übersicht</Text>
-                    <Ionicons name="chevron-forward" size={18} color={colors.outline} />
-                </TouchableOpacity>
-            )}
-
-            {/* Summary Modal */}
-            <Modal
-                visible={summaryOpen}
-                animationType="slide"
-                transparent
-                onRequestClose={() => setSummaryOpen(false)}
-            >
-                <Pressable style={modalStyles.backdrop} onPress={() => setSummaryOpen(false)} />
-                <View style={[modalStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
-                    <View style={[modalStyles.handle, { backgroundColor: colors.outlineVariant }]} />
-                    <Text style={[modalStyles.title, { color: colors.onSurface }]}>Antworten-Übersicht</Text>
-
-                    <ScrollView style={modalStyles.scrollContent} showsVerticalScrollIndicator={false}>
-                        {fieldSummaries.length === 0 ? (
-                            <Text style={[modalStyles.emptyText, { color: colors.outline }]}>
-                                Noch keine Antworten eingegangen.
-                            </Text>
-                        ) : fieldSummaries.map(({ field, valueCounts, total }) => {
-                            const sorted = Object.entries(valueCounts).sort((a, b) => b[1] - a[1]);
-                            const maxCount = sorted[0]?.[1] ?? 1;
-
-                            return (
-                                <View key={field.custom_field_id} style={modalStyles.fieldSection}>
-                                    <Text style={[modalStyles.fieldLabel, { color: colors.onSurface }]}>
-                                        {field.label}
-                                    </Text>
-                                    {sorted.map(([value, count]) => {
-                                        const percent = Math.round((count / maxCount) * 100);
-                                        return (
-                                            <View key={value} style={modalStyles.barRow}>
-                                                <View style={modalStyles.barLabelRow}>
-                                                    <Text style={[modalStyles.barLabel, { color: colors.onSurface }]} numberOfLines={1}>
-                                                        {value}
-                                                    </Text>
-                                                    <Text style={[modalStyles.barCount, { color: colors.outline }]}>
-                                                        {count}× ({Math.round((count / total) * 100)}%)
-                                                    </Text>
-                                                </View>
-                                                <View style={[modalStyles.barBg, { backgroundColor: colors.surfaceContainerHigh }]}>
-                                                    <View
-                                                        style={[
-                                                            modalStyles.barFill,
-                                                            { width: `${percent}%`, backgroundColor: colors.primary },
-                                                        ]}
-                                                    />
-                                                </View>
-                                            </View>
-                                        );
-                                    })}
-                                </View>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
-            </Modal>
         </View>
     );
 }
@@ -1353,17 +1278,6 @@ const styles = StyleSheet.create({
     ticketRowPrice: { fontSize: 13 },
     ticketRowCount: { fontSize: 16, fontWeight: '700', minWidth: 32, textAlign: 'right' },
 
-    summaryButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        marginBottom: 16,
-    },
-    summaryButtonText: { fontSize: 15, fontWeight: '600' },
-
     // Delete button
     deleteButton: {
         flexDirection: 'row',
@@ -1462,74 +1376,5 @@ const styles = StyleSheet.create({
     deleteModalBtnText: {
         fontSize: 15,
         fontWeight: '600',
-    },
-});
-
-const modalStyles = StyleSheet.create({
-    backdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.55)',
-    },
-    sheet: {
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        paddingTop: 12,
-        maxHeight: '75%',
-    },
-    handle: {
-        width: 36,
-        height: 4,
-        borderRadius: 2,
-        alignSelf: 'center',
-        marginBottom: 16,
-    },
-    title: {
-        fontSize: 17,
-        fontWeight: '700',
-        paddingHorizontal: 20,
-        marginBottom: 16,
-    },
-    scrollContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 40,
-    },
-    fieldSection: {
-        marginBottom: 24,
-    },
-    fieldLabel: {
-        fontSize: 15,
-        fontWeight: '700',
-        marginBottom: 10,
-    },
-    barRow: {
-        marginBottom: 10,
-    },
-    barLabelRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    barLabel: {
-        fontSize: 14,
-        flex: 1,
-    },
-    barCount: {
-        fontSize: 13,
-        marginLeft: 8,
-    },
-    barBg: {
-        height: 8,
-        borderRadius: 4,
-        overflow: 'hidden',
-    },
-    barFill: {
-        height: '100%',
-        borderRadius: 4,
-    },
-    emptyText: {
-        fontSize: 14,
-        textAlign: 'center',
-        paddingVertical: 20,
     },
 });
