@@ -354,6 +354,26 @@ export default function EventEditScreen() {
         setActiveDrawer(key);
     };
 
+    const saveBrandingDraft = async () => {
+        if (!event) return;
+        const hexRe = /^#[0-9A-Fa-f]{6}$/;
+        const patch: Record<string, any> = {
+            accent_color_primary: hexRe.test(draftPrimaryColor) ? draftPrimaryColor : null,
+            accent_color_secondary: hexRe.test(draftSecondaryColor) ? draftSecondaryColor : null,
+        };
+        if (draftBrandingUseImage) {
+            if (event.gradient_id != null) patch.gradient_id = null;
+            setSelectedGradientId(undefined);
+        } else if (draftBrandingGradientId !== undefined && draftBrandingGradientId !== event.gradient_id) {
+            patch.gradient_id = draftBrandingGradientId;
+        }
+        const changed =
+            patch.accent_color_primary !== (event.accent_color_primary ?? null) ||
+            patch.accent_color_secondary !== (event.accent_color_secondary ?? null) ||
+            'gradient_id' in patch;
+        if (changed) await saveField(patch);
+    };
+
     const closeDrawer = () => {
         if (!event || !activeDrawer) { setActiveDrawer(null); return; }
         switch (activeDrawer) {
@@ -433,26 +453,9 @@ export default function EventEditScreen() {
             case 'customFields':
                 saveCustomFields(draftCustomFields);
                 break;
-            case 'branding': {
-                const hexRe = /^#[0-9A-Fa-f]{6}$/;
-                const patch: Record<string, any> = {
-                    accent_color_primary: hexRe.test(draftPrimaryColor) ? draftPrimaryColor : null,
-                    accent_color_secondary: hexRe.test(draftSecondaryColor) ? draftSecondaryColor : null,
-                };
-                if (draftBrandingUseImage) {
-                    // Zurück zum Bild: Gradient löschen falls vorher einer aktiv war
-                    if (event.gradient_id != null) patch.gradient_id = null;
-                    setSelectedGradientId(undefined);
-                } else if (draftBrandingGradientId !== undefined && draftBrandingGradientId !== event.gradient_id) {
-                    patch.gradient_id = draftBrandingGradientId;
-                }
-                const changed =
-                    patch.accent_color_primary !== (event.accent_color_primary ?? null) ||
-                    patch.accent_color_secondary !== (event.accent_color_secondary ?? null) ||
-                    'gradient_id' in patch;
-                if (changed) saveField(patch);
+            case 'branding':
+                void saveBrandingDraft();
                 break;
-            }
         }
         setActiveDrawer(null);
     };
@@ -629,7 +632,13 @@ export default function EventEditScreen() {
 
                         {/* Vorschau + Titelbild-Buttons (overlaid on hero, top right) */}
                         <View style={styles.heroTopRight}>
-                            <TouchableOpacity style={styles.heroBtn} onPress={() => router.push(`/event/${event.event_id}?preview=1`)}>
+                            <TouchableOpacity style={styles.heroBtn} onPress={async () => {
+                                if (activeDrawer === 'branding') {
+                                    await saveBrandingDraft();
+                                    setActiveDrawer(null);
+                                }
+                                router.push(`/event/${event.event_id}?preview=1`);
+                            }}>
                                 <Ionicons name="eye-outline" size={18} color="#ffffff" />
                                 <Text style={styles.editImageText}>Vorschau</Text>
                             </TouchableOpacity>
