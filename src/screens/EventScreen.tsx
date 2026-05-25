@@ -196,7 +196,8 @@ export default function EventScreen() {
     const [buyerDisplayName, setBuyerDisplayName] = useState('');
     const [sliderIndex, setSliderIndex] = useState(0);
     const [calendarModalVisible, setCalendarModalVisible] = useState(false);
-    const [hostMenuVisible, setHostMenuVisible] = useState(false);
+    const [reportModalTarget, setReportModalTarget] = useState<'event' | 'host' | null>(null);
+    const [reportConfirmed, setReportConfirmed] = useState(false);
     const [moreMenuVisible, setMoreMenuVisible] = useState(false);
     const [moreMenuPosition, setMoreMenuPosition] = useState<{ top: number; right: number } | null>(null);
     const moreMenuTriggerRef = useRef<View | null>(null);
@@ -876,30 +877,30 @@ export default function EventScreen() {
                                         <Text style={[styles.hostSubtitle, { color: effectiveSecondary }]}>hat dich eingeladen</Text>
                                     </View>
                                 </View>
-                                <View>
-                                    <TouchableOpacity onPress={() => setHostMenuVisible(!hostMenuVisible)}>
-                                        <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurfaceVariant} />
-                                    </TouchableOpacity>
-                                    {hostMenuVisible && (
-                                        <View style={[styles.hostMenuDropdown, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-                                            <TouchableOpacity
-                                                style={styles.hostMenuItem}
-                                                onPress={() => { setHostMenuVisible(false); router.push('/account'); }}
-                                            >
-                                                <Ionicons name="camera-outline" size={18} color={colors.onSurface} />
-                                                <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Profilbild ändern</Text>
-                                            </TouchableOpacity>
-                                            <View style={[styles.hostMenuSeparator, { backgroundColor: colors.outlineVariant }]} />
-                                            <TouchableOpacity
-                                                style={styles.hostMenuItem}
-                                                onPress={() => { setHostMenuVisible(false); router.push('/account'); }}
-                                            >
-                                                <Ionicons name="pencil-outline" size={18} color={colors.onSurface} />
-                                                <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Namen ändern</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    )}
-                                </View>
+                                {!event.is_host && (
+                                    <View style={styles.reportButtons}>
+                                        <TouchableOpacity
+                                            style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
+                                            onPress={() => setReportModalTarget('event')}
+                                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+                                        >
+                                            <View style={styles.reportIconStack}>
+                                                <Ionicons name="warning-outline" size={18} color={colors.onSurfaceVariant} />
+                                                <Ionicons name="calendar-outline" size={10} color={colors.onSurfaceVariant} style={styles.reportIconBadge} />
+                                            </View>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
+                                            onPress={() => setReportModalTarget('host')}
+                                            hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                                        >
+                                            <View style={styles.reportIconStack}>
+                                                <Ionicons name="warning-outline" size={18} color={colors.onSurfaceVariant} />
+                                                <Ionicons name="people-outline" size={10} color={colors.onSurfaceVariant} style={styles.reportIconBadge} />
+                                            </View>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                             </View>
 
                             {/* Action Buttons */}
@@ -1130,30 +1131,30 @@ export default function EventScreen() {
                                         <Text style={[styles.hostSubtitle, { color: effectiveSecondary }]}>hat dich eingeladen</Text>
                                     </View>
                                 </View>
-                                <View>
-                                    <TouchableOpacity onPress={() => setHostMenuVisible(!hostMenuVisible)}>
-                                        <Ionicons name="ellipsis-horizontal" size={24} color={colors.onSurfaceVariant} />
-                                    </TouchableOpacity>
-                                    {hostMenuVisible && (
-                                        <View style={[styles.hostMenuDropdown, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-                                            <TouchableOpacity
-                                                style={styles.hostMenuItem}
-                                                onPress={() => { setHostMenuVisible(false); router.push('/account'); }}
-                                            >
-                                                <Ionicons name="camera-outline" size={18} color={colors.onSurface} />
-                                                <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Profilbild ändern</Text>
-                                            </TouchableOpacity>
-                                            <View style={[styles.hostMenuSeparator, { backgroundColor: colors.outlineVariant }]} />
-                                            <TouchableOpacity
-                                                style={styles.hostMenuItem}
-                                                onPress={() => { setHostMenuVisible(false); router.push('/account'); }}
-                                            >
-                                                <Ionicons name="pencil-outline" size={18} color={colors.onSurface} />
-                                                <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Namen ändern</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    )}
-                                </View>
+                                {!event.is_host && (
+                                    <View style={styles.reportButtons}>
+                                        <TouchableOpacity
+                                            style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
+                                            onPress={() => setReportModalTarget('event')}
+                                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+                                        >
+                                            <View style={styles.reportIconStack}>
+                                                <Ionicons name="warning-outline" size={18} color={colors.onSurfaceVariant} />
+                                                <Ionicons name="calendar-outline" size={10} color={colors.onSurfaceVariant} style={styles.reportIconBadge} />
+                                            </View>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
+                                            onPress={() => setReportModalTarget('host')}
+                                            hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                                        >
+                                            <View style={styles.reportIconStack}>
+                                                <Ionicons name="warning-outline" size={18} color={colors.onSurfaceVariant} />
+                                                <Ionicons name="people-outline" size={10} color={colors.onSurfaceVariant} style={styles.reportIconBadge} />
+                                            </View>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                             </View>
 
                             {/* Action Buttons */}
@@ -1605,14 +1606,6 @@ export default function EventScreen() {
                 );
             })()}
 
-            {/* Host menu backdrop */}
-            {hostMenuVisible && (
-                <Pressable
-                    style={StyleSheet.absoluteFillObject}
-                    onPress={() => setHostMenuVisible(false)}
-                />
-            )}
-
             {/* More menu (host actions): rendered as Modal so it stacks above all sibling content */}
             <Modal
                 visible={moreMenuVisible}
@@ -1658,6 +1651,72 @@ export default function EventScreen() {
                         )}
                     </View>
                 )}
+            </Modal>
+
+            {/* Report Modal */}
+            <Modal
+                visible={reportModalTarget !== null}
+                transparent
+                animationType="none"
+                onRequestClose={() => setReportModalTarget(null)}
+            >
+                <Pressable style={reportStyles.backdrop} onPress={() => setReportModalTarget(null)} />
+                <View style={[reportStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
+                    <View style={[reportStyles.handle, { backgroundColor: colors.outlineVariant }]} />
+                    <View style={reportStyles.iconRow}>
+                        <Ionicons
+                            name="warning-outline"
+                            size={32}
+                            color={colors.error ?? '#B00020'}
+                        />
+                    </View>
+                    <Text style={[reportStyles.title, { color: colors.onSurface }]}>
+                        {reportModalTarget === 'event' ? 'Event melden' : 'Host melden'}
+                    </Text>
+                    <Text style={[reportStyles.body, { color: colors.onSurfaceVariant }]}>
+                        {reportModalTarget === 'event'
+                            ? 'Möchtest du dieses Event als unangemessen oder verdächtig melden?'
+                            : `Möchtest du ${event?.host_name || 'diesen Host'} melden?`}
+                    </Text>
+                    <TouchableOpacity
+                        style={[reportStyles.confirmBtn, { backgroundColor: colors.error ?? '#B00020' }]}
+                        onPress={() => { setReportModalTarget(null); setReportConfirmed(true); }}
+                    >
+                        <Text style={[reportStyles.confirmBtnText, { color: '#ffffff' }]}>Melden</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[reportStyles.cancelBtn, { borderColor: colors.outlineVariant }]}
+                        onPress={() => setReportModalTarget(null)}
+                    >
+                        <Text style={[reportStyles.cancelBtnText, { color: colors.onSurface }]}>Abbrechen</Text>
+                    </TouchableOpacity>
+                </View>
+            </Modal>
+
+            {/* Report confirmation toast */}
+            <Modal
+                visible={reportConfirmed}
+                transparent
+                animationType="none"
+                onRequestClose={() => setReportConfirmed(false)}
+            >
+                <Pressable style={reportStyles.backdrop} onPress={() => setReportConfirmed(false)} />
+                <View style={[reportStyles.sheet, { backgroundColor: colors.surfaceContainerLow }]}>
+                    <View style={[reportStyles.handle, { backgroundColor: colors.outlineVariant }]} />
+                    <View style={reportStyles.iconRow}>
+                        <Ionicons name="checkmark-circle-outline" size={40} color={colors.primary} />
+                    </View>
+                    <Text style={[reportStyles.title, { color: colors.onSurface }]}>Danke für deine Meldung</Text>
+                    <Text style={[reportStyles.body, { color: colors.onSurfaceVariant }]}>
+                        Wir haben deine Meldung erhalten und werden uns darum kümmern.
+                    </Text>
+                    <TouchableOpacity
+                        style={[reportStyles.confirmBtn, { backgroundColor: colors.primary }]}
+                        onPress={() => setReportConfirmed(false)}
+                    >
+                        <Text style={[reportStyles.confirmBtnText, { color: colors.onPrimary }]}>OK</Text>
+                    </TouchableOpacity>
+                </View>
             </Modal>
 
             {/* RSVP Modal (for free private events) */}
@@ -2166,6 +2225,30 @@ const styles = StyleSheet.create({
         height: 1,
         marginHorizontal: 12,
     },
+    reportButtons: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    reportBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reportIconStack: {
+        position: 'relative',
+        width: 20,
+        height: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reportIconBadge: {
+        position: 'absolute',
+        bottom: -2,
+        right: -4,
+    },
     moreMenuWrapper: {
         flex: 1,
         position: 'relative',
@@ -2612,5 +2695,67 @@ const cancelledBannerStyles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         flex: 1,
+    },
+});
+
+const reportStyles = StyleSheet.create({
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    sheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingHorizontal: 24,
+        paddingBottom: 40,
+        paddingTop: 12,
+        alignItems: 'center',
+    },
+    handle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        marginBottom: 20,
+    },
+    iconRow: {
+        marginBottom: 12,
+    },
+    title: {
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    body: {
+        fontSize: 14,
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 20,
+    },
+    confirmBtn: {
+        width: '100%',
+        paddingVertical: 16,
+        borderRadius: 14,
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    confirmBtnText: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    cancelBtn: {
+        width: '100%',
+        paddingVertical: 14,
+        borderRadius: 14,
+        alignItems: 'center',
+        borderWidth: 1,
+    },
+    cancelBtnText: {
+        fontSize: 15,
+        fontWeight: '500',
     },
 });
