@@ -18,12 +18,13 @@ import { api } from '../services/api';
 import { parseTicketPayload, type TicketPayload } from '../utils/ticketToken';
 import type { ScanTicketResponse } from '../types/host';
 
-type ScanState = 'idle' | 'preview' | 'confirmed' | 'invalid' | 'offline';
+type ScanState = 'idle' | 'preview' | 'confirmed' | 'invalid';
 
 interface ScanDisplay {
     state: ScanState;
     payload: TicketPayload | null;
     backendResult: ScanTicketResponse | null;
+    syncedWithBackend: boolean;
 }
 
 interface ScanHistoryEntry {
@@ -39,11 +40,12 @@ export default function ScanTicketScreen() {
     const { eventId } = useLocalSearchParams<{ eventId: string }>();
 
     const [permission, requestPermission] = useCameraPermissions();
-    const [display, setDisplay] = useState<ScanDisplay>({ state: 'idle', payload: null, backendResult: null });
+    const [display, setDisplay] = useState<ScanDisplay>({ state: 'idle', payload: null, backendResult: null, syncedWithBackend: true });
     const [scanCount, setScanCount] = useState(0);
     const [history, setHistory] = useState<ScanHistoryEntry[]>([]);
     const [showHistory, setShowHistory] = useState(false);
     const [offline, setOffline] = useState(false);
+    const [showOfflineInfo, setShowOfflineInfo] = useState(true);
     const processingRef = useRef(false);
     const scannedTokens = useRef(new Set<string>());
     const autoResumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,7 +63,7 @@ export default function ScanTicketScreen() {
             if (completedToken) {
                 resumedTokenRef.current = { token: completedToken, at: Date.now() };
             }
-            setDisplay({ state: 'idle', payload: null, backendResult: null });
+            setDisplay({ state: 'idle', payload: null, backendResult: null, syncedWithBackend: true });
         }, delay);
     };
 
@@ -82,6 +84,7 @@ export default function ScanTicketScreen() {
                     state: 'invalid',
                     payload: parseTicketPayload(data),
                     backendResult: { valid: false, reason: 'already_used' },
+                    syncedWithBackend: true,
                 });
                 scheduleResume(2500, data);
             }
@@ -91,12 +94,12 @@ export default function ScanTicketScreen() {
         const payload = parseTicketPayload(data);
 
         if (!payload || (eventId && payload.eid !== eventId)) {
-            setDisplay({ state: 'invalid', payload: null, backendResult: { valid: false, reason: 'not_found' } });
+            setDisplay({ state: 'invalid', payload: null, backendResult: { valid: false, reason: 'not_found' }, syncedWithBackend: true });
             scheduleResume();
             return;
         }
 
-        setDisplay({ state: 'preview', payload, backendResult: null });
+        setDisplay({ state: 'preview', payload, backendResult: null, syncedWithBackend: true });
 
         try {
             const token = await getSession();
@@ -118,9 +121,9 @@ export default function ScanTicketScreen() {
                 scannedTokens.current.add(data);
                 const timeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 setHistory(h => [{ name: payload.name, opt: payload.opt, nr: payload.nr, time: timeStr }, ...h]);
-                setDisplay({ state: 'confirmed', payload, backendResult: response });
+                setDisplay({ state: 'confirmed', payload, backendResult: response, syncedWithBackend: true });
             } else {
-                setDisplay({ state: 'invalid', payload, backendResult: response });
+                setDisplay({ state: 'invalid', payload, backendResult: response, syncedWithBackend: true });
             }
 
             scheduleResume(resumeDelay, completedToken);
@@ -130,8 +133,8 @@ export default function ScanTicketScreen() {
             setScanCount(c => c + 1);
             const timeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             setHistory(h => [{ name: payload.name, opt: payload.opt, nr: payload.nr, time: timeStr }, ...h]);
-            setDisplay({ state: 'offline', payload, backendResult: null });
-            scheduleResume();
+            setDisplay({ state: 'confirmed', payload, backendResult: null, syncedWithBackend: false });
+            scheduleResume(4000, data);
         }
     }, [eventId]);
 
@@ -204,7 +207,6 @@ export default function ScanTicketScreen() {
             case 'confirmed': return '#16a34a';
             case 'invalid': return '#dc2626';
             case 'preview': return '#3b82f6';
-            case 'offline': return '#ea580c';
             default: return 'transparent';
         }
     };
@@ -214,7 +216,6 @@ export default function ScanTicketScreen() {
             case 'confirmed': return '✓';
             case 'invalid': return '✕';
             case 'preview': return '...';
-            case 'offline': return '⚠';
             default: return '';
         }
     };
@@ -223,7 +224,6 @@ export default function ScanTicketScreen() {
         const { state, payload, backendResult } = display;
         if (state === 'preview') return payload?.name || 'Wird geprüft...';
         if (state === 'confirmed') return payload?.name || 'Gültiges Ticket';
-        if (state === 'offline') return payload?.name || 'Offline';
         if (state === 'invalid') {
             if (backendResult?.reason === 'already_used') {
                 const time = backendResult.used_at
@@ -237,13 +237,13 @@ export default function ScanTicketScreen() {
     };
 
     const getSubtext = () => {
-        const { state, payload, backendResult } = display;
+        const { state, payload, backendResult, syncedWithBackend } = display;
         const parts: string[] = [];
 
         if (payload?.opt) parts.push(payload.opt);
         if (payload && payload.nr > 1) parts.push(`Ticket ${payload.nr}`);
 
-        if (state === 'offline') parts.push('Nicht synchronisiert');
+        if (state === 'confirmed' && !syncedWithBackend) parts.push('Nicht synchronisiert');
         if (state === 'invalid' && backendResult?.guest_name && !payload) {
             parts.unshift(backendResult.guest_name);
         }
@@ -278,7 +278,7 @@ export default function ScanTicketScreen() {
                 style={styles.camera}
                 facing="back"
                 barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                onBarcodeScanned={!processingRef.current ? handleBarCodeScanned : undefined}
+                onBarcodeScanned={!processingRef.current && !showOfflineInfo ? handleBarCodeScanned : undefined}
             />
 
             {/* Scan Frame Overlay */}
@@ -342,6 +342,39 @@ export default function ScanTicketScreen() {
                             </ScrollView>
                         )}
                     </Animated.View>
+                </View>
+            </Modal>
+
+            {/* Offline Info Modal — appears before first scan */}
+            <Modal visible={showOfflineInfo} animationType="fade" transparent>
+                <View style={styles.infoOverlay}>
+                    <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.infoTitle, { color: colors.onSurface }]}>
+                            Hinweis zum Offline-Scannen
+                        </Text>
+                        <Text style={[styles.infoText, { color: colors.onSurfaceVariant }]}>
+                            Wenn du offline bist, können Tickets nicht beim Server verifiziert werden:
+                        </Text>
+                        <View style={styles.infoBullets}>
+                            <Text style={[styles.infoBullet, { color: colors.onSurfaceVariant }]}>
+                                • Tickets werden lokal anhand der Signatur geprüft
+                            </Text>
+                            <Text style={[styles.infoBullet, { color: colors.onSurfaceVariant }]}>
+                                • Doppel-Scans erkennt nur dieses Gerät
+                            </Text>
+                            <Text style={[styles.infoBullet, { color: colors.onSurfaceVariant }]}>
+                                • Auf einem zweiten Gerät könnte dasselbe Ticket erneut akzeptiert werden
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.infoBtn, { backgroundColor: colors.primary }]}
+                            onPress={() => setShowOfflineInfo(false)}
+                        >
+                            <Text style={[styles.infoBtnText, { color: colors.onPrimary }]}>
+                                Verstanden
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </Modal>
         </View>
@@ -472,4 +505,31 @@ const styles = StyleSheet.create({
     historyName: { fontSize: 16, fontWeight: '600' },
     historyMeta: { fontSize: 13, marginTop: 2 },
     historyTime: { fontSize: 14, fontWeight: '500' },
+
+    infoOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    infoCard: {
+        width: '100%',
+        maxWidth: 420,
+        borderRadius: 20,
+        padding: 24,
+        alignItems: 'center',
+    },
+    infoTitle: { fontSize: 20, fontWeight: '700', marginBottom: 12, textAlign: 'center' },
+    infoText: { fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 12 },
+    infoBullets: { alignSelf: 'stretch', marginBottom: 20 },
+    infoBullet: { fontSize: 14, lineHeight: 22, marginTop: 4 },
+    infoBtn: {
+        paddingHorizontal: 32,
+        paddingVertical: 14,
+        borderRadius: 14,
+        minWidth: 180,
+        alignItems: 'center',
+    },
+    infoBtnText: { fontSize: 16, fontWeight: '700' },
 });
