@@ -9,6 +9,7 @@ import {
     Modal,
     PanResponder,
     Animated,
+    Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useTheme } from '@/hooks/use-theme';
@@ -17,6 +18,12 @@ import { getSession } from '../services/supabase';
 import { api } from '../services/api';
 import { parseTicketPayload, type TicketPayload } from '../utils/ticketToken';
 import type { ScanTicketResponse } from '../types/host';
+
+const blurActiveElement = () => {
+    if (Platform.OS === 'web') {
+        (document.activeElement as HTMLElement | null)?.blur();
+    }
+};
 
 type ScanState = 'idle' | 'preview' | 'confirmed' | 'invalid';
 
@@ -45,7 +52,7 @@ export default function ScanTicketScreen() {
     const [history, setHistory] = useState<ScanHistoryEntry[]>([]);
     const [showHistory, setShowHistory] = useState(false);
     const [offline, setOffline] = useState(false);
-    const [showOfflineInfo, setShowOfflineInfo] = useState(true);
+    const [showOfflineInfo, setShowOfflineInfo] = useState(false);
     const processingRef = useRef(false);
     const scannedTokens = useRef(new Set<string>());
     const autoResumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -127,16 +134,32 @@ export default function ScanTicketScreen() {
             }
 
             scheduleResume(resumeDelay, completedToken);
-        } catch {
-            setOffline(true);
-            scannedTokens.current.add(data);
-            setScanCount(c => c + 1);
-            const timeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            setHistory(h => [{ name: payload.name, opt: payload.opt, nr: payload.nr, time: timeStr }, ...h]);
-            setDisplay({ state: 'confirmed', payload, backendResult: null, syncedWithBackend: false });
-            scheduleResume(4000, data);
+        } catch (err) {
+            const isNetworkError = err instanceof TypeError;
+            console.error('[ScanTicket] Backend-Call fehlgeschlagen:', { isNetworkError, error: err });
+
+            if (isNetworkError) {
+                if (!offline) {
+                    setShowOfflineInfo(true);
+                }
+                setOffline(true);
+                scannedTokens.current.add(data);
+                setScanCount(c => c + 1);
+                const timeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                setHistory(h => [{ name: payload.name, opt: payload.opt, nr: payload.nr, time: timeStr }, ...h]);
+                setDisplay({ state: 'confirmed', payload, backendResult: null, syncedWithBackend: false });
+                scheduleResume(4000, data);
+            } else {
+                setDisplay({
+                    state: 'invalid',
+                    payload,
+                    backendResult: { valid: false, reason: 'not_found' },
+                    syncedWithBackend: true,
+                });
+                scheduleResume(2500);
+            }
         }
-    }, [eventId]);
+    }, [eventId, offline]);
 
     const historyTranslateY = useRef(new Animated.Value(0)).current;
     const historyPanResponder = useRef(
@@ -155,6 +178,7 @@ export default function ScanTicketScreen() {
                         duration: 200,
                         useNativeDriver: true,
                     }).start(() => {
+                        blurActiveElement();
                         setShowHistory(false);
                         historyTranslateY.setValue(0);
                     });
@@ -310,7 +334,7 @@ export default function ScanTicketScreen() {
                             <Text style={[styles.historyTitle, { color: colors.onSurface }]}>
                                 Scan-Verlauf ({history.length})
                             </Text>
-                            <TouchableOpacity onPress={() => setShowHistory(false)} style={styles.historyCloseBtn}>
+                            <TouchableOpacity onPress={() => { blurActiveElement(); setShowHistory(false); }} style={styles.historyCloseBtn}>
                                 <Text style={[styles.historyCloseText, { color: colors.onSurfaceVariant }]}>Schließen</Text>
                             </TouchableOpacity>
                         </View>
@@ -368,7 +392,7 @@ export default function ScanTicketScreen() {
                         </View>
                         <TouchableOpacity
                             style={[styles.infoBtn, { backgroundColor: colors.primary }]}
-                            onPress={() => setShowOfflineInfo(false)}
+                            onPress={() => { blurActiveElement(); setShowOfflineInfo(false); }}
                         >
                             <Text style={[styles.infoBtnText, { color: colors.onPrimary }]}>
                                 Verstanden
