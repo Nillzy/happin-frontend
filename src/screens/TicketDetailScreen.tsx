@@ -424,8 +424,8 @@ export default function TicketDetailScreen() {
                     </Text>
                 </TouchableOpacity>
 
-                {/* Ticket stornieren — nur wenn aktiv */}
-                {tickets.length > 0 && tickets.every(t => t.status === 'active') && (
+                {/* Ticket stornieren — nur bei bezahlten, aktiven Tickets */}
+                {tickets.length > 0 && tickets.every(t => t.status === 'active' && t.price > 0) && (
                     <TouchableOpacity
                         style={[styles.eventButton, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.error }]}
                         onPress={handleCancelTicket}
