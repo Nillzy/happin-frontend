@@ -20,6 +20,7 @@ import Head from 'expo-router/head';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import EditDrawer from '../components/atoms/EditDrawer';
 import ImageSelectionModal from '../components/atoms/ImageSelectionModal';
+import EventBlurBackground from '../components/event/EventBlurBackground';
 import EventCategories from '../components/event/EventCategories';
 import EventImageGallery from '../components/atoms/EventImageGallery';
 import CategorySelector, { CATEGORIES } from '../components/atoms/CategorySelector';
@@ -598,17 +599,10 @@ export default function EventEditScreen() {
         <ScreenWithNav showBottomNav={false}>
             <Head><title>{event.title} bearbeiten – Happin</title></Head>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                {/* === Blurred background === */}
-                {showImage ? (
-                    <Image
-                        source={{ uri: effectiveImageUrl! }}
-                        style={[styles.bgImage, isWeb ? { filter: 'blur(60px) saturate(1.8) brightness(0.7)' } as any : {}]}
-                        resizeMode="cover"
-                    />
-                ) : (
-                    <LinearGradient colors={heroGradient as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.bgImage} />
-                )}
-                <View style={[styles.bgOverlay, { backgroundColor: isDark ? 'rgba(12,13,20,0.35)' : 'rgba(248,249,250,0.25)' }]} />
+                <EventBlurBackground
+                    imageUrl={showImage ? effectiveImageUrl : null}
+                    gradientColors={heroGradient as [string, string]}
+                />
 
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {/* === Hero Image with Title Overlay (identical to EventScreen) === */}
@@ -1374,9 +1368,6 @@ const styles = StyleSheet.create({
     retryButton: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, minHeight: 48 },
     retryText: { fontSize: 14, fontWeight: '600' },
 
-    // Background (same as EventScreen)
-    bgImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
-    bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
     glassCard: { borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', overflow: 'hidden' },
 
     // Hero (same as EventScreen)
