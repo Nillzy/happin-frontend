@@ -28,6 +28,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
+import EventBlurBackground from '../components/event/EventBlurBackground';
 import EventCategories from '../components/event/EventCategories';
 import EventImageGallery from '../components/atoms/EventImageGallery';
 import MapView from '../components/MapView';
@@ -749,30 +750,14 @@ export default function EventScreen() {
         <ScreenWithNav showBottomNav={false}>
             <Head><title>{event.title} – Happin</title></Head>
             <View style={[styles.root, { backgroundColor: colors.background }]}>
-                {/* Blurred background: gradient when set, otherwise blurred cover image */}
-                {event.gradient_id != null ? (
-                    <LinearGradient
-                        colors={getGradientByIndex(event.gradient_id)}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.bgImage}
-                    />
-                ) : event.image_url ? (
-                    <Image
-                        source={{ uri: event.image_url }}
-                        style={[styles.bgImage, isWeb ? { filter: 'blur(60px) saturate(1.8) brightness(0.7)' } as any : {}]}
-                        blurRadius={isWeb ? 0 : 25}
-                        resizeMode="cover"
-                    />
-                ) : (
-                    <LinearGradient
-                        colors={getGradientByIndex(0)}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.bgImage}
-                    />
-                )}
-                <View style={[styles.bgOverlay, { backgroundColor: isDark ? 'rgba(12,13,20,0.35)' : 'rgba(248,249,250,0.25)' }]} />
+                <EventBlurBackground
+                    imageUrl={event.gradient_id == null ? event.image_url : null}
+                    gradientColors={
+                        event.gradient_id != null
+                            ? getGradientByIndex(event.gradient_id)
+                            : getGradientByIndex(0)
+                    }
+                />
 
                 {isDesktop ? (
                     /* ── Desktop: split layout ── */
@@ -2007,22 +1992,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
         paddingTop: 28,
         paddingBottom: 0,
-    },
-    bgImage: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100%',
-        height: '100%',
-    },
-    bgOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
     },
     glassCard: {
         borderRadius: 16,
