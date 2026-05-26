@@ -52,6 +52,7 @@ export interface EventDetailResponse extends EventListItem {
     created_at?: string;
     updated_at?: string;
     host_name?: string;
+    host_person_id?: string;
     media_urls: string[];
     ticket_options: TicketOption[];
     custom_fields?: CustomField[];

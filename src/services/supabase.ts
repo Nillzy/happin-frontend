@@ -115,13 +115,32 @@ export async function getUserProfile(): Promise<UserProfile | null> {
     const { data, error } = await getSupabase().auth.getUser();
     if (error || !data.user) return null;
     const u = data.user;
+
+    // Fetch avatar_url from backend (stored in person table)
+    let avatarUrl: string | null = null;
+    try {
+        const token = await getSession();
+        if (token) {
+            const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+            const res = await fetch(`${backendUrl}/api/v1/users/me/profile`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const profile = await res.json();
+                avatarUrl = profile.avatar_url ?? null;
+            }
+        }
+    } catch (err) {
+        console.warn('[getUserProfile] Failed to fetch avatar_url from backend:', err);
+    }
+
     return {
         id: u.id,
         email: u.email ?? '',
         displayName: u.user_metadata?.display_name ?? null,
         firstName: u.user_metadata?.first_name ?? null,
         lastName: u.user_metadata?.last_name ?? null,
-        avatarUrl: u.user_metadata?.avatar_url ?? null,
+        avatarUrl,
     };
 }
 
@@ -266,6 +285,37 @@ export async function uploadEventImage(imageUri: string): Promise<string> {
 
     const { data } = getSupabase().storage
         .from('event-images')
+        .getPublicUrl(path);
+
+    return data.publicUrl;
+}
+
+export async function uploadProfilePicture(imageUri: string): Promise<string> {
+    const user = await getSupabase().auth.getUser();
+    if (!user.data.user) throw new Error('Not authenticated');
+
+    let blob: Blob;
+
+    if (typeof document !== 'undefined') {
+        // Web: convert to JPEG and resize via canvas
+        blob = await toJpegBlob(imageUri);
+    } else {
+        // Native: ImagePicker already handles quality/size — just fetch the blob
+        const response = await fetch(imageUri);
+        blob = await response.blob();
+    }
+
+    const userId = user.data.user.id;
+    const path = `${userId}/avatar-${Date.now()}.jpg`;
+
+    const { error } = await getSupabase().storage
+        .from('profile-pictures')
+        .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+
+    if (error) throw new Error(`Upload failed: ${error.message}`);
+
+    const { data } = getSupabase().storage
+        .from('profile-pictures')
         .getPublicUrl(path);
 
     return data.publicUrl;

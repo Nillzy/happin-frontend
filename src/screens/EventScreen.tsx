@@ -867,7 +867,28 @@ export default function EventScreen() {
                             )}
 
                             {/* Host Card */}
-                            <View style={[...glassCard, styles.hostCard]}>
+                            <TouchableOpacity
+                                style={[...glassCard, styles.hostCard]}
+                                onPress={() => {
+                                    console.log('[EventScreen] Host card clicked:', {
+                                        is_host: event.is_host,
+                                        host_person_id: event.host_person_id,
+                                        host_name: event.host_name,
+                                    });
+                                    if (event.is_host) {
+                                        // Eigener Organisator → zum Account-Screen
+                                        console.log('[EventScreen] Navigating to /account (own event)');
+                                        router.push('/account');
+                                    } else if (event.host_person_id) {
+                                        // Fremder Organisator → zu seinen öffentlichen Events
+                                        console.log('[EventScreen] Navigating to /host/' + event.host_person_id);
+                                        router.push(`/host/${event.host_person_id}`);
+                                    } else {
+                                        console.log('[EventScreen] No action - missing host_person_id');
+                                    }
+                                }}
+                                activeOpacity={0.7}
+                            >
                                 <View style={styles.hostInfo}>
                                     <View style={[styles.hostAvatar, { backgroundColor: effectivePrimary }]}>
                                         <Text style={[styles.hostAvatarText, { color: effectiveOnPrimary }]}>{hostInitial}</Text>
@@ -878,10 +899,13 @@ export default function EventScreen() {
                                     </View>
                                 </View>
                                 {!event.is_host && (
-                                    <View style={styles.reportButtons}>
+                                    <View style={styles.reportButtons} pointerEvents="box-none">
                                         <TouchableOpacity
                                             style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
-                                            onPress={() => setReportModalTarget('event')}
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                setReportModalTarget('event');
+                                            }}
                                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
                                         >
                                             <View style={styles.reportIconStack}>
@@ -891,7 +915,10 @@ export default function EventScreen() {
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
-                                            onPress={() => setReportModalTarget('host')}
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                setReportModalTarget('host');
+                                            }}
                                             hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                                         >
                                             <View style={styles.reportIconStack}>
@@ -901,7 +928,7 @@ export default function EventScreen() {
                                         </TouchableOpacity>
                                     </View>
                                 )}
-                            </View>
+                            </TouchableOpacity>
 
                             {/* Action Buttons */}
                             <View style={[styles.actionButtons, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
@@ -1132,10 +1159,13 @@ export default function EventScreen() {
                                     </View>
                                 </View>
                                 {!event.is_host && (
-                                    <View style={styles.reportButtons}>
+                                    <View style={styles.reportButtons} pointerEvents="box-none">
                                         <TouchableOpacity
                                             style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
-                                            onPress={() => setReportModalTarget('event')}
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                setReportModalTarget('event');
+                                            }}
                                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
                                         >
                                             <View style={styles.reportIconStack}>
@@ -1145,7 +1175,10 @@ export default function EventScreen() {
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
-                                            onPress={() => setReportModalTarget('host')}
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                setReportModalTarget('host');
+                                            }}
                                             hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                                         >
                                             <View style={styles.reportIconStack}>
