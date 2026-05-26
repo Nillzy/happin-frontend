@@ -11,8 +11,10 @@ import {
     Platform,
     Pressable,
     Animated,
+    Image,
 } from 'react-native';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { useTheme } from '@/hooks/use-theme';
@@ -30,6 +32,7 @@ import {
     deleteAccount,
     getSession,
     UserProfile,
+    uploadProfilePicture,
 } from '../services/supabase';
 import { useUserCity } from '@/hooks/use-user-city';
 import CityAutocomplete from '../components/atoms/CityAutocomplete';
@@ -41,10 +44,12 @@ import { SkeletonBox } from '../components/atoms/SkeletonBox';
 
 function AvatarPlaceholder({
     displayName,
+    avatarUrl,
     colors,
     onPress,
 }: {
     displayName: string | null;
+    avatarUrl: string | null;
     colors: ReturnType<typeof useTheme>['colors'];
     onPress: () => void;
 }) {
@@ -59,9 +64,15 @@ function AvatarPlaceholder({
             onPress={onPress}
             onHoverIn={() => setHovered(true)}
             onHoverOut={() => setHovered(false)}
-            style={[avatarStyles.circle, { backgroundColor: colors.primaryContainer }]}
+            style={[avatarStyles.circle, { backgroundColor: avatarUrl ? 'transparent' : colors.primaryContainer }]}
         >
-            {initials ? (
+            {avatarUrl ? (
+                <Image
+                    source={{ uri: avatarUrl }}
+                    style={avatarStyles.image}
+                    resizeMode="cover"
+                />
+            ) : initials ? (
                 <Text style={[avatarStyles.initials, { color: colors.onPrimaryContainer }]}>{initials}</Text>
             ) : (
                 <PersonIcon size={40} color={colors.onPrimaryContainer} />
@@ -84,6 +95,11 @@ const avatarStyles = StyleSheet.create({
         borderRadius: 44,
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    image: {
+        width: '100%',
+        height: '100%',
     },
     initials: {
         fontSize: 32,
@@ -365,6 +381,43 @@ export default function AccountScreen() {
         }
     };
 
+    const handleUploadAvatar = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Berechtigung erforderlich', 'Wir benötigen Zugriff auf deine Fotos, um ein Profilbild hochzuladen.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (result.canceled) return;
+
+            const imageUri = result.assets[0].uri;
+
+            // Upload to Supabase
+            const avatarUrl = await uploadProfilePicture(imageUri);
+
+            // Update backend
+            const token = await getSession();
+            if (!token) throw new Error('Not authenticated');
+            await api.updateAvatar(token, avatarUrl);
+
+            // Update local state
+            setProfile(prev => prev ? { ...prev, avatarUrl } : prev);
+
+            Alert.alert('Erfolg', 'Profilbild wurde aktualisiert.');
+        } catch (error) {
+            console.error('Avatar upload failed:', error);
+            Alert.alert('Fehler', 'Profilbild konnte nicht hochgeladen werden.');
+        }
+    };
+
     const handleLogout = async () => {
         const confirmed = Platform.OS === 'web'
             ? window.confirm('Möchtest du dich wirklich abmelden?')
@@ -465,10 +518,9 @@ export default function AccountScreen() {
                 <View style={[s.profileCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
                     <AvatarPlaceholder
                         displayName={(profile?.displayName ?? `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim()) || null}
+                        avatarUrl={profile?.avatarUrl ?? null}
                         colors={colors}
-                        onPress={() => {
-                            Alert.alert('Profilbild', 'Profilbild-Upload wird in einer späteren Version verfügbar sein.');
-                        }}
+                        onPress={handleUploadAvatar}
                     />
 
                     <View style={s.profileInfo}>

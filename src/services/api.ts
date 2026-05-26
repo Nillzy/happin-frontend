@@ -112,6 +112,13 @@ export const api = {
         });
     },
 
+    getEventsByHost: (hostPersonId: string, limit = 50, offset = 0, token?: string) => {
+        const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+        return request<EventListResponse>(`/api/v1/events/host/${hostPersonId}?${params}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+    },
+
     getEventById: async (eventId: string, token?: string) => {
         const cached = _eventCache.get(eventId);
         if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
@@ -378,6 +385,13 @@ export const api = {
 
     getVapidPublicKey: () =>
         request<{ public_key: string | null }>('/api/v1/users/vapid-public-key'),
+
+    updateAvatar: (token: string, avatarUrl: string) =>
+        request<{ avatar_url: string }>('/api/v1/users/me/avatar', {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ avatar_url: avatarUrl }),
+        }),
 
     invalidateCaches: (eventId?: string) => {
         if (eventId) _eventCache.delete(eventId);
