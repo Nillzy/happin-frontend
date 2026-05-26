@@ -21,6 +21,7 @@ import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import { getSession } from '../services/supabase';
 import { api } from '../services/api';
+import { downloadFile } from '../utils/downloadFile';
 import { getGradientByIndex } from '../constants/gradients';
 import { SkeletonBox } from '../components/atoms/SkeletonBox';
 import type { EventDetailResponse, CustomField } from '../types/events';
@@ -74,6 +75,10 @@ export default function EventHostScreen() {
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [deleteConfirmed, setDeleteConfirmed] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [exportModalVisible, setExportModalVisible] = useState(false);
+    const [exportLoading, setExportLoading] = useState(false);
+    const [exportIncludeRsvp, setExportIncludeRsvp] = useState(false);
+    const [exportError, setExportError] = useState<string | null>(null);
 
     useEffect(() => {
         void loadData();
@@ -225,6 +230,33 @@ export default function EventHostScreen() {
         ? (new Date(event.starts_at).getTime() - Date.now()) >= 48 * 60 * 60 * 1000
         : false;
 
+    const handleExport = async (format: 'csv' | 'pdf') => {
+        if (!eventId) return;
+        try {
+            setExportError(null);
+            setExportLoading(true);
+            const token = await getSession();
+            if (!token) {
+                router.replace('/login');
+                return;
+            }
+            const { blob, filename } = await api.exportEventGuestList(
+                eventId,
+                format,
+                exportIncludeRsvp,
+                token,
+            );
+            const mime = format === 'csv' ? 'text/csv' : 'application/pdf';
+            await downloadFile(blob, filename, mime);
+            setExportModalVisible(false);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Export fehlgeschlagen';
+            setExportError(message);
+        } finally {
+            setExportLoading(false);
+        }
+    };
+
     const scanButton = (
         <TouchableOpacity
             style={[styles.scanButton, { backgroundColor: colors.primary }]}
@@ -282,6 +314,7 @@ export default function EventHostScreen() {
                                 isDesktop
                                 onShare={handleShare}
                                 onDeletePress={() => setDeleteModalVisible(true)}
+                                onExportPress={() => { setExportError(null); setExportModalVisible(true); }}
                                 canDelete={canDelete}
                                 isDeleted={event.is_deleted === true}
                             />
@@ -311,6 +344,7 @@ export default function EventHostScreen() {
                             ticketOptionSummary={ticketOptionSummary}
                             onShare={handleShare}
                             onDeletePress={() => setDeleteModalVisible(true)}
+                            onExportPress={() => { setExportError(null); setExportModalVisible(true); }}
                             canDelete={canDelete}
                             isDeleted={event.is_deleted === true}
                         />
@@ -392,6 +426,102 @@ export default function EventHostScreen() {
                                 </Text>
                             </TouchableOpacity>
                         </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* Export Modal */}
+            <Modal
+                visible={exportModalVisible}
+                animationType="fade"
+                transparent
+                onRequestClose={() => { if (!exportLoading) setExportModalVisible(false); }}
+            >
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => { if (!exportLoading) setExportModalVisible(false); }}
+                >
+                    <Pressable
+                        style={[styles.deleteModalCard, { backgroundColor: colors.surface }]}
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        <View style={[styles.deleteModalIconWrap, { backgroundColor: colors.primary + '20' }]}>
+                            <Ionicons name="download-outline" size={28} color={colors.primary} />
+                        </View>
+                        <Text style={[styles.deleteModalTitle, { color: colors.onSurface }]}>
+                            Gästeliste exportieren
+                        </Text>
+                        <Text style={[styles.deleteModalBody, { color: colors.onSurfaceVariant }]}>
+                            Lade die Liste aller zugesagten Gäste als CSV (für Tabellenkalkulation) oder PDF (druckfähig) herunter.
+                        </Text>
+
+                        {customFields.length > 0 && (
+                            <TouchableOpacity
+                                style={styles.deleteModalCheckRow}
+                                onPress={() => setExportIncludeRsvp(v => !v)}
+                                activeOpacity={0.7}
+                                disabled={exportLoading}
+                            >
+                                <View style={[
+                                    styles.checkbox,
+                                    { borderColor: colors.outline },
+                                    exportIncludeRsvp && { backgroundColor: colors.primary, borderColor: colors.primary },
+                                ]}>
+                                    {exportIncludeRsvp && <Ionicons name="checkmark" size={14} color={colors.onPrimary} />}
+                                </View>
+                                <Text style={[styles.deleteModalCheckLabel, { color: colors.onSurface }]}>
+                                    RSVP-Antworten als zusätzliche Spalten einschließen
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {exportError && (
+                            <Text style={[styles.exportErrorText, { color: colors.error }]}>
+                                {exportError}
+                            </Text>
+                        )}
+
+                        <View style={styles.deleteModalActions}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.deleteModalBtn,
+                                    { backgroundColor: colors.surfaceContainerHigh },
+                                    exportLoading && styles.deleteModalBtnDisabled,
+                                ]}
+                                onPress={() => handleExport('csv')}
+                                disabled={exportLoading}
+                            >
+                                <Text style={[styles.deleteModalBtnText, { color: colors.onSurface }]}>
+                                    {exportLoading ? '…' : 'Als CSV'}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.deleteModalBtn,
+                                    { backgroundColor: colors.primary },
+                                    exportLoading && styles.deleteModalBtnDisabled,
+                                ]}
+                                onPress={() => handleExport('pdf')}
+                                disabled={exportLoading}
+                            >
+                                <Text style={[styles.deleteModalBtnText, { color: colors.onPrimary }]}>
+                                    {exportLoading ? '…' : 'Als PDF'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                            style={[
+                                styles.deleteModalBtn,
+                                { backgroundColor: 'transparent', marginTop: -4 },
+                                exportLoading && styles.deleteModalBtnDisabled,
+                            ]}
+                            onPress={() => setExportModalVisible(false)}
+                            disabled={exportLoading}
+                        >
+                            <Text style={[styles.deleteModalBtnText, { color: colors.onSurfaceVariant }]}>
+                                Abbrechen
+                            </Text>
+                        </TouchableOpacity>
                     </Pressable>
                 </Pressable>
             </Modal>
@@ -842,6 +972,7 @@ function OverviewContent({
     isDesktop = false,
     onShare,
     onDeletePress,
+    onExportPress,
     canDelete,
     isDeleted = false,
 }: {
@@ -857,6 +988,7 @@ function OverviewContent({
     isDesktop?: boolean;
     onShare?: () => void;
     onDeletePress?: () => void;
+    onExportPress?: () => void;
     canDelete?: boolean;
     isDeleted?: boolean;
 }) {
@@ -999,6 +1131,24 @@ function OverviewContent({
                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Bearbeiten</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Zweite Reihe: Gästeliste exportieren (volle Breite) */}
+            <TouchableOpacity
+                style={[
+                    styles.exportButton,
+                    {
+                        borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+                    },
+                    isWeb
+                        ? { backgroundColor: isDark ? 'rgba(30,31,38,0.6)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any
+                        : { backgroundColor: isDark ? 'rgba(30,31,38,0.85)' : 'rgba(255,255,255,0.85)' },
+                ]}
+                onPress={onExportPress}
+                activeOpacity={0.75}
+            >
+                <Ionicons name="download-outline" size={20} color={colors.onSurface} />
+                <Text style={[styles.exportButtonText, { color: colors.onSurface }]}>Gästeliste exportieren</Text>
+            </TouchableOpacity>
 
             {/* Delete Button */}
             {isDeleted ? (
@@ -1376,5 +1526,25 @@ const styles = StyleSheet.create({
     deleteModalBtnText: {
         fontSize: 15,
         fontWeight: '600',
+    },
+    exportButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginBottom: 16,
+    },
+    exportButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    exportErrorText: {
+        fontSize: 13,
+        textAlign: 'center',
+        lineHeight: 18,
     },
 });
