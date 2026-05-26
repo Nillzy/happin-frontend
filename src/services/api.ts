@@ -182,6 +182,32 @@ export const api = {
             body: JSON.stringify({ participation_ids: participationIds }),
         }),
 
+    exportEventGuestList: async (
+        eventId: string,
+        format: 'csv' | 'pdf',
+        includeRsvpResponses: boolean,
+        token: string,
+    ): Promise<{ blob: Blob; filename: string }> => {
+        const base = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
+        const params = new URLSearchParams({
+            format,
+            include_rsvp_responses: String(includeRsvpResponses),
+        });
+        const response = await fetch(
+            `${base}/api/v1/events/${eventId}/export?${params.toString()}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`Export fehlgeschlagen (${response.status}): ${body}`);
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('content-disposition') ?? '';
+        const match = disposition.match(/filename="?([^";]+)"?/i);
+        const filename = match?.[1] ?? `gaesteliste.${format}`;
+        return { blob, filename };
+    },
+
     getUserEvents: async (token: string, period: 'upcoming' | 'past' = 'upcoming', limit = 50, offset = 0, role?: 'organizer' | 'attendee') => {
         const params = new URLSearchParams({ period, limit: String(limit), offset: String(offset) });
         if (role) params.set('role', role);
