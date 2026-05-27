@@ -1093,7 +1093,7 @@ export default function EventScreen() {
                         <ScrollView
                             style={styles.desktopRight}
                             contentContainerStyle={styles.desktopRightContent}
-                            onScrollBeginDrag={() => { setHostMenuVisible(false); setMoreMenuVisible(false); }}
+                            onScrollBeginDrag={() => { setMoreMenuVisible(false); }}
                             showsVerticalScrollIndicator={false}
                         >
                             {/* Preview Badge */}
@@ -1358,7 +1358,7 @@ export default function EventScreen() {
                     </View>
                 ) : (
                     /* ── Mobile: original layout ── */
-                    <ScrollView showsVerticalScrollIndicator={false} onScrollBeginDrag={() => { setHostMenuVisible(false); setMoreMenuVisible(false); }}>
+                    <ScrollView showsVerticalScrollIndicator={false} onScrollBeginDrag={() => { setMoreMenuVisible(false); }}>
                         {/* Hero Image with Title Overlay */}
                         <View style={styles.heroContainer}>
                             {event.image_url ? (
