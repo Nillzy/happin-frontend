@@ -11,6 +11,7 @@ import {
     syncReminders,
     unregisterWebPush,
 } from '@/src/services/reminders';
+import { registerExpoPush, unregisterExpoPush } from '@/src/services/expoPush';
 import { DEFAULT_REMINDER_SETTINGS, type ReminderSettings } from '@/src/types/reminders';
 
 const STORAGE_KEY_PREFIX = '@happin:reminder_settings:';
@@ -64,6 +65,7 @@ export function ReminderSettingsProvider({ children }: { children: ReactNode }) 
                 console.warn('[reminders] AsyncStorage read failed:', err);
             }
 
+            let resolvedEnabled = DEFAULT_REMINDER_SETTINGS.enabled;
             try {
                 const token = await getSession();
                 if (token && !cancelled) {
@@ -72,6 +74,7 @@ export function ReminderSettingsProvider({ children }: { children: ReactNode }) 
                         enabled: remote.enabled,
                         leadTimeMinutes: remote.lead_time_minutes,
                     };
+                    resolvedEnabled = remote.enabled;
                     setSettings(next);
                     await AsyncStorage.setItem(key, JSON.stringify(next));
                 }
@@ -80,6 +83,17 @@ export function ReminderSettingsProvider({ children }: { children: ReactNode }) 
             }
 
             if (!cancelled) setLoaded(true);
+
+            // Native: bei aktiviertem Toggle Token frisch registrieren
+            // (Expo-Tokens können sich nach Reinstall/OS-Updates ändern).
+            if (!cancelled && Platform.OS !== 'web' && resolvedEnabled) {
+                try {
+                    const token = await getSession();
+                    if (token) await registerExpoPush(token).catch(() => {});
+                } catch {
+                    // ignore
+                }
+            }
         })();
         return () => {
             cancelled = true;
@@ -108,6 +122,9 @@ export function ReminderSettingsProvider({ children }: { children: ReactNode }) 
                 if (Platform.OS === 'web') {
                     if (next.enabled) await registerWebPush(token).catch(() => {});
                     else await unregisterWebPush(token).catch(() => {});
+                } else {
+                    if (next.enabled) await registerExpoPush(token).catch(() => {});
+                    else await unregisterExpoPush(token).catch(() => {});
                 }
                 if (next.enabled) await syncReminders(token, next).catch(() => {});
                 else await cancelAllReminders().catch(() => {});

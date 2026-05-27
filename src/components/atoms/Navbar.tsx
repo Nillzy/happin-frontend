@@ -3,6 +3,7 @@ import { View, TouchableOpacity, Text, StyleSheet, Platform, useWindowDimensions
 import { useTheme } from '@/hooks/use-theme';
 import HappinLogo from './HappinLogo';
 import DarkLightToggle from './DarkLightToggle';
+import NotificationBell from './NotificationBell';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -90,6 +91,7 @@ export default function Navbar({ showCta = true, showBack = false, onBackPress, 
                                 </TouchableOpacity>
                             );
                         })}
+                        <NotificationBell />
                         <TouchableOpacity
                             style={[styles.createBtn, { borderColor: colors.primary }]}
                             onPress={() => router.push('/events/create' as any)}

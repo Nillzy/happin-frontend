@@ -24,6 +24,8 @@ import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import DarkLightToggle from '../components/atoms/DarkLightToggle';
 import ReminderSettingsSection from '../components/atoms/ReminderSettingsSection';
 import { PersonIcon, EditIcon, LogoutIcon, TrashIcon, ChevronRightIcon, MailIcon, GpsIcon } from '../components/atoms/icons';
+import { Ionicons } from '@expo/vector-icons';
+import { useNotifications } from '../contexts/NotificationsContext';
 import {
     getUserProfile,
     updateDisplayName,
@@ -232,6 +234,7 @@ const actionStyles = StyleSheet.create({
 export default function AccountScreen() {
     const { colors } = useTheme();
     const router = useRouter();
+    const { unreadCount } = useNotifications();
 
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
@@ -696,6 +699,24 @@ export default function AccountScreen() {
                 <View style={s.section}>
                     <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Konto</Text>
                     <View style={[s.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                        <TouchableOpacity
+                            style={[actionStyles.row, { borderBottomColor: colors.outlineVariant }]}
+                            onPress={() => router.push('/notifications' as any)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={actionStyles.left}>
+                                <Ionicons name="notifications-outline" size={20} color={colors.onSurface} />
+                                <Text style={[actionStyles.label, { color: colors.onSurface }]}>Benachrichtigungen</Text>
+                                {unreadCount > 0 && (
+                                    <View style={[s.inlineBadge, { backgroundColor: colors.error }]}>
+                                        <Text style={[s.inlineBadgeText, { color: colors.onError }]}>
+                                            {unreadCount > 99 ? '99+' : String(unreadCount)}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+                            <ChevronRightIcon size={18} color={colors.onSurfaceVariant} />
+                        </TouchableOpacity>
                         {/* E-Mail ändern — demnächst verfügbar */}
                         <View style={[actionStyles.row, { borderBottomColor: colors.outlineVariant, opacity: 0.45 }]}>
                             <View style={actionStyles.left}>
@@ -733,6 +754,19 @@ export default function AccountScreen() {
 const s = StyleSheet.create({
     root: {
         flex: 1,
+    },
+    inlineBadge: {
+        marginLeft: 8,
+        minWidth: 20,
+        height: 20,
+        borderRadius: 10,
+        paddingHorizontal: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    inlineBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
     },
     centered: {
         flex: 1,
