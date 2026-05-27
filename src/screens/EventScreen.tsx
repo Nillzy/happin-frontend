@@ -551,7 +551,11 @@ export default function EventScreen() {
             }
 
             const token = await getSession();
-            const data = await api.getEventById(id, token || undefined);
+            if (!token) {
+                router.replace('/login');
+                return;
+            }
+            const data = await api.getEventById(id, token);
             setEvent(data);
             setRsvpStatus(data.my_rsvp_status ?? null);
             const loc = data.location;
