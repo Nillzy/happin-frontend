@@ -40,6 +40,7 @@ export interface EventListItem {
     is_deleted?: boolean;
     deleted_at?: string | null;
     location_is_private?: boolean;
+    show_weather_forecast?: boolean;
 }
 
 export interface EventListResponse {
@@ -59,6 +60,15 @@ export interface EventDetailResponse extends EventListItem {
     my_rsvp_status?: RsvpStatus | null;
     ticket?: { ticket_id: string; guest_name?: string }[];
     max_tickets_per_person?: number;
+    show_weather_forecast?: boolean;
+    weather_forecast?: {
+        temp_c: number;
+        condition: string;
+        icon: string;
+        humidity: number;
+        wind_kph: number;
+        chance_of_rain: number;
+    } | null;
 }
 
 export type CustomFieldType = 'text' | 'textarea' | 'single_select' | 'multi_select';
@@ -117,6 +127,7 @@ export interface EventCreateRequest {
     location: LocationCreate;
     image_url?: string;
     gradient_id?: number | null;
+    show_weather_forecast?: boolean;
 }
 
 export interface EventUpdateRequest {
@@ -137,6 +148,7 @@ export interface EventUpdateRequest {
     accent_color_secondary?: string | null;
     media_urls?: string[];
     location_is_private?: boolean;
+    show_weather_forecast?: boolean;
 }
 
 export interface UserTicket {

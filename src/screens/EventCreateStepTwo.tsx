@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Image,
+    Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -48,6 +49,7 @@ export default function EventCreateStepTwo() {
     const [categories, setCategories] = useState<string[]>([]);
     const [address, setAddress] = useState<AddressSuggestion | null>(null);
     const [maxCapacity, setMaxCapacity] = useState('');
+    const [showWeather, setShowWeather] = useState(false);
     const [endDate, setEndDate] = useState('');
     const [endTime, setEndTime] = useState('');
 
@@ -99,6 +101,7 @@ export default function EventCreateStepTwo() {
             is_public: params.isPublic === 'true',
             image_url: imageUri || undefined,
             gradient_id: selectedGradientId ?? undefined,
+            show_weather_forecast: showWeather,
             location: {
                 city: address!.city,
                 street: address!.street || undefined,
@@ -275,6 +278,28 @@ export default function EventCreateStepTwo() {
                                 </View>
                             )}
                         </View>
+
+                        {/* Weather Toggle (like map, shown when address exists) */}
+                        {address && address.lat !== 0 && address.lng !== 0 && (
+                            <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.label, { color: colors.onSurface, marginBottom: 4 }]}>
+                                            Wettervorhersage anzeigen
+                                        </Text>
+                                        <Text style={[styles.sublabel, { color: colors.onSurfaceVariant, marginTop: 0 }]}>
+                                            Zeige Teilnehmern die vorhergesagte Temperatur und Wetterlage
+                                        </Text>
+                                    </View>
+                                    <Switch
+                                        value={showWeather}
+                                        onValueChange={setShowWeather}
+                                        trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+                                        thumbColor={showWeather ? colors.primary : '#ffffff'}
+                                    />
+                                </View>
+                            </View>
+                        )}
 
                         {/* Details (optional) */}
                         <View style={[styles.card, { backgroundColor: colors.surfaceContainer }]}>
