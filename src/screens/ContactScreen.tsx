@@ -14,7 +14,6 @@ import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/use-theme';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
-import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 
 export default function ContactScreen() {
@@ -38,9 +37,8 @@ export default function ContactScreen() {
     };
 
     return (
-        <ScreenWithNav>
+        <ScreenWithNav showBottomNav={false}>
             <Head><title>Kontakt – Happin</title></Head>
-            <Navbar showCta={false} />
             <ScrollView
                 style={{ backgroundColor: colors.background }}
                 contentContainerStyle={styles.content}

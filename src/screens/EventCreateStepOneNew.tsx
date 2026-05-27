@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -26,6 +26,12 @@ import { getSession } from '../services/supabase';
 export default function EventCreateStepOneNew() {
     const { colors } = useTheme();
     const router = useRouter();
+
+    useEffect(() => {
+        getSession().then((token) => {
+            if (!token) router.replace('/login');
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const [title, setTitle] = useState('');
     const [date, setDate] = useState('');

@@ -49,13 +49,17 @@ export default function HostEventsScreen() {
 
         try {
             const token = await getSession();
-            const response = await api.getEventsByHost(hostId, 50, offset, token ?? undefined);
+            if (!token) {
+                router.replace('/login');
+                return;
+            }
+            const response = await api.getEventsByHost(hostId, 50, offset, token);
 
             if (offset === 0) {
                 setEvents(response.events);
                 // Get host name from first event
                 if (response.events.length > 0) {
-                    const firstEvent = await api.getEventById(response.events[0].event_id, token ?? undefined);
+                    const firstEvent = await api.getEventById(response.events[0].event_id, token);
                     setHostName(firstEvent.host_name || 'Organisator');
                 }
             } else {

@@ -22,7 +22,6 @@ import Head from 'expo-router/head';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import { sendOtp, verifyOtp } from '../services/supabase';
-import { clearAllAuthData } from '../utils/clearAuthData';
 import { useAuth } from '../contexts/AuthContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -153,7 +152,6 @@ export default function LoginScreen() {
     const [otpError, setOtpError] = useState(false);
     const [resendSeconds, setResendSeconds] = useState(RESEND_COUNTDOWN);
     const [isSending, setIsSending] = useState(false);
-    const [isClearing, setIsClearing] = useState(false);
     const resendRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const shakeX = useSharedValue(0);
@@ -238,18 +236,6 @@ export default function LoginScreen() {
             console.error('OTP verification failed:', e);
             setOtpError(true);
             triggerShake();
-        }
-    };
-
-    const handleClearStorage = async () => {
-        setIsClearing(true);
-        try {
-            await clearAllAuthData();
-            alert('✅ Storage cleared! Try OTP flow again.');
-        } catch (e) {
-            alert('❌ Failed to clear storage: ' + (e instanceof Error ? e.message : 'Unknown error'));
-        } finally {
-            setIsClearing(false);
         }
     };
 
@@ -348,17 +334,6 @@ export default function LoginScreen() {
                             Mit der Anmeldung stimmst du unseren{' '}
                             <Text style={{ color: colors.primary }}>Nutzungsbedingungen</Text> zu.
                         </Text>
-
-                        {/* Debug: Clear Storage Button */}
-                        <TouchableOpacity
-                            onPress={handleClearStorage}
-                            disabled={isClearing}
-                            style={{ marginTop: 20, padding: 8 }}
-                        >
-                            <Text style={[s.legalText, { color: colors.error, textDecorationLine: 'underline' }]}>
-                                {isClearing ? 'Clearing...' : '🔧 Debug: Clear Auth Storage'}
-                            </Text>
-                        </TouchableOpacity>
                     </StepView>
                 )}
 
