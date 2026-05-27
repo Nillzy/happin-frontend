@@ -156,6 +156,79 @@ const deskBarStyles = StyleSheet.create({
     btnText: { fontSize: 15, fontWeight: '700' },
 });
 
+function WaitlistSection({
+    event,
+    onJoin,
+    onLeave,
+    loading,
+    colors,
+    effectivePrimary,
+    effectiveOnPrimary,
+    isDark,
+}: {
+    event: EventDetailResponse;
+    onJoin: () => void;
+    onLeave: () => void;
+    loading: boolean;
+    colors: any;
+    effectivePrimary: string;
+    effectiveOnPrimary: string;
+    isDark: boolean;
+}) {
+    const onWaitlist = event.my_waitlist_position != null;
+    return (
+        <View style={{ marginTop: 16, gap: 10 }}>
+            {onWaitlist ? (
+                <>
+                    <View style={{
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)',
+                        borderRadius: 12,
+                        padding: 14,
+                        alignItems: 'center',
+                    }}>
+                        <Text style={{ color: colors.onSurfaceVariant, fontSize: 13 }}>
+                            Du bist auf der Warteliste
+                        </Text>
+                        <Text style={{ color: colors.onSurface, fontSize: 22, fontWeight: '800', marginTop: 4 }}>
+                            {event.my_waitlist_position === 0 ? 'Du bist dran!' : `Platz ${event.my_waitlist_position}`}
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={{
+                            borderWidth: 1.5,
+                            borderColor: colors.outline,
+                            borderRadius: 14,
+                            paddingVertical: 14,
+                            alignItems: 'center',
+                        }}
+                        onPress={onLeave}
+                        disabled={loading}
+                    >
+                        <Text style={{ color: colors.onSurface, fontWeight: '600', fontSize: 15 }}>
+                            {loading ? '...' : 'Von der Warteliste entfernen'}
+                        </Text>
+                    </TouchableOpacity>
+                </>
+            ) : (
+                <TouchableOpacity
+                    style={{
+                        backgroundColor: effectivePrimary,
+                        borderRadius: 14,
+                        paddingVertical: 14,
+                        alignItems: 'center',
+                    }}
+                    onPress={onJoin}
+                    disabled={loading}
+                >
+                    <Text style={{ color: effectiveOnPrimary, fontWeight: '700', fontSize: 15 }}>
+                        {loading ? '...' : 'Auf die Warteliste setzen'}
+                    </Text>
+                </TouchableOpacity>
+            )}
+        </View>
+    );
+}
+
 
 function openInMaps(lat: number, lng: number) {
     const url = Platform.OS === 'ios'
@@ -187,6 +260,7 @@ export default function EventScreen() {
     const [rsvpMenuVisible, setRsvpMenuVisible] = useState(false);
     const [rsvpLoading, setRsvpLoading] = useState(false);
     const { refresh: refreshReminders } = useReminderSettings();
+    const [waitlistLoading, setWaitlistLoading] = useState(false);
     const [customFieldsModalOpen, setCustomFieldsModalOpen] = useState(false);
     const [customFieldsSubmitting, setCustomFieldsSubmitting] = useState(false);
     const [cfConfirmVisible, setCfConfirmVisible] = useState(false);
@@ -635,6 +709,34 @@ export default function EventScreen() {
             }
         } else {
             openDrawer();
+        }
+    };
+
+    const handleJoinWaitlist = async () => {
+        const token = await getSession();
+        if (!token) return;
+        setWaitlistLoading(true);
+        try {
+            await api.joinWaitlist(id!, token);
+            await loadEvent(true);
+        } catch (err) {
+            Alert.alert('Fehler', 'Du konntest nicht auf die Warteliste gesetzt werden.');
+        } finally {
+            setWaitlistLoading(false);
+        }
+    };
+
+    const handleLeaveWaitlist = async () => {
+        const token = await getSession();
+        if (!token) return;
+        setWaitlistLoading(true);
+        try {
+            await api.leaveWaitlist(id!, token);
+            await loadEvent(true);
+        } catch (err) {
+            Alert.alert('Fehler', 'Du konntest nicht von der Warteliste entfernt werden.');
+        } finally {
+            setWaitlistLoading(false);
         }
     };
 
@@ -1096,21 +1198,34 @@ export default function EventScreen() {
 
                             {/* Desktop sticky bar inline at bottom of scroll */}
                             <View style={isPreview ? { opacity: 0.4 } : undefined} pointerEvents={isPreview ? 'none' : 'auto'}>
-                                <DesktopStickyBar
-                                    event={event}
-                                    isFree={effectiveIsFree}
-                                    colors={colors}
-                                    isDark={isDark}
-                                    rsvpStatus={rsvpStatus}
-                                    rsvpLoading={rsvpLoading}
-                                    onRsvp={handleStickyBarPress}
-                                    onTickets={openDrawer}
-                                    onShowTicket={() => router.push(`/ticket/${event.event_id}`)}
-                                    effectivePrimary={effectivePrimary}
-                                    effectiveOnPrimary={effectiveOnPrimary}
-                                    effectiveSecondary={effectiveSecondary}
+                                {event.is_full && !hasTicketAccess ? (
+                                    <WaitlistSection
+                                        event={event}
+                                        onJoin={handleJoinWaitlist}
+                                        onLeave={handleLeaveWaitlist}
+                                        loading={waitlistLoading}
+                                        colors={colors}
+                                        effectivePrimary={effectivePrimary}
+                                        effectiveOnPrimary={effectiveOnPrimary}
+                                        isDark={isDark}
+                                    />
+                                ) : (
+                                    <DesktopStickyBar
+                                        event={event}
+                                        isFree={effectiveIsFree}
+                                        colors={colors}
+                                        isDark={isDark}
+                                        rsvpStatus={rsvpStatus}
+                                        rsvpLoading={rsvpLoading}
+                                        onRsvp={handleStickyBarPress}
+                                        onTickets={openDrawer}
+                                        onShowTicket={() => router.push(`/ticket/${event.event_id}`)}
+                                        effectivePrimary={effectivePrimary}
+                                        effectiveOnPrimary={effectiveOnPrimary}
+                                        effectiveSecondary={effectiveSecondary}
                                     effectiveOnSecondary={effectiveOnSecondary}
                                 />
+                                )}
                             </View>
 
                             <View style={{ height: 32 }} />
@@ -1369,6 +1484,29 @@ export default function EventScreen() {
 
             {/* Sticky Bottom Bar — mobile only */}
             {!isDesktop && (() => {
+                if (event.is_full && !hasTicketAccess) {
+                    return (
+                        <View style={[
+                            styles.stickyBar,
+                            { borderTopColor: colors.outlineVariant },
+                            isWeb
+                                ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
+                                : { backgroundColor: colors.surface },
+                            isPreview && { opacity: 0.4 },
+                        ]} pointerEvents={isPreview ? 'none' : 'auto'}>
+                            <WaitlistSection
+                                event={event}
+                                onJoin={handleJoinWaitlist}
+                                onLeave={handleLeaveWaitlist}
+                                loading={waitlistLoading}
+                                colors={colors}
+                                effectivePrimary={effectivePrimary}
+                                effectiveOnPrimary={effectiveOnPrimary}
+                                isDark={isDark}
+                            />
+                        </View>
+                    );
+                }
                 if (effectiveIsFree) {
                     const statusHint = rsvpStatus === 'Accepted' ? 'Du hast zugesagt'
                         : rsvpStatus === 'Declined' ? 'Du hast abgesagt'

@@ -69,6 +69,9 @@ export interface EventDetailResponse extends EventListItem {
         wind_kph: number;
         chance_of_rain: number;
     } | null;
+    waitlist_promotion_hours?: number;
+    is_full?: boolean;
+    my_waitlist_position?: number | null;
 }
 
 export type CustomFieldType = 'text' | 'textarea' | 'single_select' | 'multi_select';
@@ -149,6 +152,7 @@ export interface EventUpdateRequest {
     media_urls?: string[];
     location_is_private?: boolean;
     show_weather_forecast?: boolean;
+    waitlist_promotion_hours?: number | null;
 }
 
 export interface UserTicket {
