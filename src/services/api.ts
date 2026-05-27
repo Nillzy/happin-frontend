@@ -327,6 +327,12 @@ export const api = {
         return result;
     },
 
+    abandonCheckoutSession: (eventId: string, token: string) =>
+        request<{ abandoned: boolean }>(`/api/v1/events/${eventId}/checkout-session/abandon`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
     getConnectStatus: (token: string) =>
         request<{ has_account: boolean; charges_enabled: boolean; payouts_enabled: boolean; onboarding_complete: boolean }>(
             '/api/v1/connect/status',
