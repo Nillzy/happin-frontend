@@ -10,7 +10,10 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "build": "expo export --platform web"
+    "build": "expo export --platform web",
+    "build:apk": "JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home android/gradlew -p android assembleRelease && open android/app/build/outputs/apk/release/",
+    "upload:apk": "if [ -z \"$VM_USER\" ]; then printf 'VM User: '; read VM_USER; fi && scp android/app/build/outputs/apk/release/app-release.apk ${VM_USER}@vm552.ipp-vps.net:/var/www/happin/download/app.apk",
+    "release:apk": "npm run build:apk && npm run upload:apk"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
