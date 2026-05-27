@@ -84,12 +84,20 @@ export function ReminderSettingsProvider({ children }: { children: ReactNode }) 
 
             if (!cancelled) setLoaded(true);
 
-            // Native: bei aktiviertem Toggle Token frisch registrieren
-            // (Expo-Tokens können sich nach Reinstall/OS-Updates ändern).
-            if (!cancelled && Platform.OS !== 'web' && resolvedEnabled) {
+            // Bei aktiviertem Toggle Push-Registrierung beim Backend frisch
+            // setzen — damit übernimmt der Backend-Upsert (on_conflict=token/
+            // endpoint) das Gerät auf die neue person_id, falls es vorher
+            // einer anderen Person gehörte.
+            if (!cancelled && resolvedEnabled) {
                 try {
-                    const token = await getSession();
-                    if (token) await registerExpoPush(token).catch(() => {});
+                    const t = await getSession();
+                    if (t) {
+                        if (Platform.OS === 'web') {
+                            await registerWebPush(t).catch(() => {});
+                        } else {
+                            await registerExpoPush(t).catch(() => {});
+                        }
+                    }
                 } catch {
                     // ignore
                 }

@@ -31,6 +31,7 @@ export default function RootLayout() {
             <Stack.Screen name="imprint" options={{ title: 'Impressum – Happin' }} />
             <Stack.Screen name="privacy" options={{ title: 'Datenschutz – Happin' }} />
             <Stack.Screen name="notifications" options={{ title: 'Benachrichtigungen – Happin' }} />
+            <Stack.Screen name="devices" options={{ title: 'Push-aktivierte Geräte – Happin' }} />
             <Stack.Screen
               name="ticket/[eventId]"
               options={{

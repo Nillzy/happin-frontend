@@ -441,6 +441,44 @@ export const api = {
             body: JSON.stringify({ token: expoToken }),
         }),
 
+    // ── Geräte-Verwaltung ──────────────────────────────────────────────────
+
+    listWebPushSubscriptions: (token: string) =>
+        request<{
+            items: {
+                web_push_subscription_id: string;
+                endpoint: string;
+                user_agent: string | null;
+                created_at: string;
+            }[];
+        }>('/api/v1/users/me/web-push-subscriptions', {
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
+    deleteWebPushSubscriptionById: (token: string, id: string) =>
+        request<void>(`/api/v1/users/me/web-push-subscriptions/${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
+    listExpoPushTokens: (token: string) =>
+        request<{
+            items: {
+                expo_push_token_id: string;
+                platform: 'ios' | 'android';
+                user_agent: string | null;
+                created_at: string;
+            }[];
+        }>('/api/v1/users/me/expo-push-tokens', {
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
+    deleteExpoPushTokenById: (token: string, id: string) =>
+        request<void>(`/api/v1/users/me/expo-push-tokens/${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
     listNotifications: (token: string, before?: string, limit = 20) => {
         const params = new URLSearchParams({ limit: String(limit) });
         if (before) params.set('before', before);

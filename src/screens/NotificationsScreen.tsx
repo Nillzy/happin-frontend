@@ -126,6 +126,32 @@ export default function NotificationsScreen() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Beim Öffnen der Seite alle (jetzt geladenen) Benachrichtigungen als
+    // gelesen markieren — der Glocken-Badge soll nach Verlassen der Seite leer
+    // sein. Läuft nur, wenn der Initial-Load fertig ist und es ungelesene gibt.
+    useEffect(() => {
+        if (loading) return;
+        if (!items.some((it) => !it.read_at)) return;
+        let cancelled = false;
+        (async () => {
+            const token = await getSession();
+            if (!token || cancelled) return;
+            try {
+                await api.markAllNotificationsRead(token);
+                if (cancelled) return;
+                const now = new Date().toISOString();
+                setItems((prev) => prev.map((it) => (it.read_at ? it : { ...it, read_at: now })));
+                refreshUnreadCount();
+            } catch (err) {
+                console.warn('[notifications] auto-mark-all-read fehlgeschlagen:', err);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading]);
+
     const onRefresh = useCallback(() => {
         setRefreshing(true);
         load('refresh');
@@ -177,19 +203,6 @@ export default function NotificationsScreen() {
             console.warn('[notifications] Test-Push fehlgeschlagen:', err);
         }
     }, [refreshUnreadCount, load]);
-
-    const handleMarkAllRead = useCallback(async () => {
-        const token = await getSession();
-        if (!token) return;
-        try {
-            await api.markAllNotificationsRead(token);
-            const now = new Date().toISOString();
-            setItems((prev) => prev.map((it) => (it.read_at ? it : { ...it, read_at: now })));
-            refreshUnreadCount();
-        } catch (err) {
-            console.warn('[notifications] mark-all-read fehlgeschlagen:', err);
-        }
-    }, [refreshUnreadCount]);
 
     const renderItem = useCallback(({ item }: { item: NotificationItem }) => {
         const unread = !item.read_at;
@@ -259,11 +272,6 @@ export default function NotificationsScreen() {
                             <Ionicons name="flask-outline" size={14} color={colors.onSurfaceVariant} />
                             <Text style={[styles.testBtnText, { color: colors.onSurfaceVariant }]}>Test</Text>
                         </TouchableOpacity>
-                        {items.some((it) => !it.read_at) && (
-                            <TouchableOpacity onPress={handleMarkAllRead} activeOpacity={0.7}>
-                                <Text style={[styles.markAll, { color: colors.primary }]}>Alle als gelesen</Text>
-                            </TouchableOpacity>
-                        )}
                     </View>
                 </View>
                 {loading ? (
@@ -330,10 +338,6 @@ const styles = StyleSheet.create({
     heading: {
         fontSize: 22,
         fontWeight: '700',
-    },
-    markAll: {
-        fontSize: 14,
-        fontWeight: '600',
     },
     headerActions: {
         flexDirection: 'row',
