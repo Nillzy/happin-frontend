@@ -72,9 +72,9 @@ export default function EventHostScreen() {
     const [customFields, setCustomFields] = useState<CustomField[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-    const [deleteConfirmed, setDeleteConfirmed] = useState(false);
-    const [deleting, setDeleting] = useState(false);
+    const [cancelModalVisible, setCancelModalVisible] = useState(false);
+    const [cancelConfirmed, setCancelConfirmed] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
     const [exportModalVisible, setExportModalVisible] = useState(false);
     const [exportLoading, setExportLoading] = useState(false);
     const [exportIncludeRsvp, setExportIncludeRsvp] = useState(false);
@@ -210,25 +210,26 @@ export default function EventHostScreen() {
         }
     };
 
-    const handleDelete = async () => {
-        if (!eventId || !deleteConfirmed) return;
+    const handleCancel = async () => {
+        if (!eventId || !cancelConfirmed) return;
         try {
-            setDeleting(true);
+            setCancelling(true);
             const token = await getSession();
             if (!token) return;
-            await api.deleteEvent(eventId, token);
-            setDeleteModalVisible(false);
+            const summary = await api.cancelEvent(eventId, token);
+            setCancelModalVisible(false);
+            if (summary.failed_count > 0) {
+                setError(`Event abgesagt. Achtung: ${summary.failed_count} Refund(s) fehlgeschlagen, bitte Support kontaktieren.`);
+            }
             router.replace('/my-events');
         } catch {
-            setDeleting(false);
-            setDeleteModalVisible(false);
-            setError('Event konnte nicht gelöscht werden. Bitte versuche es erneut.');
+            setCancelling(false);
+            setCancelModalVisible(false);
+            setError('Event konnte nicht abgesagt werden. Bitte versuche es erneut.');
         }
     };
 
-    const canDelete = event && !event.is_deleted
-        ? (new Date(event.starts_at).getTime() - Date.now()) >= 48 * 60 * 60 * 1000
-        : false;
+    const canCancel = event && !event.is_cancelled;
 
     const handleExport = async (format: 'csv' | 'pdf') => {
         if (!eventId) return;
@@ -313,10 +314,10 @@ export default function EventHostScreen() {
                                 ticketOptionSummary={ticketOptionSummary}
                                 isDesktop
                                 onShare={handleShare}
-                                onDeletePress={() => setDeleteModalVisible(true)}
+                                onCancelPress={() => setCancelModalVisible(true)}
                                 onExportPress={() => { setExportError(null); setExportModalVisible(true); }}
-                                canDelete={canDelete}
-                                isDeleted={event.is_deleted === true}
+                                canCancel={canCancel}
+                                isCancelled={event.is_cancelled === true}
                             />
                         </ScrollView>
                         <View style={[styles.desktopStickyBar, { borderTopColor: borderColor, backgroundColor: bgColor }]}>
@@ -343,10 +344,10 @@ export default function EventHostScreen() {
                             customFields={customFields}
                             ticketOptionSummary={ticketOptionSummary}
                             onShare={handleShare}
-                            onDeletePress={() => setDeleteModalVisible(true)}
+                            onCancelPress={() => setCancelModalVisible(true)}
                             onExportPress={() => { setExportError(null); setExportModalVisible(true); }}
-                            canDelete={canDelete}
-                            isDeleted={event.is_deleted === true}
+                            canCancel={canCancel}
+                            isCancelled={event.is_cancelled === true}
                         />
                     </ScrollView>
                     {/* Mobile sticky bottom bar */}
@@ -363,66 +364,66 @@ export default function EventHostScreen() {
                     </View>
                 </>
             )}
-            {/* Delete Confirmation Modal */}
+            {/* Cancel Confirmation Modal */}
             <Modal
-                visible={deleteModalVisible}
+                visible={cancelModalVisible}
                 animationType="fade"
                 transparent
-                onRequestClose={() => setDeleteModalVisible(false)}
+                onRequestClose={() => setCancelModalVisible(false)}
             >
                 <Pressable
                     style={styles.modalOverlay}
-                    onPress={() => setDeleteModalVisible(false)}
+                    onPress={() => setCancelModalVisible(false)}
                 >
                     <Pressable
-                        style={[styles.deleteModalCard, { backgroundColor: colors.surface }]}
+                        style={[styles.cancelModalCard, { backgroundColor: colors.surface }]}
                         onPress={(e) => e.stopPropagation()}
                     >
-                        <View style={[styles.deleteModalIconWrap, { backgroundColor: 'rgba(255,59,48,0.1)' }]}>
-                            <Ionicons name="trash-outline" size={28} color="#FF3B30" />
+                        <View style={[styles.cancelModalIconWrap, { backgroundColor: 'rgba(255,59,48,0.1)' }]}>
+                            <Ionicons name="close-circle-outline" size={28} color="#FF3B30" />
                         </View>
-                        <Text style={[styles.deleteModalTitle, { color: colors.onSurface }]}>
-                            Event löschen?
+                        <Text style={[styles.cancelModalTitle, { color: colors.onSurface }]}>
+                            Event absagen?
                         </Text>
-                        <Text style={[styles.deleteModalBody, { color: colors.onSurfaceVariant }]}>
-                            Diese Aktion kann nicht rückgängig gemacht werden. Teilnehmer sehen das Event noch 48 Stunden lang als abgesagt.
+                        <Text style={[styles.cancelModalBody, { color: colors.onSurfaceVariant }]}>
+                            Teilnehmer werden informiert. Bezahlte Tickets werden automatisch zurückerstattet. Das Event bleibt für alle Beteiligten sichtbar.
                         </Text>
                         <TouchableOpacity
-                            style={styles.deleteModalCheckRow}
-                            onPress={() => setDeleteConfirmed(v => !v)}
+                            style={styles.cancelModalCheckRow}
+                            onPress={() => setCancelConfirmed(v => !v)}
                             activeOpacity={0.7}
                         >
                             <View style={[
                                 styles.checkbox,
                                 { borderColor: colors.outline },
-                                deleteConfirmed && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
+                                cancelConfirmed && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
                             ]}>
-                                {deleteConfirmed && <Ionicons name="checkmark" size={14} color="#fff" />}
+                                {cancelConfirmed && <Ionicons name="checkmark" size={14} color="#fff" />}
                             </View>
-                            <Text style={[styles.deleteModalCheckLabel, { color: colors.onSurface }]}>
-                                Ich verstehe, dass das Event unwiderruflich gelöscht wird
+                            <Text style={[styles.cancelModalCheckLabel, { color: colors.onSurface }]}>
+                                Ich verstehe, dass das Absagen nicht rückgängig gemacht werden kann
                             </Text>
                         </TouchableOpacity>
-                        <View style={styles.deleteModalActions}>
+                        <View style={styles.cancelModalActions}>
                             <TouchableOpacity
-                                style={[styles.deleteModalBtn, { backgroundColor: colors.surfaceContainerHigh }]}
-                                onPress={() => { setDeleteModalVisible(false); setDeleteConfirmed(false); }}
+                                style={[styles.cancelModalBtn, { backgroundColor: colors.surfaceContainerHigh }]}
+                                onPress={() => { setCancelModalVisible(false); setCancelConfirmed(false); }}
                             >
-                                <Text style={[styles.deleteModalBtnText, { color: colors.onSurface }]}>
+                                <Text style={[styles.cancelModalBtnText, { color: colors.onSurface }]}>
                                     Abbrechen
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[
-                                    styles.deleteModalBtn,
-                                    styles.deleteModalBtnDestructive,
-                                    (!deleteConfirmed || deleting) && styles.deleteModalBtnDisabled,
+                                    styles.cancelModalBtn,
+                                    styles.cancelModalBtnDestructive,
+                                    (!cancelConfirmed || cancelling) && styles.cancelModalBtnDisabled,
                                 ]}
-                                onPress={handleDelete}
-                                disabled={!deleteConfirmed || deleting}
+                                onPress={handleCancel}
+                                disabled={!cancelConfirmed || cancelling}
                             >
-                                <Text style={[styles.deleteModalBtnText, { color: '#fff' }]}>
-                                    {deleting ? 'Wird gelöscht…' : 'Endgültig löschen'}
+                                <Text style={[styles.cancelModalBtnText, { color: '#fff' }]}>
+                                    {cancelling ? 'Wird abgesagt…' : 'Event absagen'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -442,22 +443,22 @@ export default function EventHostScreen() {
                     onPress={() => { if (!exportLoading) setExportModalVisible(false); }}
                 >
                     <Pressable
-                        style={[styles.deleteModalCard, { backgroundColor: colors.surface }]}
+                        style={[styles.cancelModalCard, { backgroundColor: colors.surface }]}
                         onPress={(e) => e.stopPropagation()}
                     >
-                        <View style={[styles.deleteModalIconWrap, { backgroundColor: colors.primary + '20' }]}>
+                        <View style={[styles.cancelModalIconWrap, { backgroundColor: colors.primary + '20' }]}>
                             <Ionicons name="download-outline" size={28} color={colors.primary} />
                         </View>
-                        <Text style={[styles.deleteModalTitle, { color: colors.onSurface }]}>
+                        <Text style={[styles.cancelModalTitle, { color: colors.onSurface }]}>
                             Gästeliste exportieren
                         </Text>
-                        <Text style={[styles.deleteModalBody, { color: colors.onSurfaceVariant }]}>
+                        <Text style={[styles.cancelModalBody, { color: colors.onSurfaceVariant }]}>
                             Lade die Liste aller zugesagten Gäste als CSV (für Tabellenkalkulation) oder PDF (druckfähig) herunter.
                         </Text>
 
                         {customFields.length > 0 && (
                             <TouchableOpacity
-                                style={styles.deleteModalCheckRow}
+                                style={styles.cancelModalCheckRow}
                                 onPress={() => setExportIncludeRsvp(v => !v)}
                                 activeOpacity={0.7}
                                 disabled={exportLoading}
@@ -469,7 +470,7 @@ export default function EventHostScreen() {
                                 ]}>
                                     {exportIncludeRsvp && <Ionicons name="checkmark" size={14} color={colors.onPrimary} />}
                                 </View>
-                                <Text style={[styles.deleteModalCheckLabel, { color: colors.onSurface }]}>
+                                <Text style={[styles.cancelModalCheckLabel, { color: colors.onSurface }]}>
                                     RSVP-Antworten als zusätzliche Spalten einschließen
                                 </Text>
                             </TouchableOpacity>
@@ -481,44 +482,44 @@ export default function EventHostScreen() {
                             </Text>
                         )}
 
-                        <View style={styles.deleteModalActions}>
+                        <View style={styles.cancelModalActions}>
                             <TouchableOpacity
                                 style={[
-                                    styles.deleteModalBtn,
+                                    styles.cancelModalBtn,
                                     { backgroundColor: colors.surfaceContainerHigh },
-                                    exportLoading && styles.deleteModalBtnDisabled,
+                                    exportLoading && styles.cancelModalBtnDisabled,
                                 ]}
                                 onPress={() => handleExport('csv')}
                                 disabled={exportLoading}
                             >
-                                <Text style={[styles.deleteModalBtnText, { color: colors.onSurface }]}>
+                                <Text style={[styles.cancelModalBtnText, { color: colors.onSurface }]}>
                                     {exportLoading ? '…' : 'Als CSV'}
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[
-                                    styles.deleteModalBtn,
+                                    styles.cancelModalBtn,
                                     { backgroundColor: colors.primary },
-                                    exportLoading && styles.deleteModalBtnDisabled,
+                                    exportLoading && styles.cancelModalBtnDisabled,
                                 ]}
                                 onPress={() => handleExport('pdf')}
                                 disabled={exportLoading}
                             >
-                                <Text style={[styles.deleteModalBtnText, { color: colors.onPrimary }]}>
+                                <Text style={[styles.cancelModalBtnText, { color: colors.onPrimary }]}>
                                     {exportLoading ? '…' : 'Als PDF'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
                         <TouchableOpacity
                             style={[
-                                styles.deleteModalBtn,
+                                styles.cancelModalBtn,
                                 { backgroundColor: 'transparent', marginTop: -4 },
-                                exportLoading && styles.deleteModalBtnDisabled,
+                                exportLoading && styles.cancelModalBtnDisabled,
                             ]}
                             onPress={() => setExportModalVisible(false)}
                             disabled={exportLoading}
                         >
-                            <Text style={[styles.deleteModalBtnText, { color: colors.onSurfaceVariant }]}>
+                            <Text style={[styles.cancelModalBtnText, { color: colors.onSurfaceVariant }]}>
                                 Abbrechen
                             </Text>
                         </TouchableOpacity>
@@ -971,10 +972,10 @@ function OverviewContent({
     ticketOptionSummary,
     isDesktop = false,
     onShare,
-    onDeletePress,
+    onCancelPress,
     onExportPress,
-    canDelete,
-    isDeleted = false,
+    canCancel,
+    isCancelled = false,
 }: {
     counts: ParticipantCounts;
     maxCapacity?: number;
@@ -987,10 +988,10 @@ function OverviewContent({
     ticketOptionSummary: TicketOptionSummary[];
     isDesktop?: boolean;
     onShare?: () => void;
-    onDeletePress?: () => void;
+    onCancelPress?: () => void;
     onExportPress?: () => void;
-    canDelete?: boolean;
-    isDeleted?: boolean;
+    canCancel?: boolean;
+    isCancelled?: boolean;
 }) {
     const router = useRouter();
     const totalAccepted = counts.accepted;
@@ -1150,35 +1151,35 @@ function OverviewContent({
                 <Text style={[styles.exportButtonText, { color: colors.onSurface }]}>Gästeliste exportieren</Text>
             </TouchableOpacity>
 
-            {/* Delete Button */}
-            {isDeleted ? (
-                <View style={[styles.deleteButton, styles.deleteButtonDisabled]}>
+            {/* Cancel Button */}
+            {isCancelled ? (
+                <View style={[styles.cancelButton, styles.cancelButtonDisabled]}>
                     <Ionicons name="close-circle-outline" size={18} color={colors.outline} />
-                    <Text style={[styles.deleteButtonText, { color: colors.outline }]}>
+                    <Text style={[styles.cancelButtonText, { color: colors.outline }]}>
                         Event abgesagt
                     </Text>
                 </View>
             ) : (
                 <TouchableOpacity
                     style={[
-                        styles.deleteButton,
-                        !canDelete && styles.deleteButtonDisabled,
+                        styles.cancelButton,
+                        !canCancel && styles.cancelButtonDisabled,
                     ]}
-                    onPress={canDelete ? onDeletePress : undefined}
-                    activeOpacity={canDelete ? 0.75 : 1}
-                    disabled={!canDelete}
+                    onPress={canCancel ? onCancelPress : undefined}
+                    activeOpacity={canCancel ? 0.75 : 1}
+                    disabled={!canCancel}
                 >
                     <Ionicons
-                        name="trash-outline"
+                        name="close-circle-outline"
                         size={18}
-                        color={canDelete ? '#FF3B30' : colors.outline}
+                        color={canCancel ? '#FF3B30' : colors.outline}
                     />
-                    <Text style={[styles.deleteButtonText, { color: canDelete ? '#FF3B30' : colors.outline }]}>
-                        Event löschen
+                    <Text style={[styles.cancelButtonText, { color: canCancel ? '#FF3B30' : colors.outline }]}>
+                        Event absagen
                     </Text>
-                    {!canDelete && (
-                        <Text style={[styles.deleteButtonHint, { color: colors.outline }]}>
-                            (Beginn in &lt;48h)
+                    {!canCancel && (
+                        <Text style={[styles.cancelButtonHint, { color: colors.outline }]}>
+                            (bereits abgesagt)
                         </Text>
                     )}
                 </TouchableOpacity>
@@ -1428,8 +1429,8 @@ const styles = StyleSheet.create({
     ticketRowPrice: { fontSize: 13 },
     ticketRowCount: { fontSize: 16, fontWeight: '700', minWidth: 32, textAlign: 'right' },
 
-    // Delete button
-    deleteButton: {
+    // Cancel button
+    cancelButton: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
@@ -1441,19 +1442,19 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,59,48,0.06)',
         marginBottom: 16,
     },
-    deleteButtonDisabled: {
+    cancelButtonDisabled: {
         borderColor: 'rgba(0,0,0,0.12)',
         backgroundColor: 'transparent',
     },
-    deleteButtonText: {
+    cancelButtonText: {
         fontSize: 15,
         fontWeight: '500',
     },
-    deleteButtonHint: {
+    cancelButtonHint: {
         fontSize: 12,
         marginLeft: 4,
     },
-    // Delete modal
+    // Cancel modal
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1461,14 +1462,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 24,
     },
-    deleteModalCard: {
+    cancelModalCard: {
         width: '100%',
         maxWidth: 400,
         borderRadius: 20,
         padding: 24,
         gap: 16,
     },
-    deleteModalIconWrap: {
+    cancelModalIconWrap: {
         width: 52,
         height: 52,
         borderRadius: 26,
@@ -1476,17 +1477,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         alignSelf: 'center',
     },
-    deleteModalTitle: {
+    cancelModalTitle: {
         fontSize: 18,
         fontWeight: '700',
         textAlign: 'center',
     },
-    deleteModalBody: {
+    cancelModalBody: {
         fontSize: 14,
         lineHeight: 20,
         textAlign: 'center',
     },
-    deleteModalCheckRow: {
+    cancelModalCheckRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 10,
@@ -1501,29 +1502,29 @@ const styles = StyleSheet.create({
         marginTop: 1,
         flexShrink: 0,
     },
-    deleteModalCheckLabel: {
+    cancelModalCheckLabel: {
         flex: 1,
         fontSize: 13,
         lineHeight: 19,
     },
-    deleteModalActions: {
+    cancelModalActions: {
         flexDirection: 'row',
         gap: 10,
         marginTop: 4,
     },
-    deleteModalBtn: {
+    cancelModalBtn: {
         flex: 1,
         paddingVertical: 12,
         borderRadius: 12,
         alignItems: 'center',
     },
-    deleteModalBtnDestructive: {
+    cancelModalBtnDestructive: {
         backgroundColor: '#FF3B30',
     },
-    deleteModalBtnDisabled: {
+    cancelModalBtnDisabled: {
         opacity: 0.4,
     },
-    deleteModalBtnText: {
+    cancelModalBtnText: {
         fontSize: 15,
         fontWeight: '600',
     },

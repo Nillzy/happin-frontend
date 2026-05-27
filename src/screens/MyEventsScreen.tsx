@@ -185,7 +185,7 @@ export default function MyEventsScreen() {
     const renderHostCard = (event: EventListItem, index: number) => {
         const gradient = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
         const isPublic = event.is_public;
-        const isDeleted = event.is_deleted === true;
+        const isCancelled = event.is_cancelled === true;
 
         const accepted = (event as any).rsvp_accepted ?? event.participant_count ?? 0;
         const declined = (event as any).rsvp_declined ?? 0;
@@ -203,7 +203,7 @@ export default function MyEventsScreen() {
         return (
             <TouchableOpacity
                 key={event.event_id}
-                style={[styles.hostCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }, isDeleted && { opacity: 0.55 }]}
+                style={[styles.hostCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }, isCancelled && { opacity: 0.55 }]}
                 onPress={() => router.push(`/event/${event.event_id}/manage`)}
                 activeOpacity={0.85}
             >
@@ -233,13 +233,13 @@ export default function MyEventsScreen() {
 
                     <View style={[
                         styles.hostCardLabel,
-                        { backgroundColor: isDeleted ? 'rgba(255,59,48,0.12)' : isPublic ? `${colors.tertiary}18` : `${colors.secondary}18` }
+                        { backgroundColor: isCancelled ? 'rgba(255,59,48,0.12)' : isPublic ? `${colors.tertiary}18` : `${colors.secondary}18` }
                     ]}>
                         <Text style={[
                             styles.hostCardLabelText,
-                            { color: isDeleted ? '#FF3B30' : isPublic ? colors.tertiary : colors.secondary }
+                            { color: isCancelled ? '#FF3B30' : isPublic ? colors.tertiary : colors.secondary }
                         ]}>
-                            {isDeleted ? 'Abgesagt' : isPublic ? 'Öffentlich' : 'Privat'}
+                            {isCancelled ? 'Abgesagt' : isPublic ? 'Öffentlich' : 'Privat'}
                         </Text>
                     </View>
                 </View>
@@ -330,14 +330,14 @@ export default function MyEventsScreen() {
     };
 
     const renderTicketCard = (event: EventListItem, showQR: boolean = true) => {
-        const isDeleted = event.is_deleted === true;
+        const isCancelled = event.is_cancelled === true;
         return (
             <TouchableOpacity
                 key={event.event_id}
                 style={[
                     styles.card,
                     { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant },
-                    isDeleted && { opacity: 0.55, borderColor: 'rgba(255,59,48,0.3)' },
+                    isCancelled && { opacity: 0.55, borderColor: 'rgba(255,59,48,0.3)' },
                 ]}
                 onPress={() => router.push(showQR ? `/ticket/${event.event_id}` : `/event/${event.event_id}`)}
                 activeOpacity={0.85}
@@ -347,7 +347,7 @@ export default function MyEventsScreen() {
                         <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2}>
                             {event.title}
                         </Text>
-                        {isDeleted && (
+                        {isCancelled && (
                             <View style={styles.cancelledBadge}>
                                 <Text style={styles.cancelledBadgeText}>Abgesagt</Text>
                             </View>

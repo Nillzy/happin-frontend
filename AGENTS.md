@@ -196,12 +196,13 @@ Strict mode is enabled. Path alias `@/*` maps to the repo root (e.g. `@/src/scre
 If you make commits, they should always be in german.
 Never push to the main branch. If you start a new topic open a new one.
 
-## Event Soft-Delete
+## Event Absagen
 
-Events können von Hosts soft-gelöscht werden via `DELETE /api/v1/events/{event_id}`.
+Hosts können Events absagen via `POST /api/v1/events/{event_id}/cancel`. Bezahlte Tickets werden vom Backend automatisch via Stripe zurückerstattet; das Event bleibt dauerhaft für Host und Teilnehmer sichtbar (kein 48h-Fenster).
 
-- `api.deleteEvent(eventId, token)` in `src/services/api.ts` — löscht Event (204 No Content)
-- `EventListItem.is_deleted?: boolean` und `EventListItem.deleted_at?: string | null` in `src/types/events.ts`
-- Delete-Button + Modal in `src/screens/EventHostScreen.tsx` — gesperrt wenn `starts_at - now() < 48h`
-- "Abgesagt"-Badge in `src/screens/MyEventsScreen.tsx` — `opacity: 0.55` bei gelöschten Events
-- Roter Banner in `src/screens/EventScreen.tsx` — bei `is_deleted === true`
+- `api.cancelEvent(eventId, token): Promise<RefundSummary>` in `src/services/api.ts` — sagt Event ab und liefert `RefundSummary` (`refunded_count`, `failed_count`, `failed_order_ids`, `skipped_count`)
+- `EventListItem.is_cancelled?: boolean` und `EventListItem.cancelled_at?: string | null` in `src/types/events.ts`
+- `RefundSummary` Interface in `src/types/events.ts`
+- Cancel-Button + Bestätigungs-Modal in `src/screens/EventHostScreen.tsx` — Sperre, sobald `is_cancelled === true` (kein 48h-Block vor Absage)
+- "Abgesagt"-Badge in `src/screens/MyEventsScreen.tsx` — `opacity: 0.55` bei abgesagten Events
+- Roter Banner in `src/screens/EventScreen.tsx` — bei `is_cancelled === true`; alle modifizierenden Buttons (RSVP, Tickets, Custom Fields, Verwalten) werden disabled
