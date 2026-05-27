@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User, AuthChangeEvent } from '@supabase/supabase-js';
 import { getSupabaseClient } from '@/src/services/supabase';
+import { unregisterWebPush } from '@/src/services/reminders';
+import { unregisterExpoPush } from '@/src/services/expoPush';
 
 interface AuthContextType {
   /**
@@ -100,6 +102,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signOut = async () => {
     const supabase = getSupabaseClient();
+    // Vor dem Logout aktive Push-Registrierungen entfernen, damit das Gerät
+    // keine Pushes mehr erhält und die DB-Zeile nicht mit alter person_id
+    // liegen bleibt. Backend-Hänger dürfen den Logout nicht blockieren.
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await Promise.allSettled([
+          unregisterWebPush(session.access_token),
+          unregisterExpoPush(session.access_token),
+        ]);
+      }
+    } catch (err) {
+      console.warn('[AuthContext] Push-Unregister vor Logout fehlgeschlagen:', err);
+    }
     await supabase.auth.signOut();
     // onAuthStateChange will handle state update automatically
   };

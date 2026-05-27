@@ -685,7 +685,6 @@ export default function AccountScreen() {
                                 </View>
                             )}
                         </View>
-                        <ReminderSettingsSection />
                         <View style={[actionStyles.row, { borderBottomWidth: 0 }]}>
                             <View style={actionStyles.left}>
                                 <Text style={[actionStyles.label, { color: colors.onSurface }]}>Design</Text>
@@ -695,10 +694,11 @@ export default function AccountScreen() {
                     </View>
                 </View>
 
-                {/* ── Konto-Aktionen ── */}
+                {/* ── Benachrichtigungen ── */}
                 <View style={s.section}>
-                    <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Konto</Text>
+                    <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Benachrichtigungen</Text>
                     <View style={[s.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                        <ReminderSettingsSection />
                         <TouchableOpacity
                             style={[actionStyles.row, { borderBottomColor: colors.outlineVariant }]}
                             onPress={() => router.push('/notifications' as any)}
@@ -717,6 +717,24 @@ export default function AccountScreen() {
                             </View>
                             <ChevronRightIcon size={18} color={colors.onSurfaceVariant} />
                         </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[actionStyles.row, { borderBottomWidth: 0 }]}
+                            onPress={() => router.push('/devices' as any)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={actionStyles.left}>
+                                <Ionicons name="phone-portrait-outline" size={20} color={colors.onSurface} />
+                                <Text style={[actionStyles.label, { color: colors.onSurface }]}>Push-aktivierte Geräte</Text>
+                            </View>
+                            <ChevronRightIcon size={18} color={colors.onSurfaceVariant} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* ── Konto-Aktionen ── */}
+                <View style={s.section}>
+                    <Text style={[s.sectionTitle, { color: colors.onBackground }]}>Konto</Text>
+                    <View style={[s.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
                         {/* E-Mail ändern — demnächst verfügbar */}
                         <View style={[actionStyles.row, { borderBottomColor: colors.outlineVariant, opacity: 0.45 }]}>
                             <View style={actionStyles.left}>
