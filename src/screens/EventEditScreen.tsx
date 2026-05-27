@@ -86,6 +86,7 @@ export default function EventEditScreen() {
     const [draftMaxTicketsPerPerson, setDraftMaxTicketsPerPerson] = useState('');
     const [draftIsPublic, setDraftIsPublic] = useState(true);
     const [draftLocationIsPrivate, setDraftLocationIsPrivate] = useState(false);
+    const [draftShowWeather, setDraftShowWeather] = useState(false);
     const [draftEndDate, setDraftEndDate] = useState('');
     const [draftEndTime, setDraftEndTime] = useState('');
     const [draftGalleryImages, setDraftGalleryImages] = useState<string[]>([]);
@@ -320,6 +321,7 @@ export default function EventEditScreen() {
                 setDraftMaxTicketsPerPerson(event.max_tickets_per_person && event.max_tickets_per_person > 1 ? String(event.max_tickets_per_person) : '');
                 setDraftIsPublic(event.is_public ?? true);
                 setDraftLocationIsPrivate(event.location_is_private ?? false);
+                setDraftShowWeather(event.show_weather_forecast ?? false);
                 if (event.ends_at) {
                     const end = new Date(event.ends_at);
                     const pad = (n: number) => String(n).padStart(2, '0');
@@ -435,6 +437,7 @@ export default function EventEditScreen() {
                 patch.max_tickets_per_person = draftMaxTicketsPerPerson ? Number(draftMaxTicketsPerPerson) : 1;
                 patch.is_public = draftIsPublic;
                 patch.location_is_private = draftLocationIsPrivate;
+                patch.show_weather_forecast = draftShowWeather;
                 saveField(patch);
                 break;
             }
@@ -1226,6 +1229,19 @@ export default function EventEditScreen() {
                     </View>
                     <Text style={{ color: colors.onSurfaceVariant, fontSize: 12, marginTop: 2 }}>
                         Nur Zugesagte sehen die genaue Adresse
+                    </Text>
+                    <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 16 }]}>Wettervorhersage</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                        <Text style={{ color: colors.onSurface, fontSize: 15 }}>Wettervorhersage anzeigen</Text>
+                        <Switch
+                            value={draftShowWeather}
+                            onValueChange={setDraftShowWeather}
+                            trackColor={{ false: colors.surfaceVariant, true: colors.primary }}
+                            thumbColor={'#ffffff'}
+                        />
+                    </View>
+                    <Text style={{ color: colors.onSurfaceVariant, fontSize: 12, marginTop: 2 }}>
+                        Zeige Teilnehmern die vorhergesagte Temperatur und Wetterlage
                     </Text>
                 </EditDrawer>
 

@@ -31,6 +31,7 @@ import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import EventBlurBackground from '../components/event/EventBlurBackground';
 import EventCategories from '../components/event/EventCategories';
 import EventImageGallery from '../components/atoms/EventImageGallery';
+import { WeatherBlock } from '../components/event/WeatherBlock';
 import MapView from '../components/MapView';
 import { getSession, getUserProfile } from '../services/supabase';
 import { api, invalidateTicketsCache } from '../services/api';
@@ -1077,6 +1078,16 @@ export default function EventScreen() {
                                 </View>
                             )}
 
+                            {/* Weather forecast */}
+                            {event.show_weather_forecast && event.weather_forecast && (
+                                <View style={styles.section}>
+                                    <WeatherBlock
+                                        forecast={event.weather_forecast}
+                                        location={event.location?.city}
+                                    />
+                                </View>
+                            )}
+
                             {event.media_urls && event.media_urls.length > 0 && (
                                 <View style={styles.section}>
                                     <EventImageGallery images={event.media_urls} />
@@ -1331,6 +1342,16 @@ export default function EventScreen() {
                                         </TouchableOpacity>
                                         )}
                                     </View>
+                                </View>
+                            )}
+
+                            {/* Weather forecast */}
+                            {event.show_weather_forecast && event.weather_forecast && (
+                                <View style={styles.section}>
+                                    <WeatherBlock
+                                        forecast={event.weather_forecast}
+                                        location={event.location?.city}
+                                    />
                                 </View>
                             )}
 
