@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse, CustomField, CustomFieldResponseItem, TicketResponses, EventFilterParams, FilterPeriod } from '@/src/types/events';
+import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse, CustomField, CustomFieldResponseItem, TicketResponses, EventFilterParams, FilterPeriod, RefundSummary } from '@/src/types/events';
 import type { ParticipantListResponse, RemoveParticipantsResponse, ScanTicketResponse } from '@/src/types/host';
 import type { NotificationListResponse } from '@/src/types/notifications';
 
@@ -147,13 +147,14 @@ export const api = {
         return result;
     },
 
-    deleteEvent: async (eventId: string, token: string): Promise<void> => {
-        await request<void>(`/api/v1/events/${eventId}`, {
-            method: 'DELETE',
+    cancelEvent: async (eventId: string, token: string): Promise<RefundSummary> => {
+        const result = await request<RefundSummary>(`/api/v1/events/${eventId}/cancel`, {
+            method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
         });
         _eventCache.delete(eventId);
         _userEventsCache.clear();
+        return result;
     },
 
     syncTicketOptions: async (eventId: string, options: TicketOption[], token: string) => {

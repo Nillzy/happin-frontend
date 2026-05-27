@@ -37,8 +37,8 @@ export interface EventListItem {
     location?: EventLocation;
     participant_count: number;
     is_host?: boolean;
-    is_deleted?: boolean;
-    deleted_at?: string | null;
+    is_cancelled?: boolean;
+    cancelled_at?: string | null;
     location_is_private?: boolean;
     show_weather_forecast?: boolean;
 }
@@ -46,6 +46,13 @@ export interface EventListItem {
 export interface EventListResponse {
     events: EventListItem[];
     count: number;
+}
+
+export interface RefundSummary {
+    refunded_count: number;
+    failed_count: number;
+    failed_order_ids: string[];
+    skipped_count: number;
 }
 
 export interface EventDetailResponse extends EventListItem {

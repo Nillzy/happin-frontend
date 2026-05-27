@@ -94,9 +94,9 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
                     <Text style={[deskBarStyles.hint, { color: colors.onSurfaceVariant }]}>{event.participant_count} Teilnehmer</Text>
                 </View>
                 <TouchableOpacity
-                    style={[deskBarStyles.btn, { backgroundColor: btnBg, borderColor: btnBorder, borderWidth: btnBorder === 'transparent' ? 0 : 1.5 }]}
+                    style={[deskBarStyles.btn, { backgroundColor: btnBg, borderColor: btnBorder, borderWidth: btnBorder === 'transparent' ? 0 : 1.5 }, event.is_cancelled && { opacity: 0.4 }]}
                     onPress={onRsvp}
-                    disabled={rsvpLoading}
+                    disabled={rsvpLoading || event.is_cancelled}
                 >
                     <Text style={[deskBarStyles.btnText, { color: btnTextColor }]}>
                         {rsvpLoading ? '...' : event.is_public ? (rsvpStatus === 'Accepted' ? 'Absagen' : 'Zusagen') : 'RSVP'}
@@ -121,8 +121,9 @@ function DesktopStickyBar({ event, isFree, colors, isDark, rsvpStatus, rsvpLoadi
                 </Text>
             </View>
             <TouchableOpacity
-                style={[deskBarStyles.btn, { backgroundColor: userHasTicket ? effectiveSecondary : effectivePrimary }]}
+                style={[deskBarStyles.btn, { backgroundColor: userHasTicket ? effectiveSecondary : effectivePrimary }, event.is_cancelled && { opacity: 0.4 }]}
                 onPress={userHasTicket ? onShowTicket : onTickets}
+                disabled={!!event.is_cancelled && !userHasTicket}
             >
                 <Text style={[deskBarStyles.btnText, { color: userHasTicket ? effectiveOnSecondary : effectiveOnPrimary }]}>
                     {userHasTicket ? 'Ticket anzeigen' : 'Tickets wählen'}
@@ -692,6 +693,7 @@ export default function EventScreen() {
 
     const handleRsvp = async (newStatus: RsvpStatus, ticketCount: number = 1, names?: string[]) => {
         if (!event) return;
+        if (event.is_cancelled) return;
         const token = await getSession();
         if (!token) {
             router.navigate('/login');
@@ -784,6 +786,7 @@ export default function EventScreen() {
     };
 
     const openCustomFieldsModal = async () => {
+        if (event?.is_cancelled) return;
         if (!event) return;
         const token = await getSession();
         let tickets = event.ticket || [];
@@ -837,6 +840,7 @@ export default function EventScreen() {
 
     const handleStickyBarPress = () => {
         if (!event) return;
+        if (event.is_cancelled) return;
         if (effectiveIsFree) {
             if (event.is_public) {
                 handleRsvpWithTicketCount(rsvpStatus === 'Accepted' ? 'Declined' : 'Accepted');
@@ -1096,7 +1100,7 @@ export default function EventScreen() {
                             )}
 
                             {/* Cancelled Banner */}
-                            {event.is_deleted && (
+                            {event.is_cancelled && (
                                 <View style={cancelledBannerStyles.container}>
                                     <Ionicons name="close-circle" size={20} color="#fff" />
                                     <Text style={cancelledBannerStyles.text}>
@@ -1177,7 +1181,11 @@ export default function EventScreen() {
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
                                 {event.is_host && !useMehrMenu && (
-                                    <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/event/${id}/manage`)}>
+                                    <TouchableOpacity
+                                        style={[glassActionBtn, event.is_cancelled && { opacity: 0.4 }]}
+                                        onPress={() => router.push(`/event/${id}/manage`)}
+                                        disabled={!!event.is_cancelled}
+                                    >
                                         <Ionicons name="settings-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
                                     </TouchableOpacity>
@@ -1377,7 +1385,7 @@ export default function EventScreen() {
                         </View>
 
                         {/* Cancelled Banner */}
-                        {event.is_deleted && (
+                        {event.is_cancelled && (
                             <View style={cancelledBannerStyles.container}>
                                 <Ionicons name="close-circle" size={20} color="#fff" />
                                 <Text style={cancelledBannerStyles.text}>
@@ -1437,7 +1445,11 @@ export default function EventScreen() {
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
                                 {event.is_host && !useMehrMenu && (
-                                    <TouchableOpacity style={glassActionBtn} onPress={() => router.push(`/event/${id}/manage`)}>
+                                    <TouchableOpacity
+                                        style={[glassActionBtn, event.is_cancelled && { opacity: 0.4 }]}
+                                        onPress={() => router.push(`/event/${id}/manage`)}
+                                        disabled={!!event.is_cancelled}
+                                    >
                                         <Ionicons name="settings-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
                                     </TouchableOpacity>
@@ -1633,9 +1645,9 @@ export default function EventScreen() {
                                 </Text>
                             </View>
                             <TouchableOpacity
-                                style={[styles.stickyBarButton, { backgroundColor: btnBg, borderColor: btnBorder, borderWidth: btnBorder === 'transparent' ? 0 : 1.5 }]}
+                                style={[styles.stickyBarButton, { backgroundColor: btnBg, borderColor: btnBorder, borderWidth: btnBorder === 'transparent' ? 0 : 1.5 }, event.is_cancelled && { opacity: 0.4 }]}
                                 onPress={handleStickyBarPress}
-                                disabled={rsvpLoading}
+                                disabled={rsvpLoading || !!event.is_cancelled}
                             >
                                 <Text style={[styles.stickyBarButtonText, { color: btnTextColor }]}>
                                     {btnLabel}
@@ -1666,8 +1678,9 @@ export default function EventScreen() {
                             </Text>
                         </View>
                         <TouchableOpacity
-                            style={[styles.stickyBarButton, { backgroundColor: userHasTicket ? effectiveSecondary : effectivePrimary }]}
+                            style={[styles.stickyBarButton, { backgroundColor: userHasTicket ? effectiveSecondary : effectivePrimary }, event.is_cancelled && { opacity: 0.4 }]}
                             onPress={userHasTicket ? () => router.push(`/ticket/${event.event_id}`) : openDrawer}
+                            disabled={!!event.is_cancelled && !userHasTicket}
                         >
                             <Text style={[styles.stickyBarButtonText, { color: userHasTicket ? effectiveOnSecondary : effectiveOnPrimary }]}>
                                 {userHasTicket ? 'Ticket anzeigen' : 'Tickets wählen'}

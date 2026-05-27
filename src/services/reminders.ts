@@ -150,7 +150,7 @@ export async function syncReminders(token: string, settings: ReminderSettings): 
 
     await Promise.all(
         events
-            .filter((e) => !e.is_deleted)
+            .filter((e) => !e.is_cancelled)
             .map((e) => scheduleNativeReminder(e, settings.leadTimeMinutes)),
     );
 }
