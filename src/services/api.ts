@@ -177,6 +177,28 @@ export const api = {
             }),
         }),
 
+    joinWaitlist: async (eventId: string, token: string): Promise<{ waitlist_id: string; position: number }> => {
+        const result = await request<{ waitlist_id: string; position: number }>(
+            `/api/v1/events/${eventId}/waitlist`,
+            { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
+        );
+        _eventCache.delete(eventId);
+        return result;
+    },
+
+    leaveWaitlist: async (eventId: string, token: string): Promise<void> => {
+        await request<void>(
+            `/api/v1/events/${eventId}/waitlist`,
+            { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+        );
+        _eventCache.delete(eventId);
+    },
+
+    getWaitlistPosition: (eventId: string, token: string): Promise<{ position: number }> =>
+        request<{ position: number }>(`/api/v1/events/${eventId}/waitlist/position`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
     getEventParticipants: (eventId: string, token: string) =>
         request<ParticipantListResponse>(`/api/v1/events/${eventId}/participants`, {
             headers: { Authorization: `Bearer ${token}` },

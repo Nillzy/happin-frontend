@@ -84,6 +84,7 @@ export default function EventEditScreen() {
     const [draftAddress, setDraftAddress] = useState<AddressSuggestion | null>(null);
     const [draftMaxCapacity, setDraftMaxCapacity] = useState('');
     const [draftMaxTicketsPerPerson, setDraftMaxTicketsPerPerson] = useState('');
+    const [waitlistPromotionHours, setWaitlistPromotionHours] = useState<string>('24');
     const [draftIsPublic, setDraftIsPublic] = useState(true);
     const [draftLocationIsPrivate, setDraftLocationIsPrivate] = useState(false);
     const [draftShowWeather, setDraftShowWeather] = useState(false);
@@ -196,7 +197,7 @@ export default function EventEditScreen() {
 
         // Strip fields the backend doesn't support via PATCH
         // Remove keys whose value is null unless they are explicitly nullable fields
-        const nullableFields = new Set(['title', 'description', 'category', 'starts_at', 'ends_at', 'max_capacity', 'max_tickets_per_person', 'is_public', 'is_free', 'gradient_id', 'media_urls', 'accent_color_primary', 'accent_color_secondary']);
+        const nullableFields = new Set(['title', 'description', 'category', 'starts_at', 'ends_at', 'max_capacity', 'max_tickets_per_person', 'is_public', 'is_free', 'gradient_id', 'media_urls', 'accent_color_primary', 'accent_color_secondary', 'waitlist_promotion_hours']);
         const cleanPatch = Object.fromEntries(
             Object.entries(patch).filter(([k, v]) => v !== null || nullableFields.has(k))
         );
@@ -319,6 +320,7 @@ export default function EventEditScreen() {
             case 'details':
                 setDraftMaxCapacity(event.max_capacity ? String(event.max_capacity) : '');
                 setDraftMaxTicketsPerPerson(event.max_tickets_per_person && event.max_tickets_per_person > 1 ? String(event.max_tickets_per_person) : '');
+                setWaitlistPromotionHours(String(event.waitlist_promotion_hours ?? 24));
                 setDraftIsPublic(event.is_public ?? true);
                 setDraftLocationIsPrivate(event.location_is_private ?? false);
                 setDraftShowWeather(event.show_weather_forecast ?? false);
@@ -438,6 +440,9 @@ export default function EventEditScreen() {
                 patch.is_public = draftIsPublic;
                 patch.location_is_private = draftLocationIsPrivate;
                 patch.show_weather_forecast = draftShowWeather;
+                if (!event.is_free) {
+                    patch.waitlist_promotion_hours = parseInt(waitlistPromotionHours, 10) || 24;
+                }
                 saveField(patch);
                 break;
             }
@@ -1200,6 +1205,21 @@ export default function EventEditScreen() {
                     <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxCapacity} onChangeText={setDraftMaxCapacity} placeholder="Keine Begrenzung" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
                     <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 4 }]}>Max. Personen pro Gast (inkl. Gast selbst)</Text>
                     <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxTicketsPerPerson} onChangeText={setDraftMaxTicketsPerPerson} placeholder="1 (keine Begleitpersonen)" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
+                    {!event.is_free && (
+                        <View style={{ marginTop: 16 }}>
+                            <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>
+                                Zahlungsfrist für Warteliste (Stunden)
+                            </Text>
+                            <TextInput
+                                style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]}
+                                value={waitlistPromotionHours}
+                                onChangeText={setWaitlistPromotionHours}
+                                keyboardType="number-pad"
+                                placeholder="24"
+                                placeholderTextColor={colors.onSurfaceVariant}
+                            />
+                        </View>
+                    )}
                     <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 16 }]}>Sichtbarkeit</Text>
                     <View style={[styles.segmentControl, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
                         <TouchableOpacity
