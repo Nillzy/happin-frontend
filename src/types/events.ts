@@ -59,7 +59,7 @@ export interface EventDetailResponse extends EventListItem {
     custom_fields?: CustomField[];
     my_rsvp_status?: RsvpStatus | null;
     ticket?: { ticket_id: string; guest_name?: string }[];
-    max_tickets_per_person?: number;
+    max_tickets_per_person?: number | null;
     show_weather_forecast?: boolean;
     weather_forecast?: {
         temp_c: number;

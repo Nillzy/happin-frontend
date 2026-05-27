@@ -42,6 +42,7 @@ import CustomFieldForm from '../components/atoms/CustomFieldForm';
 import { SkeletonBox } from '../components/atoms/SkeletonBox';
 import ConfirmModal from '../components/atoms/ConfirmModal';
 import { useReminderSettings } from '@/src/contexts/ReminderSettingsContext';
+import { formatCheckoutError, openCheckoutUrl, showCheckoutAlert } from '@/src/utils/openCheckoutUrl';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.56; // ~16:9
@@ -230,6 +231,124 @@ function WaitlistSection({
 }
 
 
+function ReportMenuButton({
+    onReportEvent,
+    onReportHost,
+    colors,
+}: {
+    onReportEvent: () => void;
+    onReportHost: () => void;
+    colors: ReturnType<typeof useTheme>['colors'];
+}) {
+    const [menuVisible, setMenuVisible] = useState(false);
+    const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+    const triggerRef = useRef<View | null>(null);
+
+    const toggleMenu = (e?: { stopPropagation?: () => void }) => {
+        e?.stopPropagation?.();
+        if (menuVisible) {
+            setMenuVisible(false);
+            return;
+        }
+        triggerRef.current?.measureInWindow((x, y, width, height) => {
+            const screenWidth = Dimensions.get('window').width;
+            setMenuPosition({
+                top: y + height + 4,
+                right: Math.max(8, screenWidth - (x + width)),
+            });
+            setMenuVisible(true);
+        });
+    };
+
+    return (
+        <>
+            <View ref={triggerRef} style={styles.reportMenuWrapper} collapsable={false}>
+                <TouchableOpacity
+                    style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
+                    onPress={toggleMenu}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Meldeoptionen"
+                >
+                    <Ionicons name="ellipsis-vertical" size={18} color={colors.onSurfaceVariant} />
+                </TouchableOpacity>
+            </View>
+            <Modal
+                visible={menuVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setMenuVisible(false)}
+            >
+                <Pressable
+                    style={StyleSheet.absoluteFillObject}
+                    onPress={() => setMenuVisible(false)}
+                />
+                {menuPosition && (
+                    <View
+                        style={[
+                            styles.hostMenuDropdown,
+                            {
+                                position: 'absolute',
+                                top: menuPosition.top,
+                                right: menuPosition.right,
+                                backgroundColor: colors.surfaceContainer,
+                                borderColor: colors.outlineVariant,
+                            },
+                        ]}
+                    >
+                        <TouchableOpacity
+                            style={styles.hostMenuItem}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                onReportEvent();
+                            }}
+                        >
+                            <Ionicons name="calendar-outline" size={18} color={colors.onSurface} />
+                            <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Event melden</Text>
+                        </TouchableOpacity>
+                        <View style={[styles.hostMenuSeparator, { backgroundColor: colors.outlineVariant }]} />
+                        <TouchableOpacity
+                            style={styles.hostMenuItem}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                onReportHost();
+                            }}
+                        >
+                            <Ionicons name="person-outline" size={18} color={colors.onSurface} />
+                            <Text style={[styles.hostMenuItemText, { color: colors.onSurface }]}>Host melden</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+            </Modal>
+        </>
+    );
+}
+
+function getMaxPurchasableTickets(
+    event: EventDetailResponse,
+    selected?: { quantity_limit?: number | null },
+): number {
+    const ownedTickets = event.ticket?.length ?? 0;
+    const limits: number[] = [];
+
+    if (event.max_tickets_per_person != null) {
+        const byPerson = Math.max(0, event.max_tickets_per_person - ownedTickets);
+        if (byPerson === 0) return 0;
+        limits.push(byPerson);
+    }
+
+    if (selected?.quantity_limit != null) {
+        limits.push(selected.quantity_limit);
+    }
+
+    if (event.max_capacity != null) {
+        limits.push(Math.max(0, event.max_capacity - (event.participant_count ?? 0)));
+    }
+
+    if (limits.length === 0) return 99;
+
+    return Math.max(0, Math.min(...limits));
+}
+
 function openInMaps(lat: number, lng: number) {
     const url = Platform.OS === 'ios'
         ? `https://maps.apple.com/place?coordinate=${lat},${lng}`
@@ -379,6 +498,23 @@ export default function EventScreen() {
             setTicketCount(1);
         });
     };
+
+    useEffect(() => {
+        if (!drawerOpen || !event) return;
+        const selected = event.ticket_options?.[selectedTicketIdx];
+        const max = getMaxPurchasableTickets(event, selected);
+        setTicketCount(current => {
+            if (max === 0) return 1;
+            return Math.min(Math.max(1, current), max);
+        });
+    }, [
+        drawerOpen,
+        selectedTicketIdx,
+        event?.event_id,
+        event?.max_tickets_per_person,
+        event?.ticket?.length,
+        event?.ticket_options?.[selectedTicketIdx]?.quantity_limit,
+    ]);
 
     useEffect(() => {
         loadEvent();
@@ -627,8 +763,8 @@ export default function EventScreen() {
 
     const handleRsvpWithTicketCount = (newStatus: RsvpStatus) => {
         if (!event) return;
-        const maxPerPerson = event.max_tickets_per_person ?? 1;
-        if (newStatus === 'Accepted' && maxPerPerson > 1) {
+        const maxPerPerson = event.max_tickets_per_person;
+        if (newStatus === 'Accepted' && maxPerPerson != null && maxPerPerson > 1) {
             setAttendeeNames(['']);
             setTicketCountPickerOpen(true);
             getUserProfile().then(p => {
@@ -1002,34 +1138,11 @@ export default function EventScreen() {
                                     </View>
                                 </View>
                                 {!event.is_host && (
-                                    <View style={styles.reportButtons} pointerEvents="box-none">
-                                        <TouchableOpacity
-                                            style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
-                                            onPress={(e) => {
-                                                e.stopPropagation();
-                                                setReportModalTarget('event');
-                                            }}
-                                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
-                                        >
-                                            <View style={styles.reportIconStack}>
-                                                <Ionicons name="warning-outline" size={18} color={colors.onSurfaceVariant} />
-                                                <Ionicons name="calendar-outline" size={10} color={colors.onSurfaceVariant} style={styles.reportIconBadge} />
-                                            </View>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
-                                            onPress={(e) => {
-                                                e.stopPropagation();
-                                                setReportModalTarget('host');
-                                            }}
-                                            hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                                        >
-                                            <View style={styles.reportIconStack}>
-                                                <Ionicons name="warning-outline" size={18} color={colors.onSurfaceVariant} />
-                                                <Ionicons name="people-outline" size={10} color={colors.onSurfaceVariant} style={styles.reportIconBadge} />
-                                            </View>
-                                        </TouchableOpacity>
-                                    </View>
+                                    <ReportMenuButton
+                                        colors={colors}
+                                        onReportEvent={() => setReportModalTarget('event')}
+                                        onReportHost={() => setReportModalTarget('host')}
+                                    />
                                 )}
                             </TouchableOpacity>
 
@@ -1285,34 +1398,11 @@ export default function EventScreen() {
                                     </View>
                                 </View>
                                 {!event.is_host && (
-                                    <View style={styles.reportButtons} pointerEvents="box-none">
-                                        <TouchableOpacity
-                                            style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
-                                            onPress={(e) => {
-                                                e.stopPropagation();
-                                                setReportModalTarget('event');
-                                            }}
-                                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
-                                        >
-                                            <View style={styles.reportIconStack}>
-                                                <Ionicons name="warning-outline" size={18} color={colors.onSurfaceVariant} />
-                                                <Ionicons name="calendar-outline" size={10} color={colors.onSurfaceVariant} style={styles.reportIconBadge} />
-                                            </View>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={[styles.reportBtn, { borderColor: colors.outlineVariant }]}
-                                            onPress={(e) => {
-                                                e.stopPropagation();
-                                                setReportModalTarget('host');
-                                            }}
-                                            hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                                        >
-                                            <View style={styles.reportIconStack}>
-                                                <Ionicons name="warning-outline" size={18} color={colors.onSurfaceVariant} />
-                                                <Ionicons name="people-outline" size={10} color={colors.onSurfaceVariant} style={styles.reportIconBadge} />
-                                            </View>
-                                        </TouchableOpacity>
-                                    </View>
+                                    <ReportMenuButton
+                                        colors={colors}
+                                        onReportEvent={() => setReportModalTarget('event')}
+                                        onReportHost={() => setReportModalTarget('host')}
+                                    />
                                 )}
                             </View>
 
@@ -1482,8 +1572,8 @@ export default function EventScreen() {
                 )}
             </View>
 
-            {/* Sticky Bottom Bar — mobile only */}
-            {!isDesktop && (() => {
+            {/* Sticky Bottom Bar — mobile only (hidden while ticket drawer is open) */}
+            {!isDesktop && !drawerOpen && (() => {
                 if (event.is_full && !hasTicketAccess) {
                     return (
                         <View style={[
@@ -1588,13 +1678,19 @@ export default function EventScreen() {
             })()}
 
             {/* Ticket-Drawer Bottom Sheet */}
-            {drawerOpen && event && (() => {
+            <Modal
+                visible={drawerOpen && !!event}
+                transparent
+                animationType="none"
+                onRequestClose={closeDrawer}
+            >
+                {event && (() => {
                 const tickets = event.ticket_options ?? [];
                 const selected = tickets[selectedTicketIdx];
                 const total = (selected?.price ?? 0) * ticketCount;
-                const maxPerPerson = event.max_tickets_per_person ?? 1;
-                const ownedTickets = event.ticket?.length ?? 0;
-                const maxPurchasable = Math.max(0, maxPerPerson - ownedTickets);
+                const maxPurchasable = getMaxPurchasableTickets(event, selected);
+                const canDecrement = ticketCount > 1 && maxPurchasable > 0;
+                const canIncrement = maxPurchasable > 0 && ticketCount < maxPurchasable;
 
                 const drawerTranslateY = drawerAnim.interpolate({
                     inputRange: [0, 1],
@@ -1602,19 +1698,14 @@ export default function EventScreen() {
                 });
 
                 return (
-                    <>
-                        {/* Backdrop */}
+                    <View style={styles.drawerModalRoot}>
                         <Pressable
-                            style={StyleSheet.absoluteFill}
+                            style={styles.drawerModalBackdrop}
                             onPress={closeDrawer}
-                        >
-                            <Animated.View style={[
-                                StyleSheet.absoluteFill,
-                                { backgroundColor: 'rgba(0,0,0,0.5)', opacity: drawerAnim },
-                            ]} />
-                        </Pressable>
+                            accessibilityRole="button"
+                            accessibilityLabel="Schließen"
+                        />
 
-                        {/* Drawer */}
                         <Animated.View style={[
                             styles.drawer,
                             {
@@ -1649,7 +1740,11 @@ export default function EventScreen() {
                                         <TouchableOpacity
                                             key={idx}
                                             activeOpacity={isSoldOut ? 1 : 0.7}
-                                            onPress={() => !isSoldOut && setSelectedTicketIdx(idx)}
+                                            onPress={() => {
+                                                if (isSoldOut) return;
+                                                setSelectedTicketIdx(idx);
+                                                setTicketCount(1);
+                                            }}
                                             style={[
                                                 styles.ticketOption,
                                                 {
@@ -1711,23 +1806,42 @@ export default function EventScreen() {
                             </ScrollView>
 
                             {/* Quantity Selector */}
-                            <View style={[styles.quantityRow, { borderTopColor: colors.outlineVariant }]}>
-                                <Text style={[styles.quantityLabel, { color: colors.onSurface }]}>Anzahl</Text>
-                                <View style={styles.quantityStepper}>
-                                    <TouchableOpacity
-                                        style={[styles.stepperBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
-                                        onPress={() => setTicketCount(c => Math.max(1, c - 1))}
-                                    >
-                                        <Ionicons name="remove" size={20} color={colors.onSurface} />
-                                    </TouchableOpacity>
-                                    <Text style={[styles.quantityValue, { color: colors.onSurface }]}>{ticketCount}</Text>
-                                    <TouchableOpacity
-                                        style={[styles.stepperBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
-                                        onPress={() => setTicketCount(c => Math.min(maxPurchasable, c + 1))}
-                                        disabled={ticketCount >= maxPurchasable}
-                                    >
-                                        <Ionicons name="add" size={20} color={colors.onSurface} />
-                                    </TouchableOpacity>
+                            <View style={[styles.quantitySection, { borderTopColor: colors.outlineVariant }]}>
+                                <View style={styles.quantityRow}>
+                                    <Text style={[styles.quantityLabel, { color: colors.onSurface }]}>Anzahl</Text>
+                                    <View style={styles.quantityStepper}>
+                                        <Pressable
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Anzahl verringern"
+                                            hitSlop={10}
+                                            onPress={() => setTicketCount(c => Math.max(1, c - 1))}
+                                            disabled={!canDecrement}
+                                            style={({ pressed }) => [
+                                                styles.stepperBtn,
+                                                { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' },
+                                                !canDecrement && styles.stepperBtnDisabled,
+                                                pressed && canDecrement && styles.stepperBtnPressed,
+                                            ]}
+                                        >
+                                            <Ionicons name="remove" size={20} color={colors.onSurface} />
+                                        </Pressable>
+                                        <Text style={[styles.quantityValue, { color: colors.onSurface }]}>{ticketCount}</Text>
+                                        <Pressable
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Anzahl erhöhen"
+                                            hitSlop={10}
+                                            onPress={() => setTicketCount(c => Math.min(maxPurchasable || 1, c + 1))}
+                                            disabled={!canIncrement}
+                                            style={({ pressed }) => [
+                                                styles.stepperBtn,
+                                                { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' },
+                                                !canIncrement && styles.stepperBtnDisabled,
+                                                pressed && canIncrement && styles.stepperBtnPressed,
+                                            ]}
+                                        >
+                                            <Ionicons name="add" size={20} color={colors.onSurface} />
+                                        </Pressable>
+                                    </View>
                                 </View>
                                 {maxPurchasable === 0 && (
                                     <Text style={{ color: colors.onSurfaceVariant, fontSize: 13, marginTop: 8 }}>
@@ -1756,32 +1870,42 @@ export default function EventScreen() {
                                         const purchasedCount = ticketCount;
                                         try {
                                             const token = await getSession();
-                                            if (!token) { Alert.alert('Fehler', 'Bitte melde dich an.'); return; }
-                                            if (total > 0 && purchasedOptionId) {
-                                                // Paid ticket → Stripe Checkout
+                                            if (!token) {
+                                                showCheckoutAlert('Fehler', 'Bitte melde dich an.');
+                                                return;
+                                            }
+                                            if (total > 0) {
+                                                if (!purchasedOptionId) {
+                                                    showCheckoutAlert(
+                                                        'Fehler',
+                                                        'Ticket-Option konnte nicht geladen werden. Bitte Seite neu laden.',
+                                                    );
+                                                    return;
+                                                }
                                                 const { checkout_url } = await api.createCheckoutSession(
                                                     event.event_id,
                                                     purchasedOptionId,
                                                     purchasedCount,
-                                                    token
+                                                    token,
                                                 );
-                                                closeDrawer();
-                                                Linking.openURL(checkout_url);
+                                                openCheckoutUrl(checkout_url);
+                                                if (Platform.OS !== 'web') {
+                                                    closeDrawer();
+                                                }
                                             } else {
-                                                // Free ticket → direct booking
                                                 await api.createTickets(
                                                     event.event_id,
                                                     purchasedOptionId ?? null,
                                                     purchasedCount,
-                                                    token
+                                                    token,
                                                 );
                                                 invalidateTicketsCache();
                                                 api.invalidateCaches(event.event_id);
                                                 closeDrawer();
                                                 await silentRefresh(purchasedOptionId, purchasedCount);
                                             }
-                                        } catch (err: any) {
-                                            Alert.alert('Fehler', err?.message ?? 'Ticket konnte nicht gebucht werden.');
+                                        } catch (err: unknown) {
+                                            showCheckoutAlert('Fehler', formatCheckoutError(err));
                                         } finally {
                                             setCheckoutLoading(false);
                                         }
@@ -1794,9 +1918,10 @@ export default function EventScreen() {
                                 </TouchableOpacity>
                             </View>
                         </Animated.View>
-                    </>
+                    </View>
                 );
-            })()}
+                })()}
+            </Modal>
 
             {/* More menu (host actions): rendered as Modal so it stacks above all sibling content */}
             <Modal
@@ -2417,9 +2542,9 @@ const styles = StyleSheet.create({
         height: 1,
         marginHorizontal: 12,
     },
-    reportButtons: {
-        flexDirection: 'row',
-        gap: 8,
+    reportMenuWrapper: {
+        position: 'relative',
+        zIndex: 200,
     },
     reportBtn: {
         width: 36,
@@ -2428,18 +2553,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    reportIconStack: {
-        position: 'relative',
-        width: 20,
-        height: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    reportIconBadge: {
-        position: 'absolute',
-        bottom: -2,
-        right: -4,
     },
     moreMenuWrapper: {
         flex: 1,
@@ -2587,11 +2700,16 @@ const styles = StyleSheet.create({
     },
 
     // Ticket Drawer (Bottom Sheet)
+    drawerModalRoot: {
+        flex: 1,
+        justifyContent: 'flex-end',
+    },
+    drawerModalBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
     drawer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
+        width: '100%',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         paddingBottom: Platform.OS === 'ios' ? 34 : 16,
@@ -2667,13 +2785,15 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         marginLeft: 12,
     },
+    quantitySection: {
+        paddingHorizontal: 24,
+        paddingVertical: 16,
+        borderTopWidth: StyleSheet.hairlineWidth,
+    },
     quantityRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 24,
-        paddingVertical: 16,
-        borderTopWidth: StyleSheet.hairlineWidth,
     },
     quantityLabel: {
         fontSize: 16,
@@ -2690,6 +2810,12 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    stepperBtnDisabled: {
+        opacity: 0.35,
+    },
+    stepperBtnPressed: {
+        opacity: 0.7,
     },
     quantityValue: {
         fontSize: 18,

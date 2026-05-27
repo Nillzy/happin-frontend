@@ -11,6 +11,8 @@ import {
     Dimensions,
     Platform,
     Switch,
+    Alert,
+    Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -62,6 +64,45 @@ function localIso(date: string, time: string): string {
 
 type DrawerKey = 'image' | 'title' | 'startDateTime' | 'description' | 'categories' | 'location' | 'tickets' | 'details' | 'gallery' | 'customFields' | 'branding' | null;
 
+type ConnectStatus = {
+    has_account: boolean;
+    charges_enabled: boolean;
+    payouts_enabled: boolean;
+    onboarding_complete: boolean;
+};
+
+const STRIPE_SETUP_MESSAGE =
+    'Für kostenpflichtige öffentliche Events musst du zuerst Stripe Connect einrichten, damit Gäste Tickets kaufen können.';
+
+function hasPaidTickets(tickets: TicketOption[]): boolean {
+    return tickets.some(t => (t.price ?? 0) > 0);
+}
+
+function requiresStripeForEvent(isPublic: boolean, tickets: TicketOption[]): boolean {
+    return isPublic && hasPaidTickets(tickets);
+}
+
+function isStripeReady(status: ConnectStatus | null): boolean {
+    return !!status?.has_account && status.charges_enabled;
+}
+
+function parseApiError(e: unknown): { status?: number; detail?: string } {
+    const msg = e instanceof Error ? e.message : String(e);
+    const match = msg.match(/API error (\d+): (.+)/s);
+    if (!match) return { detail: msg };
+    try {
+        const body = JSON.parse(match[2]);
+        return { status: Number(match[1]), detail: body.detail ?? match[2] };
+    } catch {
+        return { status: Number(match[1]), detail: match[2] };
+    }
+}
+
+function isStripeSetupError(e: unknown): boolean {
+    const { status, detail } = parseApiError(e);
+    return status === 402 || !!detail?.toLowerCase().includes('payment setup') || !!detail?.toLowerCase().includes('not yet active');
+}
+
 export default function EventEditScreen() {
     const { colors, isDark } = useTheme();
     const router = useRouter();
@@ -110,6 +151,8 @@ export default function EventEditScreen() {
     const mapMovedRef = useRef(false);
     const pendingSavesRef = useRef(0);
     const mountedRef = useRef(false);
+    const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
+    const [connectLoading, setConnectLoading] = useState(false);
 
     const isWeb = Platform.OS === 'web';
     const isDraft = event?.status === 'draft';
@@ -147,10 +190,28 @@ export default function EventEditScreen() {
 
     useEffect(() => { loadEvent(); }, [loadEvent]);
 
+    const loadConnectStatus = useCallback(async () => {
+        try {
+            const token = await getSession();
+            if (!token) return;
+            const status = await api.getConnectStatus(token);
+            setConnectStatus(status);
+        } catch {
+            /* ignore */
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!event) return;
+        if (!requiresStripeForEvent(event.is_public ?? true, event.ticket_options ?? [])) return;
+        void loadConnectStatus();
+    }, [event?.event_id, event?.is_public, event?.ticket_options, loadConnectStatus]);
+
     useFocusEffect(useCallback(() => {
         if (!mountedRef.current) { mountedRef.current = true; return; }
         if (pendingSavesRef.current === 0) loadEvent(true);
-    }, [loadEvent]));
+        void loadConnectStatus();
+    }, [loadEvent, loadConnectStatus]));
 
     useEffect(() => {
         if (event && !gradientInitialized) {
@@ -223,6 +284,10 @@ export default function EventEditScreen() {
             }
         } catch (e) {
             console.error('[saveField] failed:', e);
+            if (isStripeSetupError(e)) {
+                Alert.alert('Stripe erforderlich', STRIPE_SETUP_MESSAGE);
+                void loadConnectStatus();
+            }
             // Keep optimistic state on failure to avoid losing user changes
         } finally {
             pendingSavesRef.current -= 1;
@@ -231,21 +296,26 @@ export default function EventEditScreen() {
     };
 
     const saveTickets = async (tickets: TicketOption[]) => {
-        if (!event) return;
+        if (!event) return false;
         setEvent(prev => prev ? { ...prev, ticket_options: tickets } : prev);
         pendingSavesRef.current += 1;
         setSaving(true);
         try {
             const token = await getSession();
-            if (!token) return;
+            if (!token) return false;
             const saved = await api.syncTicketOptions(event.event_id, tickets, token);
             console.log('[saveTickets] API response:', saved);
             if (Array.isArray(saved)) {
                 setEvent(prev => prev ? { ...prev, ticket_options: saved } : prev);
             }
+            return true;
         } catch (e) {
             console.error('[saveTickets] failed:', e);
-            // Keep optimistic state instead of rolling back — server might just not support this endpoint yet
+            if (isStripeSetupError(e)) {
+                Alert.alert('Stripe erforderlich', STRIPE_SETUP_MESSAGE);
+                void loadConnectStatus();
+            }
+            return false;
         } finally {
             pendingSavesRef.current -= 1;
             setSaving(false);
@@ -253,9 +323,44 @@ export default function EventEditScreen() {
     };
 
     const handlePublish = async () => {
-        // TODO Backend: status 'draft' -> 'published' muss unterstuetzt werden
+        if (!event) return;
+        const tickets = event.ticket_options ?? [];
+        if (requiresStripeForEvent(event.is_public ?? true, tickets)) {
+            let status = connectStatus;
+            if (!status) {
+                const token = await getSession();
+                if (token) {
+                    try {
+                        status = await api.getConnectStatus(token);
+                        setConnectStatus(status);
+                    } catch {
+                        /* ignore */
+                    }
+                }
+            }
+            if (!isStripeReady(status)) {
+                Alert.alert('Stripe erforderlich', STRIPE_SETUP_MESSAGE);
+                return;
+            }
+        }
         await saveField({ status: 'published' });
-        if (event) router.replace(`/event/${event.event_id}`);
+        router.replace(`/event/${event.event_id}`);
+    };
+
+    const handleStripeOnboarding = async () => {
+        if (!event) return;
+        setConnectLoading(true);
+        try {
+            const token = await getSession();
+            if (!token) return;
+            const { url } = await api.createOnboardingLink(token, event.event_id);
+            Linking.openURL(url);
+        } catch (err: unknown) {
+            const { detail } = parseApiError(err);
+            Alert.alert('Fehler', detail ?? 'Onboarding konnte nicht gestartet werden.');
+        } finally {
+            setConnectLoading(false);
+        }
     };
 
     const openDrawer = (key: DrawerKey) => {
@@ -333,6 +438,7 @@ export default function EventEditScreen() {
                     setDraftEndDate('');
                     setDraftEndTime('');
                 }
+                void loadConnectStatus();
                 break;
             case 'gallery': {
                 // Exclude the cover image from the gallery editor
@@ -343,6 +449,7 @@ export default function EventEditScreen() {
             }
             case 'tickets':
                 setDraftTickets(event.ticket_options?.length ? [...event.ticket_options] : []);
+                void loadConnectStatus();
                 break;
             case 'customFields':
                 setDraftCustomFields(event.custom_fields?.length ? [...event.custom_fields] : []);
@@ -379,7 +486,7 @@ export default function EventEditScreen() {
         if (changed) await saveField(patch);
     };
 
-    const closeDrawer = () => {
+    const closeDrawer = async () => {
         if (!event || !activeDrawer) { setActiveDrawer(null); return; }
         switch (activeDrawer) {
             case 'image':
@@ -436,12 +543,19 @@ export default function EventEditScreen() {
                 const patch: Record<string, any> = {};
                 patch.ends_at = (draftEndDate && draftEndTime) ? localIso(draftEndDate, draftEndTime) : null;
                 patch.max_capacity = draftMaxCapacity ? Number(draftMaxCapacity) : null;
-                patch.max_tickets_per_person = draftMaxTicketsPerPerson ? Number(draftMaxTicketsPerPerson) : 1;
+                patch.max_tickets_per_person = draftMaxTicketsPerPerson ? Number(draftMaxTicketsPerPerson) : null;
                 patch.is_public = draftIsPublic;
                 patch.location_is_private = draftLocationIsPrivate;
                 patch.show_weather_forecast = draftShowWeather;
                 if (!event.is_free) {
                     patch.waitlist_promotion_hours = parseInt(waitlistPromotionHours, 10) || 24;
+                }
+                if (
+                    requiresStripeForEvent(draftIsPublic, event.ticket_options ?? [])
+                    && !isStripeReady(connectStatus)
+                ) {
+                    Alert.alert('Stripe erforderlich', STRIPE_SETUP_MESSAGE);
+                    return;
                 }
                 saveField(patch);
                 break;
@@ -456,9 +570,18 @@ export default function EventEditScreen() {
                     saveField({ media_urls: allUrls });
                 break;
             }
-            case 'tickets':
-                saveTickets(draftTickets);
+            case 'tickets': {
+                if (
+                    requiresStripeForEvent(event.is_public ?? true, draftTickets)
+                    && !isStripeReady(connectStatus)
+                ) {
+                    Alert.alert('Stripe erforderlich', STRIPE_SETUP_MESSAGE);
+                    return;
+                }
+                const saved = await saveTickets(draftTickets);
+                if (!saved) return;
                 break;
+            }
             case 'customFields':
                 saveCustomFields(draftCustomFields);
                 break;
@@ -576,6 +699,23 @@ export default function EventEditScreen() {
     const missingFields: string[] = [];
     if (!effectiveImageUrl && selectedGradientId === undefined) missingFields.push('Titelbild');
     if (!event.location?.city && !(event.location?.latitude != null && event.location?.longitude != null)) missingFields.push('Ort');
+    if (
+        requiresStripeForEvent(event.is_public ?? true, event.ticket_options ?? [])
+        && !isStripeReady(connectStatus)
+    ) {
+        missingFields.push('Stripe');
+    }
+
+    const showStripeBannerInTickets = requiresStripeForEvent(event.is_public ?? true, draftTickets)
+        && !isStripeReady(connectStatus);
+    const showStripeBannerInDetails = requiresStripeForEvent(
+        draftIsPublic,
+        event.ticket_options?.length ? event.ticket_options : draftTickets,
+    ) && !isStripeReady(connectStatus);
+    const showStripeStatusOnOverview = requiresStripeForEvent(
+        event.is_public ?? true,
+        event.ticket_options ?? [],
+    );
 
     const glassCard = [
         styles.glassCard,
@@ -779,8 +919,8 @@ export default function EventEditScreen() {
 
                         {/* Ticket Options Section */}
                         {event.ticket_options?.length > 0 ? (
-                            <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('tickets')}>
-                                <View style={[...glassCard, styles.section, { padding: 20, position: 'relative' }]}>
+                            <View style={[...glassCard, styles.section, { padding: 20, position: 'relative' }]}>
+                                <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('tickets')}>
                                     <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Ticketoptionen</Text>
                                     {event.ticket_options.map((t, i) => (
                                         <View key={i} style={[styles.ticketRow, i < event.ticket_options.length - 1 && { borderBottomColor: colors.outlineVariant, borderBottomWidth: StyleSheet.hairlineWidth }]}>
@@ -794,8 +934,48 @@ export default function EventEditScreen() {
                                         </View>
                                     ))}
                                     {renderEditOverlay(() => openDrawer('tickets'))}
-                                </View>
-                            </TouchableOpacity>
+                                </TouchableOpacity>
+                                {showStripeStatusOnOverview && (
+                                    <TouchableOpacity
+                                        style={[styles.stripeStatusRow, { borderTopColor: colors.outlineVariant }]}
+                                        onPress={() => router.push(`/event/${event.event_id}/manage`)}
+                                        activeOpacity={isStripeReady(connectStatus) ? 1 : 0.7}
+                                        disabled={isStripeReady(connectStatus)}
+                                    >
+                                        {connectStatus === null ? (
+                                            <>
+                                                <ActivityIndicator size="small" color={colors.primary} />
+                                                <Text style={[styles.stripeStatusText, { color: colors.onSurfaceVariant }]}>
+                                                    Zahlungsstatus wird geladen…
+                                                </Text>
+                                            </>
+                                        ) : isStripeReady(connectStatus) ? (
+                                            <>
+                                                <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                                                <Text style={[styles.stripeStatusText, { color: '#4CAF50', fontWeight: '600' }]}>
+                                                    Stripe eingerichtet – Zahlungen aktiv
+                                                </Text>
+                                            </>
+                                        ) : !connectStatus.has_account ? (
+                                            <>
+                                                <Ionicons name="card-outline" size={18} color={colors.primary} />
+                                                <Text style={[styles.stripeStatusText, { color: colors.onSurface, flex: 1 }]}>
+                                                    Zahlungen einrichten
+                                                </Text>
+                                                <Ionicons name="chevron-forward" size={16} color={colors.onSurfaceVariant} />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Ionicons name="time-outline" size={18} color={colors.tertiary} />
+                                                <Text style={[styles.stripeStatusText, { color: colors.onSurface, flex: 1 }]}>
+                                                    Verifizierung ausstehend
+                                                </Text>
+                                                <Ionicons name="chevron-forward" size={16} color={colors.onSurfaceVariant} />
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                         ) : (
                             <View style={styles.section}>
                                 {renderPlaceholder('Tickets konfigurieren', 'ticket-outline', () => openDrawer('tickets'))}
@@ -860,9 +1040,11 @@ export default function EventEditScreen() {
                                 <View style={styles.detailRow}>
                                     <Ionicons name="person-add-outline" size={18} color={colors.onSurfaceVariant} />
                                     <Text style={[styles.detailText, { color: colors.onSurface }]}>
-                                        {event.max_tickets_per_person && event.max_tickets_per_person > 1
-                                            ? `Max. ${event.max_tickets_per_person} Personen pro Gast`
-                                            : 'Keine Begleitpersonen'}
+                                        {event.max_tickets_per_person == null
+                                            ? 'Unbegrenzt Tickets pro Gast'
+                                            : event.max_tickets_per_person === 1
+                                                ? '1 Ticket pro Gast'
+                                                : `Max. ${event.max_tickets_per_person} Personen pro Gast`}
                                     </Text>
                                 </View>
                                 {event.ends_at ? (
@@ -1093,6 +1275,39 @@ export default function EventEditScreen() {
                 </EditDrawer>
 
                 <EditDrawer visible={activeDrawer === 'tickets'} onClose={closeDrawer} title="Ticketoptionen">
+                    {showStripeBannerInTickets && (
+                        <View style={[styles.stripeBanner, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
+                                <Ionicons name="card-outline" size={20} color={colors.primary} style={{ marginTop: 2 }} />
+                                <Text style={{ flex: 1, color: colors.onSurface, fontSize: 14, lineHeight: 20 }}>
+                                    {STRIPE_SETUP_MESSAGE}
+                                </Text>
+                            </View>
+                            {!connectStatus?.has_account ? (
+                                <TouchableOpacity
+                                    style={[styles.stripeBannerButton, { backgroundColor: colors.primary }]}
+                                    onPress={handleStripeOnboarding}
+                                    disabled={connectLoading}
+                                >
+                                    <Text style={{ color: colors.onPrimary, fontWeight: '600' }}>
+                                        {connectLoading ? 'Wird geladen…' : 'Stripe einrichten'}
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : !connectStatus.charges_enabled ? (
+                                <>
+                                    <Text style={{ color: colors.onSurfaceVariant, fontSize: 13, marginBottom: 12 }}>
+                                        Konto verbunden – Verifizierung ausstehend. Stripe prüft deine Angaben.
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={[styles.stripeBannerButton, { backgroundColor: colors.surfaceContainerHigh || colors.surface, borderWidth: 1, borderColor: colors.outlineVariant }]}
+                                        onPress={loadConnectStatus}
+                                    >
+                                        <Text style={{ color: colors.onSurface, fontWeight: '600' }}>Status aktualisieren</Text>
+                                    </TouchableOpacity>
+                                </>
+                            ) : null}
+                        </View>
+                    )}
                     {draftTickets.map((ticket, idx) => (
                         <View key={idx} style={[styles.ticketCard, { borderColor: colors.outlineVariant, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' }]}>
                             <View style={styles.ticketCardHeader}>
@@ -1192,6 +1407,34 @@ export default function EventEditScreen() {
                 </EditDrawer>
 
                 <EditDrawer visible={activeDrawer === 'details'} onClose={closeDrawer} title="Details bearbeiten">
+                    {showStripeBannerInDetails && (
+                        <View style={[styles.stripeBanner, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, marginBottom: 16 }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
+                                <Ionicons name="card-outline" size={20} color={colors.primary} style={{ marginTop: 2 }} />
+                                <Text style={{ flex: 1, color: colors.onSurface, fontSize: 14, lineHeight: 20 }}>
+                                    Öffentliche Events mit kostenpflichtigen Tickets erfordern Stripe Connect.
+                                </Text>
+                            </View>
+                            {!connectStatus?.has_account ? (
+                                <TouchableOpacity
+                                    style={[styles.stripeBannerButton, { backgroundColor: colors.primary }]}
+                                    onPress={handleStripeOnboarding}
+                                    disabled={connectLoading}
+                                >
+                                    <Text style={{ color: colors.onPrimary, fontWeight: '600' }}>
+                                        {connectLoading ? 'Wird geladen…' : 'Stripe einrichten'}
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : !connectStatus.charges_enabled ? (
+                                <TouchableOpacity
+                                    style={[styles.stripeBannerButton, { backgroundColor: colors.surfaceContainerHigh || colors.surface, borderWidth: 1, borderColor: colors.outlineVariant }]}
+                                    onPress={loadConnectStatus}
+                                >
+                                    <Text style={{ color: colors.onSurface, fontWeight: '600' }}>Status aktualisieren</Text>
+                                </TouchableOpacity>
+                            ) : null}
+                        </View>
+                    )}
                     <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>Endet am (optional)</Text>
                     <View style={[styles.drawerRow, { zIndex: 50 }]}>
                         <View style={{ flex: 1 }}>
@@ -1204,7 +1447,7 @@ export default function EventEditScreen() {
                     <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 16 }]}>Max. Teilnehmer</Text>
                     <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxCapacity} onChangeText={setDraftMaxCapacity} placeholder="Keine Begrenzung" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
                     <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant, marginTop: 4 }]}>Max. Personen pro Gast (inkl. Gast selbst)</Text>
-                    <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxTicketsPerPerson} onChangeText={setDraftMaxTicketsPerPerson} placeholder="1 (keine Begleitpersonen)" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
+                    <TextInput style={[styles.drawerInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]} value={draftMaxTicketsPerPerson} onChangeText={setDraftMaxTicketsPerPerson} placeholder="Unbegrenzt (leer lassen)" placeholderTextColor={colors.onSurfaceVariant} keyboardType="number-pad" />
                     {!event.is_free && (
                         <View style={{ marginTop: 16 }}>
                             <Text style={[styles.drawerLabel, { color: colors.onSurfaceVariant }]}>
@@ -1490,6 +1733,15 @@ const styles = StyleSheet.create({
     ticketRowName: { fontSize: 15, fontWeight: '600' },
     ticketRowDesc: { fontSize: 13, marginTop: 2 },
     ticketRowPrice: { fontSize: 15, fontWeight: '700', marginLeft: 12 },
+    stripeStatusRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    stripeStatusText: { fontSize: 13, lineHeight: 18 },
 
     // Details rows
     detailRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
@@ -1542,6 +1794,8 @@ const styles = StyleSheet.create({
     segmentOption: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
     segmentOptionActive: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.12, shadowRadius: 3, elevation: 2 },
     segmentOptionText: { fontSize: 15 },
+    stripeBanner: { borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 16 },
+    stripeBannerButton: { alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 10 },
     checkmark: {
         position: 'absolute', top: 4, right: 4,
         width: 22, height: 22, borderRadius: 11,
