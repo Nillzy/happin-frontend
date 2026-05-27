@@ -312,12 +312,20 @@ export const api = {
 
     // ── Stripe Connect / Payments ──────────────────────────────────────────
 
-    createCheckoutSession: (eventId: string, ticketOptionId: string, quantity: number, token: string) =>
-        request<{ checkout_url: string; ticket_order_id: string }>(`/api/v1/events/${eventId}/checkout-session`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ ticket_option_id: ticketOptionId, quantity }),
-        }),
+    createCheckoutSession: async (eventId: string, ticketOptionId: string, quantity: number, token: string) => {
+        const result = await request<{ checkout_url: string; ticket_order_id: string }>(
+            `/api/v1/events/${eventId}/checkout-session`,
+            {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ ticket_option_id: ticketOptionId, quantity }),
+            },
+        );
+        if (!result.checkout_url) {
+            throw new Error('Checkout-URL fehlt in der Server-Antwort');
+        }
+        return result;
+    },
 
     getConnectStatus: (token: string) =>
         request<{ has_account: boolean; charges_enabled: boolean; payouts_enabled: boolean; onboarding_complete: boolean }>(
