@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse, CustomField, CustomFieldResponseItem, TicketResponses, EventFilterParams, FilterPeriod } from '@/src/types/events';
 import type { ParticipantListResponse, RemoveParticipantsResponse, ScanTicketResponse } from '@/src/types/host';
+import type { NotificationListResponse } from '@/src/types/notifications';
 
 /**
  * Get the appropriate backend URL based on platform and environment.
@@ -385,6 +386,55 @@ export const api = {
 
     getVapidPublicKey: () =>
         request<{ public_key: string | null }>('/api/v1/users/vapid-public-key'),
+
+    registerExpoPushToken: (
+        token: string,
+        body: { token: string; platform: 'ios' | 'android'; user_agent?: string },
+    ) =>
+        request<void>('/api/v1/users/me/expo-push-tokens', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify(body),
+        }),
+
+    unregisterExpoPushToken: (authToken: string, expoToken: string) =>
+        request<void>('/api/v1/users/me/expo-push-tokens', {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${authToken}` },
+            body: JSON.stringify({ token: expoToken }),
+        }),
+
+    listNotifications: (token: string, before?: string, limit = 20) => {
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (before) params.set('before', before);
+        return request<NotificationListResponse>(
+            `/api/v1/users/me/notifications?${params.toString()}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+        );
+    },
+
+    getNotificationsUnreadCount: (token: string) =>
+        request<{ count: number }>('/api/v1/users/me/notifications/unread-count', {
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
+    markNotificationRead: (token: string, notificationId: string) =>
+        request<void>(`/api/v1/users/me/notifications/${notificationId}/read`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
+    markAllNotificationsRead: (token: string) =>
+        request<{ marked: number }>('/api/v1/users/me/notifications/read-all', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        }),
+
+    sendTestNotification: (token: string) =>
+        request<{ ok: boolean; pushed: number }>('/api/v1/users/me/notifications/test', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        }),
 
     updateAvatar: (token: string, avatarUrl: string) =>
         request<{ avatar_url: string }>('/api/v1/users/me/avatar', {

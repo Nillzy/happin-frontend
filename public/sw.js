@@ -1,4 +1,4 @@
-/* Happin Service Worker — K4 Erinnerungen (Web Push). */
+/* Happin Service Worker — K4 Erinnerungen + In-App-Benachrichtigungen (Web Push). */
 
 self.addEventListener('install', (event) => {
     self.skipWaiting();
@@ -15,34 +15,57 @@ self.addEventListener('push', (event) => {
     } catch (_e) {
         data = { title: 'Happin', body: event.data ? event.data.text() : '' };
     }
-    const title = data.title || 'Happin Erinnerung';
+    console.log('[SW] push received:', JSON.stringify(data));
+    const type = data.type || 'reminder';
+    const title = data.title || 'Happin';
+    const tag = data.eventId
+        ? `${type}-${data.eventId}`
+        : `${type}-${Date.now()}`;
     const options = {
         body: data.body || '',
         icon: '/favicon.png',
         badge: '/favicon.png',
-        data: { eventId: data.eventId },
-        tag: data.eventId ? `event-reminder-${data.eventId}` : undefined,
+        data: { eventId: data.eventId, type },
+        tag,
         renotify: false,
     };
-    event.waitUntil(self.registration.showNotification(title, options));
+    event.waitUntil(
+        Promise.all([
+            self.registration.showNotification(title, options).then(
+                () => console.log('[SW] showNotification ok:', title),
+                (err) => console.error('[SW] showNotification failed:', err),
+            ),
+            self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+                for (const client of clients) {
+                    client.postMessage({ kind: 'happin-notification', type, eventId: data.eventId });
+                }
+            }),
+        ]),
+    );
 });
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    const eventId = event.notification.data && event.notification.data.eventId;
-    const targetUrl = eventId ? `/event?id=${eventId}` : '/';
+    const data = event.notification.data || {};
+    const eventId = data.eventId;
+    const type = data.type;
+    let targetUrl;
+    if (type === 'reminder' && eventId) {
+        targetUrl = `/event?id=${eventId}`;
+    } else if (eventId) {
+        targetUrl = `/notifications`;
+    } else {
+        targetUrl = '/notifications';
+    }
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
             for (const client of clientList) {
                 try {
-                    const url = new URL(client.url);
-                    if (url.pathname === '/' || url.pathname.startsWith('/event')) {
-                        client.focus();
-                        if ('navigate' in client) {
-                            return client.navigate(targetUrl);
-                        }
-                        return;
+                    client.focus();
+                    if ('navigate' in client) {
+                        return client.navigate(targetUrl);
                     }
+                    return;
                 } catch (_e) {
                     /* ignore */
                 }

@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/src/contexts/AuthContext';
 import { SavedEventsProvider } from '@/src/contexts/SavedEventsContext';
 import { ReminderSettingsProvider } from '@/src/contexts/ReminderSettingsContext';
+import { NotificationsProvider } from '@/src/contexts/NotificationsContext';
 
 export default function RootLayout() {
   const scheme = useColorScheme();
@@ -15,6 +16,7 @@ export default function RootLayout() {
       <AuthProvider>
         <SavedEventsProvider>
           <ReminderSettingsProvider>
+          <NotificationsProvider>
           <Stack screenOptions={{ headerShown: false }} initialRouteName="index">
             <Stack.Screen name="index" options={{ title: 'Happin' }} />
             <Stack.Screen name="login" options={{ title: 'Anmelden – Happin' }} />
@@ -28,6 +30,7 @@ export default function RootLayout() {
             <Stack.Screen name="contact" options={{ title: 'Kontakt – Happin' }} />
             <Stack.Screen name="imprint" options={{ title: 'Impressum – Happin' }} />
             <Stack.Screen name="privacy" options={{ title: 'Datenschutz – Happin' }} />
+            <Stack.Screen name="notifications" options={{ title: 'Benachrichtigungen – Happin' }} />
             <Stack.Screen
               name="ticket/[eventId]"
               options={{
@@ -39,6 +42,7 @@ export default function RootLayout() {
             />
           </Stack>
           <StatusBar style={isDark ? 'light' : 'dark'} />
+          </NotificationsProvider>
           </ReminderSettingsProvider>
         </SavedEventsProvider>
       </AuthProvider>
