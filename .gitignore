@@ -44,7 +44,6 @@ Thumbs.db
 *.swp
 *.swo
 .superpowers
-*docs
 
 # TypeScript
 *.tsbuildinfo
@@ -58,3 +57,8 @@ app-example
 
 
 plucky-current-495510-q3-f80ce0b855e0.json
+# MkDocs build output (nur im Dev-Modus)
+public/docs/
+
+# MkDocs build output
+site/
