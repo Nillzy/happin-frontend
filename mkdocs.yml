@@ -1,0 +1,75 @@
+site_name: Happin Frontend
+site_description: Dokumentation des Happin-Frontends – React Native / Expo App für Web, iOS und Android
+site_author: Happin-Team
+docs_dir: docs
+site_dir: public/docs
+theme:
+  name: material
+  language: de
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Zum dunklen Modus wechseln
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Zum hellen Modus wechseln
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+
+plugins:
+  - search:
+      lang: de
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Startseite: index.md
+  - Architektur: architecture.md
+  - Frontend-Komponenten:
+    - Überblick: components/index.md
+    - GUI-Frontends:
+      - GUI-Frontend Web: components/gui-web.md
+      - GUI-Frontend iOS: components/gui-ios.md
+      - GUI-Frontend Android: components/gui-android.md
+    - Präsentation:
+      - Überblick: components/praesentation.md
+      - LoginViewModel: components/viewmodel-login.md
+      - EventListViewModel: components/viewmodel-eventlist.md
+      - EventDetailViewModel: components/viewmodel-eventdetail.md
+      - RSVPViewModel: components/viewmodel-rsvp.md
+      - TicketPurchaseViewModel: components/viewmodel-ticketpurchase.md
+      - NotificationViewModel: components/viewmodel-notification.md
+      - HostDashboardViewModel: components/viewmodel-hostdashboard.md
+      - CreateEventViewModel: components/viewmodel-createevent.md
+      - ScanTicketViewModel: components/viewmodel-scanticket.md
+    - Dialogkomponenten:
+      - Dialogkern: components/dialogkern.md
+      - DialogManager: components/dialogmanager.md
+      - Sitzungssteuerung: components/sitzungssteuerung.md
+      - Sitzungsverwaltung: components/sitzungsverwaltung.md
+    - BackendAdapter: components/backend-adapter.md
