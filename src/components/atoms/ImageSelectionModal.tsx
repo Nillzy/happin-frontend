@@ -9,6 +9,7 @@ import {
     ActivityIndicator,
     Alert,
     Platform,
+    TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,16 +26,6 @@ interface StockPhoto {
     thumbnail: string;
     photographer: string;
     unsplash_link: string;
-}
-
-function extractSearchTerms(title: string): string {
-    const stopWords = new Set([
-        'mit', 'und', 'der', 'die', 'das', 'ein', 'eine', 'von', 'zu', 'am', 'im',
-        'für', 'auf', 'bei', 'nach', 'an', 'in', 'um', 'den', 'dem', 'des',
-        'the', 'a', 'an', 'and', 'or', 'of', 'to', 'at', 'in', 'on', 'for', 'with',
-    ]);
-    const words = title.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
-    return words.slice(0, 3).join(' ') || title;
 }
 
 interface ImageSelectionModalProps {
@@ -61,22 +52,32 @@ export default function ImageSelectionModal({
     const [stockPhotos, setStockPhotos] = useState<StockPhoto[]>([]);
     const [stockLoading, setStockLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const fetchedForTitle = useRef<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const initializedRef = useRef(false);
 
+    // Beim Öffnen: Suchfeld mit Eventtitel befüllen und sofort laden
     useEffect(() => {
-        if (!visible) return;
-        const title = eventTitle?.trim();
-        if (title && fetchedForTitle.current !== title) {
-            fetchedForTitle.current = title;
+        if (!visible) {
+            initializedRef.current = false;
+            return;
+        }
+        if (initializedRef.current) return;
+        initializedRef.current = true;
+
+        const title = eventTitle?.trim() ?? '';
+        setSearchQuery(title);
+        if (title) {
             fetchStockPhotos(title);
         }
     }, [visible, eventTitle]);
 
-    const fetchStockPhotos = async (title: string) => {
+    const fetchStockPhotos = async (query: string) => {
+        const trimmed = query.trim();
+        if (!trimmed) return;
         try {
             setStockLoading(true);
-            const query = extractSearchTerms(title);
-            const results = await api.searchStockImages(query, 8);
+            setStockPhotos([]);
+            const results = await api.searchStockImages(trimmed, 8);
             setStockPhotos(results);
         } catch (e) {
             console.warn('Stock image search failed:', e);
@@ -84,6 +85,10 @@ export default function ImageSelectionModal({
         } finally {
             setStockLoading(false);
         }
+    };
+
+    const handleSearch = () => {
+        fetchStockPhotos(searchQuery);
     };
 
     const handlePickImage = async () => {
@@ -154,61 +159,82 @@ export default function ImageSelectionModal({
                 </TouchableOpacity>
             </View>
 
-            {/* Stockbilder-Vorschläge */}
-            {eventTitle?.trim() && (
-                <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
-                        {'Vorschläge für „'}{eventTitle}{'"'}
-                    </Text>
-                    {stockLoading ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stockScroll} scrollEnabled={false}>
-                            {[0, 1, 2, 3].map(i => (
-                                <SkeletonBox key={i} width={140} height={96} borderRadius={12} style={{ marginRight: 10 }} />
-                            ))}
-                        </ScrollView>
-                    ) : stockPhotos.length > 0 ? (
-                        <>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stockScroll}>
-                                {stockPhotos.map((photo, index) => {
-                                    const isSelected = selectedImageUrl === photo.url;
-                                    return (
-                                        <TouchableOpacity
-                                            key={`stock-${index}`}
-                                            style={[
-                                                styles.stockCard,
-                                                isSelected && { borderColor: colors.primary, borderWidth: 2.5 },
-                                            ]}
-                                            onPress={() => handleStockSelect(photo)}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Image
-                                                source={{ uri: photo.thumbnail }}
-                                                style={styles.stockImage}
-                                                resizeMode="cover"
-                                            />
-                                            {isSelected && (
-                                                <View style={[styles.checkmark, styles.stockCheckmark, { backgroundColor: colors.primary }]}>
-                                                    <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </ScrollView>
-                            <Text style={[styles.unsplashCredit, { color: colors.onSurfaceVariant }]}>
-                                Kostenlose Bilder von Unsplash
-                            </Text>
-                        </>
-                    ) : (
-                        <View style={styles.emptyState}>
-                            <Ionicons name="images-outline" size={28} color={colors.onSurfaceVariant} />
-                            <Text style={[styles.emptyText, { color: colors.onSurfaceVariant }]}>
-                                Keine Vorschläge gefunden
-                            </Text>
-                        </View>
-                    )}
+            {/* Stockbild suchen */}
+            <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Stockbild wählen</Text>
+                <View style={[styles.searchRow, { borderColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerHigh }]}>
+                    <TextInput
+                        style={[styles.searchInput, { color: colors.onSurface }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}]}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Suchbegriff eingeben..."
+                        placeholderTextColor={colors.onSurfaceVariant}
+                        returnKeyType="search"
+                        onSubmitEditing={handleSearch}
+                        editable={!stockLoading}
+                    />
+                    <TouchableOpacity
+                        style={[styles.searchBtn, { backgroundColor: colors.primary }]}
+                        onPress={handleSearch}
+                        activeOpacity={0.8}
+                        disabled={stockLoading || !searchQuery.trim()}
+                    >
+                        {stockLoading ? (
+                            <ActivityIndicator size="small" color={colors.onPrimary} />
+                        ) : (
+                            <Ionicons name="search" size={18} color={colors.onPrimary} />
+                        )}
+                    </TouchableOpacity>
                 </View>
-            )}
+
+                {stockLoading ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stockScroll} scrollEnabled={false}>
+                        {[0, 1, 2, 3].map(i => (
+                            <SkeletonBox key={i} width={140} height={96} borderRadius={12} style={{ marginRight: 10 }} />
+                        ))}
+                    </ScrollView>
+                ) : stockPhotos.length > 0 ? (
+                    <>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stockScroll}>
+                            {stockPhotos.map((photo, index) => {
+                                const isSelected = selectedImageUrl === photo.url;
+                                return (
+                                    <TouchableOpacity
+                                        key={`stock-${index}`}
+                                        style={[
+                                            styles.stockCard,
+                                            isSelected && { borderColor: colors.primary, borderWidth: 2.5 },
+                                        ]}
+                                        onPress={() => handleStockSelect(photo)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Image
+                                            source={{ uri: photo.thumbnail }}
+                                            style={styles.stockImage}
+                                            resizeMode="cover"
+                                        />
+                                        {isSelected && (
+                                            <View style={[styles.checkmark, styles.stockCheckmark, { backgroundColor: colors.primary }]}>
+                                                <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                        <Text style={[styles.unsplashCredit, { color: colors.onSurfaceVariant }]}>
+                            Kostenlose Bilder von Unsplash
+                        </Text>
+                    </>
+                ) : searchQuery.trim() ? (
+                    <View style={styles.emptyState}>
+                        <Ionicons name="images-outline" size={28} color={colors.onSurfaceVariant} />
+                        <Text style={[styles.emptyText, { color: colors.onSurfaceVariant }]}>
+                            Keine Bilder gefunden
+                        </Text>
+                    </View>
+                ) : null}
+            </View>
 
             {/* Gradient-Vorlagen */}
             <View style={styles.section}>
@@ -275,6 +301,27 @@ const styles = StyleSheet.create({
     uploadSubtext: {
         fontSize: 13,
     },
+    searchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderRadius: 12,
+        marginBottom: 14,
+        overflow: 'hidden',
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '500',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+    },
+    searchBtn: {
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     stockScroll: {
         marginHorizontal: -24,
         paddingHorizontal: 24,
@@ -295,11 +342,6 @@ const styles = StyleSheet.create({
     stockCheckmark: {
         top: 6,
         right: 6,
-    },
-    stockLoading: {
-        height: 96,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     emptyState: {
         height: 96,

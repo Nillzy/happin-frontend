@@ -27,22 +27,74 @@ export default function ImprintScreen() {
                 <Text style={[styles.h1, { color: colors.onSurface }]}>Impressum</Text>
 
                 <Section title="Angaben gemäß § 5 TMG" colors={colors}>
-                    <Line colors={colors}>Happin (in Gründung)</Line>
-                    <Line colors={colors}>Adresse wird noch bekanntgegeben</Line>
-                </Section>
-
-                <Section title="Vertreten durch" colors={colors}>
-                    <Line colors={colors}>Wird noch bekanntgegeben</Line>
+                    <Line colors={colors}>Happin UG (haftungsbeschränkt) (in Gründung)</Line>
+                    <Line colors={colors}>Erzbergerstraße 121</Line>
+                    <Line colors={colors}>76133 Karlsruhe</Line>
+                    <Line colors={colors}>Deutschland</Line>
                 </Section>
 
                 <Section title="Kontakt" colors={colors}>
-                    <Line colors={colors}>Über das Kontaktformular erreichbar</Line>
+                    <Line colors={colors}>Telefon: +49 721 97355</Line>
+                    <Line colors={colors}>E-Mail: kontakt@happin.app</Line>
                 </Section>
 
-                <Section title="Haftungsausschluss" colors={colors}>
+                <Section title="Registereintrag" colors={colors}>
                     <Paragraph colors={colors}>
-                        Die Inhalte dieser Website wurden mit größtmöglicher Sorgfalt erstellt. Für die Richtigkeit,
-                        Vollständigkeit und Aktualität der Inhalte können wir jedoch keine Gewähr übernehmen.
+                        Die Gesellschaft befindet sich derzeit im Gründungsprozess; ein Handelsregistereintrag liegt noch nicht vor.
+                        Nach Eintragung werden Registergericht und Registernummer an dieser Stelle ergänzt.
+                    </Paragraph>
+                </Section>
+
+                <Section title="Umsatzsteuer-Identifikationsnummer" colors={colors}>
+                    <Paragraph colors={colors}>
+                        Gemäß § 27a Umsatzsteuergesetz (UStG): Die Umsatzsteuer-Identifikationsnummer wird nach
+                        Erteilung durch das zuständige Finanzamt an dieser Stelle veröffentlicht.
+                    </Paragraph>
+                </Section>
+
+                <Section title="EU-Streitschlichtung" colors={colors}>
+                    <Paragraph colors={colors}>
+                        Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:{'\n'}
+                        https://ec.europa.eu/consumers/odr/{'\n\n'}
+                        Unsere E-Mail-Adresse finden Sie oben im Impressum.
+                    </Paragraph>
+                </Section>
+
+                <Section title="Verbraucherstreitbeilegung (§ 36 VSBG)" colors={colors}>
+                    <Paragraph colors={colors}>
+                        Wir sind nicht bereit und nicht verpflichtet, an Streitbeilegungsverfahren vor einer
+                        Verbraucherschlichtungsstelle teilzunehmen.
+                    </Paragraph>
+                </Section>
+
+                <Section title="Haftung für Inhalte" colors={colors}>
+                    <Paragraph colors={colors}>
+                        Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte auf diesen Seiten nach den
+                        allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch
+                        nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach
+                        Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen.
+                    </Paragraph>
+                    <Paragraph colors={colors}>
+                        Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen
+                        Gesetzen bleiben hiervon unberührt. Eine diesbezügliche Haftung ist jedoch erst ab dem Zeitpunkt
+                        der Kenntnis einer konkreten Rechtsverletzung möglich. Bei Bekanntwerden von entsprechenden
+                        Rechtsverletzungen werden wir diese Inhalte umgehend entfernen.
+                    </Paragraph>
+                </Section>
+
+                <Section title="Haftung für Links" colors={colors}>
+                    <Paragraph colors={colors}>
+                        Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss
+                        haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die
+                        Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten
+                        verantwortlich.
+                    </Paragraph>
+                    <Paragraph colors={colors}>
+                        Die verlinkten Seiten wurden zum Zeitpunkt der Verlinkung auf mögliche Rechtsverstöße überprüft.
+                        Rechtswidrige Inhalte waren zum Zeitpunkt der Verlinkung nicht erkennbar. Eine permanente
+                        inhaltliche Kontrolle der verlinkten Seiten ist jedoch ohne konkrete Anhaltspunkte einer
+                        Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige
+                        Links umgehend entfernen.
                     </Paragraph>
                 </Section>
 
@@ -51,7 +103,15 @@ export default function ImprintScreen() {
                         Die durch die Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem
                         deutschen Urheberrecht. Die Vervielfältigung, Bearbeitung, Verbreitung und jede Art der
                         Verwertung außerhalb der Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des
-                        jeweiligen Autors bzw. Erstellers.
+                        jeweiligen Autors bzw. Erstellers. Downloads und Kopien dieser Seite sind nur für den privaten,
+                        nicht kommerziellen Gebrauch gestattet.
+                    </Paragraph>
+                    <Paragraph colors={colors}>
+                        Soweit die Inhalte auf dieser Seite nicht vom Betreiber erstellt wurden, werden die
+                        Urheberrechte Dritter beachtet. Insbesondere werden Inhalte Dritter als solche gekennzeichnet.
+                        Sollten Sie trotzdem auf eine Urheberrechtsverletzung aufmerksam werden, bitten wir um einen
+                        entsprechenden Hinweis. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Inhalte
+                        umgehend entfernen.
                     </Paragraph>
                 </Section>
 
