@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { EventListResponse, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse, CustomField, CustomFieldResponseItem, TicketResponses, EventFilterParams, FilterPeriod, RefundSummary } from '@/src/types/events';
+import type { EventListResponse, EventListItem, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse, CustomField, CustomFieldResponseItem, TicketResponses, EventFilterParams, FilterPeriod, RefundSummary } from '@/src/types/events';
 import type { ParticipantListResponse, RemoveParticipantsResponse, ScanTicketResponse } from '@/src/types/host';
 import type { NotificationListResponse } from '@/src/types/notifications';
 
@@ -27,9 +27,27 @@ function getBackendUrl(): string {
 const BASE_URL = getBackendUrl();
 
 let _ticketsCache: { data: UserTicketListResponse; ts: number } | null = null;
-const _eventCache = new Map<string, { data: EventDetailResponse; ts: number }>();
+type CachedEvent = {
+    data: Partial<EventDetailResponse> & Pick<EventDetailResponse, 'event_id'>;
+    ts: number;
+    isPartial: boolean;
+};
+const _eventCache = new Map<string, CachedEvent>();
 const _userEventsCache = new Map<string, { data: EventListResponse; ts: number }>();
 const CACHE_TTL = 30_000;
+
+function hydrateEventCacheFromList(events: EventListItem[]) {
+    const now = Date.now();
+    for (const item of events) {
+        const existing = _eventCache.get(item.event_id);
+        if (existing && !existing.isPartial && now - existing.ts < CACHE_TTL) continue;
+        _eventCache.set(item.event_id, {
+            data: { ...item } as Partial<EventDetailResponse> & Pick<EventDetailResponse, 'event_id'>,
+            ts: now,
+            isPartial: true,
+        });
+    }
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const base = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
@@ -78,7 +96,7 @@ function getPeriodDates(period: Exclude<FilterPeriod, 'custom'>): { dateFrom: st
 }
 
 export const api = {
-    getPublicEvents: (limit = 50, offset = 0, token?: string, filters?: EventFilterParams, search?: string) => {
+    getPublicEvents: async (limit = 50, offset = 0, token?: string, filters?: EventFilterParams, search?: string) => {
         const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
         if (filters?.period && filters.period !== 'custom') {
             const { dateFrom, dateTo } = getPeriodDates(filters.period);
@@ -108,26 +126,37 @@ export const api = {
         if (search?.trim()) {
             params.set('search', search.trim());
         }
-        return request<EventListResponse>(`/api/v1/events/?${params}`, {
+        const data = await request<EventListResponse>(`/api/v1/events/?${params}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
+        hydrateEventCacheFromList(data.events);
+        return data;
     },
 
-    getEventsByHost: (hostPersonId: string, limit = 50, offset = 0, token?: string) => {
+    getEventsByHost: async (hostPersonId: string, limit = 50, offset = 0, token?: string) => {
         const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-        return request<EventListResponse>(`/api/v1/events/host/${hostPersonId}?${params}`, {
+        const data = await request<EventListResponse>(`/api/v1/events/host/${hostPersonId}?${params}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
+        hydrateEventCacheFromList(data.events);
+        return data;
     },
 
-    getEventById: async (eventId: string, token?: string) => {
+    getEventById: async (eventId: string, token?: string): Promise<EventDetailResponse> => {
         const cached = _eventCache.get(eventId);
-        if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+        if (cached && !cached.isPartial && Date.now() - cached.ts < CACHE_TTL) {
+            return cached.data as EventDetailResponse;
+        }
         const data = await request<EventDetailResponse>(`/api/v1/events/${eventId}`, token ? {
             headers: { Authorization: `Bearer ${token}` },
         } : undefined);
-        _eventCache.set(eventId, { data, ts: Date.now() });
+        _eventCache.set(eventId, { data, ts: Date.now(), isPartial: false });
         return data;
+    },
+
+    getCachedEventPartial: (eventId: string): Partial<EventDetailResponse> | null => {
+        const cached = _eventCache.get(eventId);
+        return cached ? cached.data : null;
     },
 
     createEvent: (data: EventCreateRequest, token: string) =>
@@ -244,11 +273,15 @@ export const api = {
         if (role) params.set('role', role);
         const cacheKey = params.toString();
         const cached = _userEventsCache.get(cacheKey);
-        if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+        if (cached && Date.now() - cached.ts < CACHE_TTL) {
+            hydrateEventCacheFromList(cached.data.events);
+            return cached.data;
+        }
         const data = await request<EventListResponse>(`/api/v1/events/me?${params}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         _userEventsCache.set(cacheKey, { data, ts: Date.now() });
+        hydrateEventCacheFromList(data.events);
         return data;
     },
 
