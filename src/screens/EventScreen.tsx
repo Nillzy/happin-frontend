@@ -20,6 +20,7 @@ import {
     TextInput,
     KeyboardAvoidingView,
 } from 'react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent, StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Calendar from 'expo-calendar';
 import { useTheme } from '@/hooks/use-theme';
@@ -166,7 +167,7 @@ function WaitlistSection({
     colors,
     effectivePrimary,
     effectiveOnPrimary,
-    isDark,
+    containerStyle,
 }: {
     event: EventDetailResponse;
     onJoin: () => void;
@@ -176,60 +177,70 @@ function WaitlistSection({
     effectivePrimary: string;
     effectiveOnPrimary: string;
     isDark: boolean;
+    containerStyle?: StyleProp<ViewStyle>;
 }) {
     const onWaitlist = event.my_waitlist_position != null;
+    const filled = !onWaitlist;
+    const btnBg = filled ? effectivePrimary : 'transparent';
+    const btnBorderColor = filled ? 'transparent' : colors.outline;
+    const btnBorderWidth = filled ? 0 : 1.5;
+    const btnTextColor = filled ? effectiveOnPrimary : colors.onSurface;
+
+    const title = onWaitlist ? 'Warteliste' : 'Ausgebucht';
+    const detail = onWaitlist
+        ? (event.my_waitlist_position === 0 ? 'Du bist dran!' : `Platz ${event.my_waitlist_position}`)
+        : `${event.participant_count ?? 0} Teilnehmer`;
+    const label = onWaitlist ? 'Verlassen' : 'Auf Warteliste';
+    const onPress = onWaitlist ? onLeave : onJoin;
+
     return (
-        <View style={{ marginTop: 16, gap: 10 }}>
-            {onWaitlist ? (
-                <>
-                    <View style={{
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)',
-                        borderRadius: 12,
-                        padding: 14,
-                        alignItems: 'center',
-                    }}>
-                        <Text style={{ color: colors.onSurfaceVariant, fontSize: 13 }}>
-                            Du bist auf der Warteliste
-                        </Text>
-                        <Text style={{ color: colors.onSurface, fontSize: 22, fontWeight: '800', marginTop: 4 }}>
-                            {event.my_waitlist_position === 0 ? 'Du bist dran!' : `Platz ${event.my_waitlist_position}`}
-                        </Text>
-                    </View>
-                    <TouchableOpacity
-                        style={{
-                            borderWidth: 1.5,
-                            borderColor: colors.outline,
-                            borderRadius: 14,
-                            paddingVertical: 14,
-                            alignItems: 'center',
-                        }}
-                        onPress={onLeave}
-                        disabled={loading}
-                    >
-                        <Text style={{ color: colors.onSurface, fontWeight: '600', fontSize: 15 }}>
-                            {loading ? '...' : 'Von der Warteliste entfernen'}
-                        </Text>
-                    </TouchableOpacity>
-                </>
-            ) : (
-                <TouchableOpacity
-                    style={{
-                        backgroundColor: effectivePrimary,
-                        borderRadius: 14,
-                        paddingVertical: 14,
-                        alignItems: 'center',
-                    }}
-                    onPress={onJoin}
-                    disabled={loading}
-                >
-                    <Text style={{ color: effectiveOnPrimary, fontWeight: '700', fontSize: 15 }}>
-                        {loading ? '...' : 'Auf die Warteliste setzen'}
-                    </Text>
-                </TouchableOpacity>
-            )}
+        <View style={[waitlistStyles.bar, containerStyle]}>
+            <View style={waitlistStyles.info}>
+                <Text style={[waitlistStyles.title, { color: colors.onSurface }]} numberOfLines={1}>
+                    {title}
+                </Text>
+                <Text style={[waitlistStyles.detail, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+                    {detail}
+                </Text>
+            </View>
+            <TouchableOpacity
+                style={[
+                    waitlistStyles.btn,
+                    { backgroundColor: btnBg, borderColor: btnBorderColor, borderWidth: btnBorderWidth },
+                ]}
+                onPress={onPress}
+                disabled={loading}
+            >
+                {loading ? (
+                    <ActivityIndicator size="small" color={btnTextColor} />
+                ) : (
+                    <Text style={[waitlistStyles.btnText, { color: btnTextColor }]}>{label}</Text>
+                )}
+            </TouchableOpacity>
         </View>
     );
 }
+
+const waitlistStyles = StyleSheet.create({
+    bar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    info: { flex: 1, marginRight: 16 },
+    title: { fontSize: 18, fontWeight: '800' },
+    detail: { fontSize: 13, marginTop: 2 },
+    btn: {
+        paddingHorizontal: 28,
+        paddingVertical: 18,
+        borderRadius: 14,
+        minHeight: 56,
+        minWidth: 140,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    btnText: { fontSize: 16, fontWeight: '700' },
+});
 
 
 function ReportMenuButton({
@@ -366,9 +377,24 @@ export default function EventScreen() {
     const { width: windowWidth } = useWindowDimensions();
 
     const [event, setEvent] = useState<EventDetailResponse | null>(null);
+    const [partial, setPartial] = useState<Partial<EventDetailResponse> | null>(() => (
+        id ? api.getCachedEventPartial(id) : null
+    ));
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(null);
+    const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(() => {
+        const loc = (id ? api.getCachedEventPartial(id) : null)?.location;
+        if (loc && loc.latitude != null && loc.longitude != null) {
+            return { lat: loc.latitude, lng: loc.longitude };
+        }
+        return null;
+    });
+
+    const scrollYRef = useRef(0);
+    const scrollViewRef = useRef<ScrollView | null>(null);
+    const handleSkeletonScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        scrollYRef.current = e.nativeEvent.contentOffset.y;
+    }, []);
 
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [selectedTicketIdx, setSelectedTicketIdx] = useState(0);
@@ -518,9 +544,19 @@ export default function EventScreen() {
     ]);
 
     useEffect(() => {
+        scrollYRef.current = 0;
         loadEvent();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
+
+    useEffect(() => {
+        if (!loading && scrollYRef.current > 0) {
+            const y = scrollYRef.current;
+            requestAnimationFrame(() => {
+                scrollViewRef.current?.scrollTo({ y, animated: false });
+            });
+        }
+    }, [loading]);
 
     useEffect(() => {
         if (params.openCustomFields === '1' && event && (event.custom_fields?.length ?? 0) > 0 && !loading) {
@@ -557,6 +593,7 @@ export default function EventScreen() {
             }
             const data = await api.getEventById(id, token);
             setEvent(data);
+            setPartial(null);
             setRsvpStatus(data.my_rsvp_status ?? null);
             const loc = data.location;
             if (loc && loc.latitude != null && loc.longitude != null) {
@@ -901,28 +938,231 @@ export default function EventScreen() {
 
 
     if (loading) {
-        return (
-            <ScreenWithNav showBottomNav={false}>
-                <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-                    {/* Hero placeholder */}
-                    <SkeletonBox height={HERO_HEIGHT} borderRadius={0} />
-                    <View style={{ padding: 20, gap: 12 }}>
-                        <SkeletonBox height={28} width="80%" borderRadius={8} />
-                        <SkeletonBox height={16} width="55%" borderRadius={6} />
-                        <SkeletonBox height={16} width="45%" borderRadius={6} />
-                        {/* Action buttons */}
-                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                            {Array.from({ length: 3 }).map((_, i) => (
-                                <SkeletonBox key={i} height={72} borderRadius={12} style={{ flex: 1 }} />
-                            ))}
-                        </View>
-                        {/* Description lines */}
-                        <View style={{ gap: 8, marginTop: 8 }}>
-                            <SkeletonBox height={14} borderRadius={5} />
-                            <SkeletonBox height={14} borderRadius={5} />
-                            <SkeletonBox height={14} width="70%" borderRadius={5} />
+        const p = partial ?? {};
+        const showCancelledBanner = p.is_cancelled === true;
+        const showWeatherSkeleton = p.show_weather_forecast === true;
+        const categoriesPartial = p.category ? p.category.split(',').map(c => c.trim()).filter(Boolean) : [];
+        const cityLine = [p.location?.postal_code, p.location?.city].filter(Boolean).join(' ');
+        const heroAccent = p.accent_color_primary ?? colors.primary;
+        const isWebPlatform = Platform.OS === 'web';
+        const isDesktopLayout = isWebPlatform && windowWidth >= 900;
+
+        const glassCardSkeleton = [
+            styles.glassCard,
+            isWebPlatform
+                ? { backgroundColor: isDark ? 'rgba(18,19,26,0.55)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
+                : { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)' },
+        ];
+        const glassActionBtnSkeleton = [
+            styles.actionButton,
+            {
+                borderWidth: 1,
+                borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+            },
+            isWebPlatform
+                ? { backgroundColor: isDark ? 'rgba(30,31,38,0.6)' : 'rgba(255,255,255,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' } as any
+                : { backgroundColor: isDark ? 'rgba(30,31,38,0.85)' : 'rgba(255,255,255,0.85)' },
+        ];
+
+        const heroBackground = p.image_url ? (
+            <Image source={{ uri: p.image_url }} style={styles.heroImage} resizeMode="cover" />
+        ) : (
+            <LinearGradient
+                colors={getGradientByIndex(p.gradient_id ?? 0)}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroImage}
+            />
+        );
+
+        const titleNode = p.title ? (
+            <Text style={styles.heroTitle}>{p.title}</Text>
+        ) : (
+            <SkeletonBox height={36} width="80%" borderRadius={8} style={{ marginBottom: 8 }} />
+        );
+
+        const dateNode = p.starts_at ? (
+            <Text style={styles.heroDate}>{formatDateGerman(p.starts_at)}</Text>
+        ) : (
+            <SkeletonBox height={18} width="55%" borderRadius={6} />
+        );
+
+        const cancelledBanner = showCancelledBanner ? (
+            <View style={cancelledBannerStyles.container}>
+                <Ionicons name="close-circle" size={20} color="#fff" />
+                <Text style={cancelledBannerStyles.text}>Dieses Event wurde abgesagt</Text>
+            </View>
+        ) : null;
+
+        const sectionsContent = (
+            <>
+                {/* Host Card Skeleton */}
+                <View style={[...glassCardSkeleton, styles.hostCard]}>
+                    <View style={styles.hostInfo}>
+                        <View style={[styles.hostAvatar, { backgroundColor: heroAccent }]} />
+                        <View style={styles.hostTextContainer}>
+                            <SkeletonBox height={16} width={140} borderRadius={6} style={{ marginBottom: 4 }} />
+                            <SkeletonBox height={14} width={100} borderRadius={6} />
                         </View>
                     </View>
+                </View>
+
+                {/* Action Buttons Skeleton */}
+                <View style={styles.actionButtons}>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <View key={i} style={glassActionBtnSkeleton}>
+                            <SkeletonBox height={22} width={22} borderRadius={6} style={{ marginBottom: 4 }} />
+                            <SkeletonBox height={12} width={48} borderRadius={4} />
+                        </View>
+                    ))}
+                </View>
+
+                {/* Categories — gleiches Layout wie EventCategories */}
+                {categoriesPartial.length > 0 ? (
+                    <EventCategories categories={categoriesPartial} editMode={false} accentColor={heroAccent} />
+                ) : (
+                    <View style={styles.section}>
+                        <View style={[...glassCardSkeleton, { padding: 16 }]}>
+                            <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Kategorien</Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                                <SkeletonBox height={26} width={90} borderRadius={8} />
+                                <SkeletonBox height={26} width={110} borderRadius={8} />
+                                <SkeletonBox height={26} width={80} borderRadius={8} />
+                            </View>
+                        </View>
+                    </View>
+                )}
+
+                {/* Description */}
+                <View style={[...glassCardSkeleton, styles.section, { padding: 20 }]}>
+                    <Text style={[styles.sectionTitle, { color: heroAccent }]}>Beschreibung</Text>
+                    {p.description ? (
+                        <Text style={[styles.description, { color: colors.onSurface }]}>{p.description}</Text>
+                    ) : (
+                        <View style={{ gap: 8 }}>
+                            <SkeletonBox height={15} borderRadius={5} />
+                            <SkeletonBox height={15} borderRadius={5} />
+                            <SkeletonBox height={15} borderRadius={5} />
+                            <SkeletonBox height={15} width="70%" borderRadius={5} />
+                        </View>
+                    )}
+                </View>
+
+                {/* Location */}
+                <View style={styles.section}>
+                    <View style={[...glassCardSkeleton, styles.locationCard]}>
+                        <View style={styles.locationHeader}>
+                            <View style={styles.locationTextContainer}>
+                                {p.location?.street ? (
+                                    <Text style={[styles.locationAddress, { color: colors.onSurface }]} numberOfLines={1}>
+                                        {p.location.street}{p.location.house_number ? ` ${p.location.house_number}` : ''}
+                                    </Text>
+                                ) : (
+                                    <SkeletonBox height={16} width="60%" borderRadius={6} style={{ marginBottom: 4 }} />
+                                )}
+                                {cityLine ? (
+                                    <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]} numberOfLines={1}>{cityLine}</Text>
+                                ) : (
+                                    <SkeletonBox height={14} width="40%" borderRadius={6} />
+                                )}
+                            </View>
+                        </View>
+                        <SkeletonBox height={200} borderRadius={12} />
+                    </View>
+                </View>
+
+                {/* Weather (nur wenn Prefill weiß, dass aktiviert) */}
+                {showWeatherSkeleton && (
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Wetter</Text>
+                        <SkeletonBox height={80} borderRadius={12} />
+                    </View>
+                )}
+            </>
+        );
+
+        if (isDesktopLayout) {
+            return (
+                <ScreenWithNav showBottomNav={false}>
+                    <View style={[styles.desktopLayout, { backgroundColor: colors.background }]}>
+                        {/* Left pane: hero/slider */}
+                        <View style={styles.desktopLeft}>
+                            {heroBackground}
+                            <TouchableOpacity
+                                style={styles.backButton}
+                                onPress={() => router.canGoBack() ? router.back() : router.push('/events')}
+                            >
+                                <Ionicons name="arrow-back" size={24} color="#ffffff" />
+                            </TouchableOpacity>
+                            <View style={styles.desktopTitleOverlay}>
+                                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.desktopTitleGradient}>
+                                    {titleNode}
+                                    {dateNode}
+                                </LinearGradient>
+                            </View>
+                        </View>
+
+                        {/* Right pane: scrollable content */}
+                        <ScrollView
+                            style={styles.desktopRight}
+                            contentContainerStyle={styles.desktopRightContent}
+                            showsVerticalScrollIndicator={false}
+                            onScroll={handleSkeletonScroll}
+                            scrollEventThrottle={32}
+                        >
+                            {cancelledBanner}
+                            {sectionsContent}
+                            <View style={{ height: 32 }} />
+                        </ScrollView>
+                    </View>
+                </ScreenWithNav>
+            );
+        }
+
+        return (
+            <ScreenWithNav showBottomNav={false}>
+                <ScrollView
+                    style={{ flex: 1, backgroundColor: colors.background }}
+                    showsVerticalScrollIndicator={false}
+                    onScroll={handleSkeletonScroll}
+                    scrollEventThrottle={32}
+                >
+                    {/* Hero */}
+                    <View style={styles.heroContainer}>
+                        {heroBackground}
+                        <TouchableOpacity
+                            style={styles.backButton}
+                            onPress={() => router.canGoBack() ? router.back() : router.push('/events')}
+                        >
+                            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+                        </TouchableOpacity>
+                        <View style={styles.titleOverlay}>
+                            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.titleGradient}>
+                                {titleNode}
+                                {dateNode}
+                            </LinearGradient>
+                        </View>
+                    </View>
+
+                    {cancelledBanner}
+
+                    <View style={styles.content}>
+                        {sectionsContent}
+                        <View style={{ height: 120 }} />
+                    </View>
+                </ScrollView>
+
+                {/* Sticky Bottom Bar Skeleton */}
+                <View style={[styles.stickyBar, { backgroundColor: colors.surface, borderTopColor: colors.outlineVariant }]}>
+                    <View style={styles.stickyBarInfo}>
+                        {p.is_free === true ? (
+                            <Text style={[styles.stickyBarPrice, { color: colors.onSurface }]}>Kostenlos</Text>
+                        ) : (
+                            <SkeletonBox height={18} width={80} borderRadius={6} style={{ marginBottom: 4 }} />
+                        )}
+                        <SkeletonBox height={13} width={120} borderRadius={5} />
+                    </View>
+                    <SkeletonBox height={56} width={140} borderRadius={14} />
                 </View>
             </ScreenWithNav>
         );
@@ -1091,6 +1331,7 @@ export default function EventScreen() {
 
                         {/* Right pane: scrollable content */}
                         <ScrollView
+                            ref={scrollViewRef}
                             style={styles.desktopRight}
                             contentContainerStyle={styles.desktopRightContent}
                             onScrollBeginDrag={() => { setMoreMenuVisible(false); }}
@@ -1333,6 +1574,15 @@ export default function EventScreen() {
                                         effectivePrimary={effectivePrimary}
                                         effectiveOnPrimary={effectiveOnPrimary}
                                         isDark={isDark}
+                                        containerStyle={[
+                                            deskBarStyles.bar,
+                                            {
+                                                borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                                                backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)',
+                                                backdropFilter: 'blur(24px)',
+                                                WebkitBackdropFilter: 'blur(24px)',
+                                            } as any,
+                                        ]}
                                     />
                                 ) : (
                                     <DesktopStickyBar
@@ -1358,7 +1608,7 @@ export default function EventScreen() {
                     </View>
                 ) : (
                     /* ── Mobile: original layout ── */
-                    <ScrollView showsVerticalScrollIndicator={false} onScrollBeginDrag={() => { setMoreMenuVisible(false); }}>
+                    <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} onScrollBeginDrag={() => { setMoreMenuVisible(false); }}>
                         {/* Hero Image with Title Overlay */}
                         <View style={styles.heroContainer}>
                             {event.image_url ? (
@@ -1592,14 +1842,7 @@ export default function EventScreen() {
             {!isDesktop && !drawerOpen && (() => {
                 if (event.is_full && !hasTicketAccess) {
                     return (
-                        <View style={[
-                            styles.stickyBar,
-                            { borderTopColor: colors.outlineVariant },
-                            isWeb
-                                ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
-                                : { backgroundColor: colors.surface },
-                            isPreview && { opacity: 0.4 },
-                        ]} pointerEvents={isPreview ? 'none' : 'auto'}>
+                        <View pointerEvents={isPreview ? 'none' : 'auto'}>
                             <WaitlistSection
                                 event={event}
                                 onJoin={handleJoinWaitlist}
@@ -1609,6 +1852,14 @@ export default function EventScreen() {
                                 effectivePrimary={effectivePrimary}
                                 effectiveOnPrimary={effectiveOnPrimary}
                                 isDark={isDark}
+                                containerStyle={[
+                                    styles.stickyBar,
+                                    { borderTopColor: colors.outlineVariant },
+                                    isWeb
+                                        ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
+                                        : { backgroundColor: colors.surface },
+                                    isPreview && { opacity: 0.4 },
+                                ]}
                             />
                         </View>
                     );
