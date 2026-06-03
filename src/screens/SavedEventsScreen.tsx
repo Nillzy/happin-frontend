@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { useSavedEvents } from '../contexts/SavedEventsContext';
+import { prefetchEvent } from '../services/api';
 import type { EventListItem } from '../types/events';
 
 const isWeb = Platform.OS === 'web';
@@ -58,6 +59,7 @@ export default function SavedEventsScreen() {
     const router = useRouter();
     const { savedEvents, toggleSaveEvent } = useSavedEvents();
     const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+    const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (!isWeb) return;
@@ -86,6 +88,14 @@ export default function SavedEventsScreen() {
                     },
                 ]}
                 onPress={() => router.push(`/event/${item.event_id}`)}
+                onHoverIn={() => {
+                    hoverTimerRef.current = setTimeout(() => {
+                        prefetchEvent(item.event_id);
+                    }, 250);
+                }}
+                onHoverOut={() => {
+                    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+                }}
             >
                 <View style={styles.imageContainer}>
                     {item.image_url ? (

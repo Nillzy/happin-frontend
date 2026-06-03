@@ -92,7 +92,9 @@ function parseApiError(e: unknown): { status?: number; detail?: string } {
     if (!match) return { detail: msg };
     try {
         const body = JSON.parse(match[2]);
-        return { status: Number(match[1]), detail: body.detail ?? match[2] };
+        const raw = body.detail ?? match[2];
+        const detail = typeof raw === 'string' ? raw : JSON.stringify(raw);
+        return { status: Number(match[1]), detail };
     } catch {
         return { status: Number(match[1]), detail: match[2] };
     }
@@ -771,6 +773,15 @@ export default function EventEditScreen() {
                         >
                             <Ionicons name="arrow-back" size={24} color="#ffffff" />
                         </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.homeButton, isWeb
+                                ? { backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' } as any
+                                : { backgroundColor: colors.surfaceContainerHigh }
+                            ]}
+                            onPress={() => router.push('/events' as any)}
+                        >
+                            <Ionicons name="compass-outline" size={22} color="#ffffff" />
+                        </TouchableOpacity>
 
                         {/* Vorschau + Titelbild-Buttons (overlaid on hero, top right) */}
                         <View style={styles.heroTopRight}>
@@ -919,21 +930,23 @@ export default function EventEditScreen() {
 
                         {/* Ticket Options Section */}
                         {event.ticket_options?.length > 0 ? (
-                            <View style={[...glassCard, styles.section, { padding: 20, position: 'relative' }]}>
+                            <View style={styles.section}>
                                 <TouchableOpacity activeOpacity={0.8} onPress={() => openDrawer('tickets')}>
-                                    <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Ticketoptionen</Text>
-                                    {event.ticket_options.map((t, i) => (
-                                        <View key={i} style={[styles.ticketRow, i < event.ticket_options.length - 1 && { borderBottomColor: colors.outlineVariant, borderBottomWidth: StyleSheet.hairlineWidth }]}>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={[styles.ticketRowName, { color: colors.onSurface }]}>{t.name}</Text>
-                                                {t.description && <Text style={[styles.ticketRowDesc, { color: colors.onSurfaceVariant }]} numberOfLines={1}>{t.description}</Text>}
+                                    <View style={[...glassCard, { padding: 20, position: 'relative' }]}>
+                                        <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>Ticketoptionen</Text>
+                                        {event.ticket_options.map((t, i) => (
+                                            <View key={i} style={[styles.ticketRow, i < event.ticket_options.length - 1 && { borderBottomColor: colors.outlineVariant, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={[styles.ticketRowName, { color: colors.onSurface }]}>{t.name}</Text>
+                                                    {t.description && <Text style={[styles.ticketRowDesc, { color: colors.onSurfaceVariant }]} numberOfLines={1}>{t.description}</Text>}
+                                                </View>
+                                                <Text style={[styles.ticketRowPrice, { color: colors.onSurface }]}>
+                                                    {t.price === 0 ? 'Kostenlos' : `${t.price.toFixed(2)} €`}
+                                                </Text>
                                             </View>
-                                            <Text style={[styles.ticketRowPrice, { color: colors.onSurface }]}>
-                                                {t.price === 0 ? 'Kostenlos' : `${t.price.toFixed(2)} €`}
-                                            </Text>
-                                        </View>
-                                    ))}
-                                    {renderEditOverlay(() => openDrawer('tickets'))}
+                                        ))}
+                                        {renderEditOverlay(() => openDrawer('tickets'))}
+                                    </View>
                                 </TouchableOpacity>
                                 {showStripeStatusOnOverview && (
                                     <TouchableOpacity
@@ -1654,6 +1667,11 @@ const styles = StyleSheet.create({
     heroImage: { width: '100%', height: '100%' },
     backButton: {
         position: 'absolute', top: Platform.OS === 'ios' ? 50 : 16, left: 16,
+        width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+        elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4,
+    },
+    homeButton: {
+        position: 'absolute', top: Platform.OS === 'ios' ? 50 : 16, left: 64,
         width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
         elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4,
     },

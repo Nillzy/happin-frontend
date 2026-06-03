@@ -24,7 +24,10 @@ export function useUserCity() {
 
             // Immer Backend als Quelle der Wahrheit fetchen
             try {
-                const backendCity = await fetchCityFromBackend();
+                const backendCity = await Promise.race([
+                    fetchCityFromBackend(),
+                    new Promise<string | null>((resolve) => setTimeout(() => resolve(null), 5000)),
+                ]);
                 if (backendCity) {
                     await AsyncStorage.multiSet([
                         [KEY_CITY, backendCity],

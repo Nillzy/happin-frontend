@@ -9,6 +9,7 @@ import {
     ActivityIndicator,
     Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,6 +87,7 @@ function formatRelative(iso: string): string {
 export default function NotificationsScreen() {
     const { colors } = useTheme();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { refreshUnreadCount } = useNotifications();
 
     const [items, setItems] = useState<NotificationItem[]>([]);
@@ -247,7 +249,7 @@ export default function NotificationsScreen() {
     );
 
     return (
-        <ScreenWithNav>
+        <ScreenWithNav showBottomNav={false}>
             {Platform.OS === 'web' && (
                 <Head>
                     <title>Benachrichtigungen – Happin</title>
@@ -257,7 +259,7 @@ export default function NotificationsScreen() {
             {Platform.OS !== 'web' && (
                 <TouchableOpacity
                     onPress={goBack}
-                    style={styles.mobileBack}
+                    style={[styles.mobileBack, { paddingTop: insets.top + 8 }]}
                     activeOpacity={0.7}
                 >
                     <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
@@ -320,7 +322,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 6,
         paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'ios' ? 54 : 16,
         paddingBottom: 8,
     },
     mobileBackText: {

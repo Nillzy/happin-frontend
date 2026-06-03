@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 let MapLibre: any = null;
@@ -19,6 +19,46 @@ export interface MapMarker {
     imageUrl?: string;
 }
 
+export interface MarkerCluster {
+    type: 'cluster';
+    lat: number;
+    lng: number;
+    count: number;
+    markers: MapMarker[];
+}
+
+export type MarkerOrCluster = (MapMarker & { type: 'single' }) | MarkerCluster;
+
+const CLUSTER_RADIUS_DEG = 0.0005; // ~55m
+
+export function groupMarkers(markers: MapMarker[]): MarkerOrCluster[] {
+    const visited = new Set<number>();
+    const result: MarkerOrCluster[] = [];
+    for (let i = 0; i < markers.length; i++) {
+        if (visited.has(i)) continue;
+        visited.add(i);
+        const group: MapMarker[] = [markers[i]];
+        for (let j = i + 1; j < markers.length; j++) {
+            if (visited.has(j)) continue;
+            if (
+                Math.abs(markers[i].lat - markers[j].lat) <= CLUSTER_RADIUS_DEG &&
+                Math.abs(markers[i].lng - markers[j].lng) <= CLUSTER_RADIUS_DEG
+            ) {
+                visited.add(j);
+                group.push(markers[j]);
+            }
+        }
+        if (group.length === 1) {
+            result.push({ ...group[0], type: 'single' });
+        } else {
+            const lat = group.reduce((s, m) => s + m.lat, 0) / group.length;
+            const lng = group.reduce((s, m) => s + m.lng, 0) / group.length;
+            result.push({ type: 'cluster', lat, lng, count: group.length, markers: group });
+        }
+    }
+    return result;
+}
+
 interface MapViewProps {
     markers: MapMarker[];
     onMarkerPress?: (eventId: string) => void;
@@ -30,6 +70,7 @@ interface MapViewProps {
     showPopups?: boolean;
     interactive?: boolean;
     onMapMoved?: (lat: number, lng: number) => void;
+    onPositionChanged?: (lat: number, lng: number, zoom: number) => void;
 }
 
 const DEFAULT_CENTER = { lat: 52.52, lng: 13.405 };
@@ -60,6 +101,35 @@ function PinIcon() {
         </Svg>
     );
 }
+
+function ClusterPin({ count }: { count: number }) {
+    return (
+        <View style={{ width: 28, height: 34 }}>
+            <PinIcon />
+            <View style={clusterBadgeStyles.badge}>
+                <Text style={clusterBadgeStyles.text}>{count}</Text>
+            </View>
+        </View>
+    );
+}
+
+const clusterBadgeStyles = StyleSheet.create({
+    badge: {
+        position: 'absolute',
+        top: -4,
+        right: -6,
+        minWidth: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: '#fff',
+        borderWidth: 1.5,
+        borderColor: '#b32053',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 3,
+    },
+    text: { color: '#b32053', fontSize: 10, fontWeight: '700', lineHeight: 12 },
+});
 
 const POPUP_ZOOM_THRESHOLD = 12.5;
 const POPUP_FLY_ZOOM = 14;
@@ -98,6 +168,228 @@ function EventPopupCard({ marker }: { marker: MapMarker }) {
     );
 }
 
+function ClusterSheet({
+    cluster,
+    onClose,
+    onEventPress,
+    isDark,
+}: {
+    cluster: MarkerCluster | null;
+    onClose: () => void;
+    onEventPress: (eventId: string) => void;
+    isDark: boolean;
+}) {
+    const bg = isDark ? '#1e1f26' : '#f8f9fa';
+    const surface = isDark ? '#292931' : '#ffffff';
+    const onSurface = isDark ? '#e3e1ec' : '#191c1d';
+    const onSurfaceVariant = isDark ? '#cac4d0' : '#49454f';
+    const outlineVariant = isDark ? '#49454f' : '#cac4d0';
+
+    const translateY = useRef(new Animated.Value(600)).current;
+    const backdropOpacity = useRef(new Animated.Value(0)).current;
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+
+    const animateClose = useCallback(() => {
+        Animated.parallel([
+            Animated.timing(translateY, { toValue: 600, duration: 280, useNativeDriver: true }),
+            Animated.timing(backdropOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+        ]).start(() => onCloseRef.current());
+    }, [translateY, backdropOpacity]);
+
+    const animateOpen = useCallback(() => {
+        translateY.setValue(600);
+        backdropOpacity.setValue(0);
+        Animated.parallel([
+            Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }),
+            Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        ]).start();
+    }, [translateY, backdropOpacity]);
+
+    useEffect(() => {
+        if (cluster) animateOpen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cluster]);
+
+    if (!cluster) return null;
+
+    return (
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+            <Animated.View
+                style={[sheetStyles.backdrop, { opacity: backdropOpacity }]}
+                pointerEvents="box-none"
+            >
+                <Pressable style={StyleSheet.absoluteFill} onPress={animateClose} />
+            </Animated.View>
+
+            <Animated.View
+                style={[sheetStyles.sheet, { backgroundColor: bg, transform: [{ translateY }] }]}
+            >
+                <View style={sheetStyles.dragHandle}>
+                    <View style={[sheetStyles.dragIndicator, { backgroundColor: outlineVariant }]} />
+                </View>
+
+                <View style={sheetStyles.header}>
+                    <Text style={[sheetStyles.headerTitle, { color: onSurface }]}>
+                        {cluster.count} Events hier
+                    </Text>
+                    <Pressable onPress={animateClose} style={sheetStyles.closeBtn} hitSlop={8}>
+                        <Text style={[sheetStyles.closeBtnText, { color: onSurfaceVariant }]}>✕</Text>
+                    </Pressable>
+                </View>
+
+                <ScrollView
+                    style={sheetStyles.scroll}
+                    contentContainerStyle={sheetStyles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {cluster.markers.map((m) => (
+                        <Pressable
+                            key={m.eventId}
+                            style={[sheetStyles.row, { backgroundColor: surface, borderColor: outlineVariant }]}
+                            onPress={() => {
+                                onEventPress(m.eventId);
+                                animateClose();
+                            }}
+                            android_ripple={{ color: '#b3205322' }}
+                        >
+                            {m.imageUrl ? (
+                                <Image
+                                    source={{ uri: m.imageUrl }}
+                                    style={sheetStyles.thumb}
+                                    resizeMode="cover"
+                                />
+                            ) : (
+                                <View style={[sheetStyles.thumb, sheetStyles.thumbFallback]} />
+                            )}
+                            <View style={sheetStyles.rowBody}>
+                                <Text numberOfLines={1} style={[sheetStyles.rowTitle, { color: onSurface }]}>
+                                    {m.title}
+                                </Text>
+                                <View style={sheetStyles.rowMeta}>
+                                    {m.startsAt ? (
+                                        <Text style={[sheetStyles.rowMetaText, { color: onSurfaceVariant }]}>
+                                            {formatDate(m.startsAt)}
+                                        </Text>
+                                    ) : null}
+                                    <View
+                                        style={[
+                                            sheetStyles.badge,
+                                            { backgroundColor: m.isFree === false ? '#b3205322' : '#16a34a22' },
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                sheetStyles.badgeText,
+                                                { color: m.isFree === false ? '#b32053' : '#16a34a' },
+                                            ]}
+                                        >
+                                            {m.isFree === false ? 'Kostenpflichtig' : 'Kostenlos'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                            <Text style={[sheetStyles.chevron, { color: onSurfaceVariant }]}>›</Text>
+                        </Pressable>
+                    ))}
+                </ScrollView>
+            </Animated.View>
+        </View>
+    );
+}
+
+const sheetStyles = StyleSheet.create({
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    sheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        maxHeight: '70%',
+        paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    },
+    dragHandle: {
+        alignItems: 'center',
+        paddingTop: 12,
+        paddingBottom: 8,
+    },
+    dragIndicator: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 12,
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    closeBtn: { padding: 4 },
+    closeBtnText: { fontSize: 20 },
+    scroll: { flex: 1 },
+    scrollContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 8,
+        gap: 8,
+    },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 14,
+        borderWidth: 1,
+        overflow: 'hidden',
+        minHeight: 68,
+    },
+    thumb: {
+        width: 56,
+        alignSelf: 'stretch',
+    },
+    thumbFallback: {
+        backgroundColor: '#b32053',
+    },
+    rowBody: {
+        flex: 1,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        gap: 6,
+    },
+    rowTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    rowMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
+    },
+    rowMetaText: { fontSize: 12 },
+    badge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 999,
+    },
+    badgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    chevron: {
+        fontSize: 22,
+        paddingRight: 14,
+        fontWeight: '300',
+    },
+});
+
 function NativeMapView({
     markers,
     onMarkerPress,
@@ -109,18 +401,24 @@ function NativeMapView({
     showPopups = true,
     interactive = true,
     onMapMoved,
+    onPositionChanged,
 }: MapViewProps) {
     const apiKey = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
     const cameraRef = useRef<any>(null);
     const onMapMovedRef = useRef(onMapMoved);
     onMapMovedRef.current = onMapMoved;
+    const onPositionChangedRef = useRef(onPositionChanged);
+    onPositionChangedRef.current = onPositionChanged;
     const isProgrammaticMoveRef = useRef(false);
     const [currentZoom, setCurrentZoom] = useState<number>(zoom);
+    const [activeCluster, setActiveCluster] = useState<MarkerCluster | null>(null);
 
     const isDraggable = !!onMapMoved;
     const initialCenterRef = useRef({ lat: centerLat, lng: centerLng, zoom });
 
     const styleUrl = styleUrlProp ?? `${isDark ? MAP_STYLE_DARK : MAP_STYLE_LIGHT}?key=${apiKey}`;
+
+    const grouped = useMemo(() => groupMarkers(markers), [markers]);
 
     useEffect(() => {
         if (isDraggable) return;
@@ -169,9 +467,12 @@ function NativeMapView({
                         isProgrammaticMoveRef.current = false;
                         return;
                     }
+                    const c = ev?.center;
+                    if (c) {
+                        onPositionChangedRef.current?.(c[1], c[0], typeof ev?.zoom === 'number' ? ev.zoom : currentZoom);
+                    }
                     if (!isDraggable) return;
                     if (!ev?.userInteraction) return;
-                    const c = ev.center;
                     if (!c) return;
                     onMapMovedRef.current?.(c[1], c[0]);
                 }}
@@ -183,41 +484,55 @@ function NativeMapView({
                         zoom: initialCenterRef.current.zoom,
                     }}
                 />
-                {markers.map((m) => (
-                    <Marker
-                        key={`pin-${m.eventId}`}
-                        id={`pin-${m.eventId}`}
-                        lngLat={[m.lng, m.lat]}
-                        anchor="bottom"
-                        onPress={() => {
-                            if (!showPopups) {
-                                onMarkerPress?.(m.eventId);
-                                return;
-                            }
-                            isProgrammaticMoveRef.current = true;
-                            cameraRef.current?.flyTo({
-                                centerCoordinate: [m.lng, m.lat],
-                                zoomLevel: POPUP_FLY_ZOOM,
-                                animationDuration: 600,
-                            });
-                        }}
-                    >
-                        <PinIcon />
-                    </Marker>
-                ))}
+                {grouped.map((item, idx) =>
+                    item.type === 'cluster' ? (
+                        <Marker
+                            key={`cluster-${idx}`}
+                            id={`cluster-${idx}`}
+                            lngLat={[item.lng, item.lat]}
+                            anchor="bottom"
+                            onPress={() => setActiveCluster(item)}
+                        >
+                            <ClusterPin count={item.count} />
+                        </Marker>
+                    ) : (
+                        <Marker
+                            key={`pin-${item.eventId}`}
+                            id={`pin-${item.eventId}`}
+                            lngLat={[item.lng, item.lat]}
+                            anchor="bottom"
+                            onPress={() => {
+                                if (!showPopups) {
+                                    onMarkerPress?.(item.eventId);
+                                    return;
+                                }
+                                isProgrammaticMoveRef.current = true;
+                                cameraRef.current?.flyTo({
+                                    centerCoordinate: [item.lng, item.lat],
+                                    zoomLevel: POPUP_FLY_ZOOM,
+                                    animationDuration: 600,
+                                });
+                            }}
+                        >
+                            <PinIcon />
+                        </Marker>
+                    )
+                )}
                 {popupsVisible
-                    ? markers.map((m) => (
-                          <Marker
-                              key={`popup-${m.eventId}`}
-                              id={`popup-${m.eventId}`}
-                              lngLat={[m.lng, m.lat]}
-                              anchor="bottom"
-                              offset={[0, -46]}
-                              onPress={() => onMarkerPress?.(m.eventId)}
-                          >
-                              <EventPopupCard marker={m} />
-                          </Marker>
-                      ))
+                    ? grouped
+                          .filter((item): item is MapMarker & { type: 'single' } => item.type === 'single')
+                          .map((item) => (
+                              <Marker
+                                  key={`popup-${item.eventId}`}
+                                  id={`popup-${item.eventId}`}
+                                  lngLat={[item.lng, item.lat]}
+                                  anchor="bottom"
+                                  offset={[0, -46]}
+                                  onPress={() => onMarkerPress?.(item.eventId)}
+                              >
+                                  <EventPopupCard marker={item} />
+                              </Marker>
+                          ))
                     : null}
             </Map>
 
@@ -226,6 +541,13 @@ function NativeMapView({
                     <PinIcon />
                 </View>
             )}
+
+            <ClusterSheet
+                cluster={activeCluster}
+                onClose={() => setActiveCluster(null)}
+                onEventPress={(id) => onMarkerPress?.(id)}
+                isDark={isDark}
+            />
         </View>
     );
 }
@@ -241,6 +563,7 @@ export default function MapView({
     showPopups = true,
     interactive = true,
     onMapMoved,
+    onPositionChanged,
 }: MapViewProps) {
     const apiKey = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -250,13 +573,14 @@ export default function MapView({
     markersRef.current = markers;
     const onMapMovedRef = useRef(onMapMoved);
     onMapMovedRef.current = onMapMoved;
-    // After a user drag we skip the next external setCenter to avoid fighting the map
+    const onPositionChangedRef = useRef(onPositionChanged);
+    onPositionChangedRef.current = onPositionChanged;
     const skipNextSetCenterRef = useRef(false);
-    // Tracks programmatic setCenter calls so moveend doesn't fire onMapMoved
     const isProgrammaticMoveRef = useRef(false);
+    const groupedMarkersRef = useRef<MarkerOrCluster[]>([]);
+    const [activeCluster, setActiveCluster] = useState<MarkerCluster | null>(null);
+    const setActiveClusterRef = useRef<((c: MarkerCluster | null) => void) | null>(null);
 
-    // For draggable maps (onMapMoved set), freeze the initial center so that
-    // parent state updates from onMapMoved don't cause the WebView to reload.
     const initialCenterRef = useRef({ lat: centerLat, lng: centerLng });
     const isDraggable = !!onMapMoved;
     const effectiveCenterLat = isDraggable ? initialCenterRef.current.lat : centerLat;
@@ -270,13 +594,15 @@ export default function MapView({
         let map: any;
         let markerInstances: any[] = [];
         let interval: ReturnType<typeof setInterval> | null = null;
+        let resizeObserver: ResizeObserver | null = null;
+        let destroyed = false;
 
         async function init() {
             const sdk = await import('@maptiler/sdk');
+            if (destroyed) return;
             sdk.config.apiKey = apiKey;
             sdk.config.primaryLanguage = sdk.Language.GERMAN;
 
-            // Inject MapTiler CSS if not already present
             if (!document.getElementById('maptiler-sdk-css')) {
                 const link = document.createElement('link');
                 link.id = 'maptiler-sdk-css';
@@ -286,6 +612,25 @@ export default function MapView({
             }
 
             if (!mapContainerRef.current || mapInstanceRef.current) return;
+
+            // If the container has no size yet (hidden parent), wait until it does.
+            const container = mapContainerRef.current;
+            if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+                if (typeof ResizeObserver !== 'undefined') {
+                    resizeObserver = new ResizeObserver(() => {
+                        if (destroyed) { resizeObserver?.disconnect(); return; }
+                        if (container.offsetWidth > 0 && container.offsetHeight > 0) {
+                            resizeObserver?.disconnect();
+                            resizeObserver = null;
+                            init();
+                        }
+                    });
+                    resizeObserver.observe(container);
+                }
+                return;
+            }
+
+            setActiveClusterRef.current = setActiveCluster;
 
             map = new sdk.Map({
                 container: mapContainerRef.current,
@@ -305,11 +650,9 @@ export default function MapView({
                 }),
             });
 
-            // MapTiler-Logo ausblenden
             const logoEl = mapContainerRef.current.querySelector('.maplibregl-ctrl-logo, .maptiler-ctrl-logo, [class*="logo"]');
             if (logoEl) (logoEl as HTMLElement).style.display = 'none';
 
-            // Steuerelemente im Dark Mode dunkel färben
             if (isDark) {
                 const style = document.createElement('style');
                 style.id = 'maptiler-dark-controls';
@@ -346,7 +689,6 @@ export default function MapView({
             } else {
                 const existing = document.getElementById('maptiler-dark-controls');
                 if (existing) existing.remove();
-                // Logo auch im Light Mode ausblenden
                 const hideLogoStyle = document.createElement('style');
                 hideLogoStyle.id = 'maptiler-hide-logo';
                 hideLogoStyle.textContent = `
@@ -362,8 +704,6 @@ export default function MapView({
             mapInstanceRef.current = map;
 
             map.on('load', () => {
-                // Force resize so the map fills its container correctly when
-                // mounted inside nested layouts (ScrollView, glassCard, etc.)
                 map.resize();
 
                 const container = mapContainerRef.current;
@@ -381,7 +721,6 @@ export default function MapView({
                 addPopupMarkers(sdk);
                 updatePopupVisibility();
 
-                // Zentrierte Nadel für Draggable-Modus
                 if (onMapMovedRef.current && mapContainerRef.current) {
                     const pin = document.createElement('div');
                     pin.style.cssText =
@@ -413,6 +752,9 @@ export default function MapView({
                 }
             });
 
+            // Popup elements keyed by eventId for O(1) lookup
+            const popupMarkerMap = new Map<string, any>();
+
             function createPopupEl(m: MapMarker): HTMLDivElement {
                 const dateStr = m.startsAt
                     ? new Date(m.startsAt).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -437,21 +779,21 @@ export default function MapView({
                 return el;
             }
 
-            let popupMarkers: any[] = [];
-
             function addPopupMarkers(sdkModule: any) {
-                popupMarkers.forEach(pm => pm.remove());
-                popupMarkers = [];
+                popupMarkerMap.forEach(pm => pm.remove());
+                popupMarkerMap.clear();
 
-                markersRef.current.forEach((m) => {
-                    const el = createPopupEl(m);
-                    const pm = new sdkModule.Marker({ element: el, anchor: 'bottom', offset: [0, -46] })
-                        .setLngLat([m.lng, m.lat])
-                        .addTo(map);
-                    const pmEl = pm.getElement();
-                    if (pmEl) pmEl.style.overflow = 'visible';
-                    popupMarkers.push(pm);
-                });
+                groupedMarkersRef.current
+                    .filter((item): item is MapMarker & { type: 'single' } => item.type === 'single')
+                    .forEach((item) => {
+                        const el = createPopupEl(item);
+                        const pm = new sdkModule.Marker({ element: el, anchor: 'bottom', offset: [0, -46] })
+                            .setLngLat([item.lng, item.lat])
+                            .addTo(map);
+                        const pmEl = pm.getElement();
+                        if (pmEl) pmEl.style.overflow = 'visible';
+                        popupMarkerMap.set(item.eventId, pm);
+                    });
 
                 updatePopupVisibility();
             }
@@ -466,47 +808,87 @@ export default function MapView({
                     if (el) el.style.display = showPins ? '' : 'none';
                 });
 
-                popupMarkers.forEach((pm) => {
+                popupMarkerMap.forEach((pm) => {
                     const el = pm.getElement();
                     if (el) el.style.display = popupsVisible ? '' : 'none';
                 });
+            }
+
+            function createClusterPinEl(count: number): HTMLDivElement {
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'position:relative;width:28px;height:34px;cursor:pointer;line-height:0;';
+                wrapper.innerHTML =
+                    '<svg width="28" height="34" viewBox="0 0 28 34" fill="none">' +
+                    '<path d="M14 1C7.9 1 3 5.9 3 12c0 7.4 11 20 11 20s11-12.6 11-20c0-6.1-4.9-11-11-11z" fill="#b32053" stroke="#fff" stroke-width="2"/>' +
+                    '<circle cx="14" cy="12" r="4.5" fill="#fff"/>' +
+                    '</svg>';
+                const badge = document.createElement('div');
+                badge.style.cssText =
+                    'position:absolute;top:-4px;right:-6px;min-width:18px;height:18px;border-radius:9px;' +
+                    'background:#fff;border:1.5px solid #b32053;display:flex;align-items:center;' +
+                    'justify-content:center;padding:0 3px;box-sizing:border-box;' +
+                    'font-family:sans-serif;font-size:10px;font-weight:700;color:#b32053;line-height:12px;';
+                badge.textContent = String(count);
+                wrapper.appendChild(badge);
+                return wrapper;
             }
 
             function addMarkers(sdkModule: any) {
                 markerInstances.forEach(mi => mi.remove());
                 markerInstances = [];
 
-                markersRef.current.forEach((m) => {
-                    const el = document.createElement('div');
-                    el.style.cssText =
-                        'width:28px;height:34px;cursor:pointer;line-height:0;';
-                    el.innerHTML = '<svg width="28" height="34" viewBox="0 0 28 34" fill="none"><path d="M14 1C7.9 1 3 5.9 3 12c0 7.4 11 20 11 20s11-12.6 11-20c0-6.1-4.9-11-11-11z" fill="#b32053" stroke="#fff" stroke-width="2"/><circle cx="14" cy="12" r="4.5" fill="#fff"/></svg>';
-                    el.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        // Auf Pin zoomen
-                        map.flyTo({ center: [m.lng, m.lat], zoom: 15, duration: 800 });
-                        // Nach Zoom-Animation Popup anzeigen
-                        const idx = markersRef.current.indexOf(m);
-                        const pm = popupMarkers[idx];
-                        if (pm) {
-                            const pmEl = pm.getElement();
-                            if (pmEl) pmEl.style.display = '';
-                        }
-                    });
-
-                    const mi = new sdkModule.Marker({ element: el, anchor: 'bottom' })
-                        .setLngLat([m.lng, m.lat])
-                        .addTo(map);
-                    const markerEl = mi.getElement();
-                    if (markerEl) markerEl.style.overflow = 'visible';
-                    markerInstances.push(mi);
+                groupedMarkersRef.current.forEach((item) => {
+                    if (item.type === 'cluster') {
+                        const el = createClusterPinEl(item.count);
+                        el.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            setActiveClusterRef.current?.(item);
+                        });
+                        const mi = new sdkModule.Marker({ element: el, anchor: 'bottom' })
+                            .setLngLat([item.lng, item.lat])
+                            .addTo(map);
+                        const markerEl = mi.getElement();
+                        if (markerEl) markerEl.style.overflow = 'visible';
+                        markerInstances.push(mi);
+                    } else {
+                        const el = document.createElement('div');
+                        el.style.cssText = 'width:28px;height:34px;cursor:pointer;line-height:0;';
+                        el.innerHTML =
+                            '<svg width="28" height="34" viewBox="0 0 28 34" fill="none">' +
+                            '<path d="M14 1C7.9 1 3 5.9 3 12c0 7.4 11 20 11 20s11-12.6 11-20c0-6.1-4.9-11-11-11z" fill="#b32053" stroke="#fff" stroke-width="2"/>' +
+                            '<circle cx="14" cy="12" r="4.5" fill="#fff"/>' +
+                            '</svg>';
+                        el.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            map.flyTo({ center: [item.lng, item.lat], zoom: 15, duration: 800 });
+                            const pm = popupMarkerMap.get(item.eventId);
+                            if (pm) {
+                                const pmEl = pm.getElement();
+                                if (pmEl) pmEl.style.display = '';
+                            }
+                        });
+                        const mi = new sdkModule.Marker({ element: el, anchor: 'bottom' })
+                            .setLngLat([item.lng, item.lat])
+                            .addTo(map);
+                        const markerEl = mi.getElement();
+                        if (markerEl) markerEl.style.overflow = 'visible';
+                        markerInstances.push(mi);
+                    }
                 });
             }
 
             map.on('zoom', () => updatePopupVisibility());
 
+            map.on('moveend', () => {
+                if (!isProgrammaticMoveRef.current) {
+                    const c = map.getCenter();
+                    onPositionChangedRef.current?.(c.lat, c.lng, map.getZoom());
+                }
+            });
+
             interval = setInterval(() => {
-                if (markersRef.current.length > markerInstances.length && map.loaded()) {
+                if (groupedMarkersRef.current.length !== markerInstances.length && map.loaded()) {
+                    groupedMarkersRef.current = groupMarkers(markersRef.current);
                     import('@maptiler/sdk').then(s => {
                         addMarkers(s);
                         addPopupMarkers(s);
@@ -516,7 +898,7 @@ export default function MapView({
 
             map.on('click', () => {
                 if (map.getZoom() < 14) {
-                    popupMarkers.forEach((pm) => {
+                    popupMarkerMap.forEach((pm) => {
                         const pmEl = pm.getElement();
                         if (pmEl) pmEl.style.display = 'none';
                     });
@@ -524,9 +906,12 @@ export default function MapView({
             });
         }
 
+        groupedMarkersRef.current = groupMarkers(markersRef.current);
         init();
 
         return () => {
+            destroyed = true;
+            resizeObserver?.disconnect();
             if (interval) clearInterval(interval);
             map?.remove();
             mapInstanceRef.current = null;
@@ -538,8 +923,6 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [apiKey, styleUrl]);
 
-    // Karte auf neue Koordinaten/Zoom zentrieren wenn sich Props ändern.
-    // Bei draggable Karten (onMapMoved) nicht eingreifen — der Nutzer steuert die Position.
     useEffect(() => {
         if (Platform.OS !== 'web') return;
         if (isDraggable) return;
@@ -563,19 +946,23 @@ export default function MapView({
                 showPopups={showPopups}
                 interactive={interactive}
                 onMapMoved={onMapMoved}
+                onPositionChanged={onPositionChanged}
             />
         );
     }
 
-    // web container
-    // Reference unused web-only refs to satisfy linter on native bundles is not needed here,
-    // since this branch only runs on web.
     void effectiveCenterLat; void effectiveCenterLng; void skipNextSetCenterRef;
 
     return (
         <View style={styles.container}>
             {/* @ts-ignore */}
             <div ref={mapContainerRef} style={{ width: '100%', height: '100%', position: 'relative' }} />
+            <ClusterSheet
+                cluster={activeCluster}
+                onClose={() => setActiveCluster(null)}
+                onEventPress={(id) => onMarkerPress?.(id)}
+                isDark={isDark}
+            />
         </View>
     );
 }

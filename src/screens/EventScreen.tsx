@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -25,7 +25,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Calendar from 'expo-calendar';
 import { useTheme } from '@/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
 import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
@@ -335,6 +334,145 @@ function ReportMenuButton({
     );
 }
 
+function GuestGate({ onPress }: { onPress: () => void }) {
+    return (
+        <TouchableOpacity
+            style={guestGateStyles.overlay}
+            onPress={onPress}
+            activeOpacity={0.9}
+        >
+            <View style={guestGateStyles.pill}>
+                <Ionicons name="lock-closed" size={14} color="#fff" />
+                <Text style={guestGateStyles.pillText}>Anmelden</Text>
+            </View>
+        </TouchableOpacity>
+    );
+}
+
+// 1 deg lat ≈ 111 km; 1 deg lng ≈ 111 km * cos(lat)
+const DEG_PER_KM_LAT = 1 / 111;
+
+// Deterministic pseudo-random from a string seed (mulberry32 / xmur3 combo).
+function seededRand(seed: string): () => number {
+    let h = 2166136261;
+    for (let i = 0; i < seed.length; i++) {
+        h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+    }
+    return () => {
+        h += h << 13; h ^= h >> 7; h += h << 3; h ^= h >> 17; h += h << 5;
+        return ((h >>> 0) / 0x100000000);
+    };
+}
+
+function fuzzCoords(lat: number, lng: number, eventId: string): { lat: number; lng: number } {
+    // Shift the circle CENTER by 0.2–2.47 km in each axis independently.
+    // Max diagonal offset: √(2.47² + 2.47²) ≈ 3.49 km < 3.5 km radius → true location always inside circle.
+    const rand = seededRand(eventId);
+    const sign = (r: number) => (r < 0.5 ? 1 : -1);
+    const randKm = (r: number) => 0.2 + r * 2.27; // 0.2–2.47 km
+    const dLat = sign(rand()) * randKm(rand()) * DEG_PER_KM_LAT;
+    const dLng = sign(rand()) * randKm(rand()) * DEG_PER_KM_LAT / Math.cos((lat * Math.PI) / 180);
+    return { lat: lat + dLat, lng: lng + dLng };
+}
+
+// Mercator: how many CSS pixels correspond to `km` kilometres at a given lat and zoom level.
+// tile size = 512px (MapTiler default), so pixels per metre = 512 * 2^zoom / (2π * R * cos(lat))
+function kmToPixels(km: number, lat: number, zoom: number): number {
+    const R_EARTH_M = 6_378_137;
+    const TILE_SIZE = 512;
+    const metersPerPx =
+        (2 * Math.PI * R_EARTH_M * Math.cos((lat * Math.PI) / 180)) /
+        (TILE_SIZE * Math.pow(2, zoom));
+    return (km * 1000) / metersPerPx;
+}
+
+const CIRCLE_RADIUS_KM = 3.5;
+const MAP_ZOOM = 9.5;
+
+function GuestMapPreview({
+    coords,
+    trueLat,
+    isDark,
+    onPress,
+}: {
+    coords: { lat: number; lng: number };
+    trueLat: number;
+    isDark: boolean;
+    onPress: () => void;
+}) {
+    const circleColor = isDark ? 'rgba(179,32,83,0.25)' : 'rgba(179,32,83,0.18)';
+    const circleBorder = isDark ? 'rgba(179,32,83,0.7)' : 'rgba(179,32,83,0.55)';
+    const diameterPx = kmToPixels(CIRCLE_RADIUS_KM, trueLat, MAP_ZOOM) * 2;
+    return (
+        <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={guestMapStyles.container}>
+            {/* No markers — only the area circle is shown */}
+            <MapView
+                markers={[]}
+                centerLat={coords.lat}
+                centerLng={coords.lng}
+                zoom={MAP_ZOOM}
+                isDark={isDark}
+                showPopups={false}
+                interactive={false}
+            />
+            {/* Translucent area circle — pixel size matches the geographic 5 km radius */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                <View style={guestMapStyles.circleWrapper}>
+                    <View style={[
+                        guestMapStyles.circle,
+                        {
+                            width: diameterPx,
+                            height: diameterPx,
+                            borderRadius: diameterPx / 2,
+                            backgroundColor: circleColor,
+                            borderColor: circleBorder,
+                        },
+                    ]} />
+                </View>
+            </View>
+            {/* Login hint badge */}
+            <View style={guestMapStyles.badge} pointerEvents="none">
+                <Ionicons name="lock-closed" size={12} color="#fff" />
+                <Text style={guestMapStyles.badgeText}>Genaue Adresse nach Anmeldung</Text>
+            </View>
+        </TouchableOpacity>
+    );
+}
+
+const guestMapStyles = StyleSheet.create({
+    container: {
+        height: 200,
+        borderRadius: 12,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    circleWrapper: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    circle: {
+        borderWidth: 2,
+    },
+    badge: {
+        position: 'absolute',
+        bottom: 10,
+        alignSelf: 'center',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        borderRadius: 20,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+    },
+    badgeText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+});
+
 function getMaxPurchasableTickets(
     event: EventDetailResponse,
     selected?: { quantity_limit?: number | null },
@@ -380,6 +518,7 @@ export default function EventScreen() {
     const [partial, setPartial] = useState<Partial<EventDetailResponse> | null>(() => (
         id ? api.getCachedEventPartial(id) : null
     ));
+    const [isGuest, setIsGuest] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number } | null>(() => {
@@ -389,6 +528,13 @@ export default function EventScreen() {
         }
         return null;
     });
+
+    // Stable fuzzed coords for guest map preview — deterministic per eventId, stable across reloads
+    const guestFuzzyCoords = useMemo(
+        () => (mapCoords && id ? fuzzCoords(mapCoords.lat, mapCoords.lng, id) : null),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [mapCoords?.lat, mapCoords?.lng, id],
+    );
 
     const scrollYRef = useRef(0);
     const scrollViewRef = useRef<ScrollView | null>(null);
@@ -565,15 +711,6 @@ export default function EventScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [params.openCustomFields, event, loading]);
 
-    useFocusEffect(
-        useCallback(() => {
-            if (id) {
-                api.invalidateCaches(id);
-                loadEvent(true);
-            }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [id])
-    );
 
     const loadEvent = async (silent = false) => {
         try {
@@ -587,12 +724,10 @@ export default function EventScreen() {
             }
 
             const token = await getSession();
-            if (!token) {
-                router.replace('/login');
-                return;
-            }
-            const data = await api.getEventById(id, token);
+            const guest = !token;
+            const data = await api.getEventById(id, token ?? undefined);
             setEvent(data);
+            setIsGuest(guest);
             setPartial(null);
             setRsvpStatus(data.my_rsvp_status ?? null);
             const loc = data.location;
@@ -1094,6 +1229,12 @@ export default function EventScreen() {
                             >
                                 <Ionicons name="arrow-back" size={24} color="#ffffff" />
                             </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.homeButton}
+                                onPress={() => router.push('/events')}
+                            >
+                                <Ionicons name="compass-outline" size={22} color="#ffffff" />
+                            </TouchableOpacity>
                             <View style={styles.desktopTitleOverlay}>
                                 <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.desktopTitleGradient}>
                                     {titleNode}
@@ -1135,6 +1276,12 @@ export default function EventScreen() {
                             onPress={() => router.canGoBack() ? router.back() : router.push('/events')}
                         >
                             <Ionicons name="arrow-back" size={24} color="#ffffff" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.homeButton}
+                            onPress={() => router.push('/events')}
+                        >
+                            <Ionicons name="compass-outline" size={22} color="#ffffff" />
                         </TouchableOpacity>
                         <View style={styles.titleOverlay}>
                             <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.titleGradient}>
@@ -1259,6 +1406,12 @@ export default function EventScreen() {
                             >
                                 <Ionicons name="arrow-back" size={24} color="#ffffff" />
                             </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.homeButton}
+                                onPress={() => router.push('/events')}
+                            >
+                                <Ionicons name="compass-outline" size={22} color="#ffffff" />
+                            </TouchableOpacity>
 
                             {isPreview && (
                                 <View style={styles.previewBadge}>
@@ -1354,10 +1507,24 @@ export default function EventScreen() {
                                 </View>
                             )}
 
+                            {/* Guest Banner */}
+                            {isGuest && (
+                                <TouchableOpacity
+                                    style={guestBannerStyles.banner}
+                                    onPress={() => router.push('/login')}
+                                    activeOpacity={0.85}
+                                >
+                                    <Ionicons name="lock-closed" size={16} color="#fff" />
+                                    <Text style={guestBannerStyles.text}>Anmelden um alle Details zu sehen</Text>
+                                    <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.7)" />
+                                </TouchableOpacity>
+                            )}
+
                             {/* Host Card */}
                             <TouchableOpacity
-                                style={[...glassCard, styles.hostCard]}
+                                style={[...glassCard, styles.hostCard, isGuest && { overflow: 'hidden' }]}
                                 onPress={() => {
+                                    if (isGuest) { router.push('/login'); return; }
                                     console.log('[EventScreen] Host card clicked:', {
                                         is_host: event.is_host,
                                         host_person_id: event.host_person_id,
@@ -1386,18 +1553,19 @@ export default function EventScreen() {
                                         <Text style={[styles.hostSubtitle, { color: effectiveSecondary }]}>hat dich eingeladen</Text>
                                     </View>
                                 </View>
-                                {!event.is_host && (
+                                {!event.is_host && !isGuest && (
                                     <ReportMenuButton
                                         colors={colors}
                                         onReportEvent={() => setReportModalTarget('event')}
                                         onReportHost={() => setReportModalTarget('host')}
                                     />
                                 )}
+                                {isGuest && <GuestGate onPress={() => router.push('/login')} />}
                             </TouchableOpacity>
 
                             {/* Action Buttons */}
                             <View style={[styles.actionButtons, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
-                                {(() => {
+                                {!isGuest && (() => {
                                     const hasAccess = effectiveIsFree
                                         ? rsvpStatus === 'Accepted'
                                         : (event.ticket ?? []).length > 0;
@@ -1411,21 +1579,23 @@ export default function EventScreen() {
                                         </TouchableOpacity>
                                     ) : null;
                                 })()}
-                                {rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 && !event.is_host && (
+                                {!isGuest && rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 && !event.is_host && (
                                     <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
                                         <Ionicons name="create-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben</Text>
                                     </TouchableOpacity>
                                 )}
-                                <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
-                                    <Ionicons name="calendar-outline" size={22} color={effectivePrimary} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>ICS-Import</Text>
-                                </TouchableOpacity>
+                                {!isGuest && (
+                                    <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
+                                        <Ionicons name="calendar-outline" size={22} color={effectivePrimary} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>ICS-Import</Text>
+                                    </TouchableOpacity>
+                                )}
                                 <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
                                     <Ionicons name="share-outline" size={22} color={effectivePrimary} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
-                                {event.is_host && !useMehrMenu && (
+                                {!isGuest && event.is_host && !useMehrMenu && (
                                     <TouchableOpacity
                                         style={[glassActionBtn, event.is_cancelled && { opacity: 0.4 }]}
                                         onPress={() => router.push(`/event/${id}/manage`)}
@@ -1435,13 +1605,13 @@ export default function EventScreen() {
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
                                     </TouchableOpacity>
                                 )}
-                                {showAngabenAendernHost && !useMehrMenu && (
+                                {!isGuest && showAngabenAendernHost && !useMehrMenu && (
                                     <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
                                         <Ionicons name="create-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben ändern</Text>
                                     </TouchableOpacity>
                                 )}
-                                {useMehrMenu && (
+                                {!isGuest && useMehrMenu && (
                                     <View ref={moreMenuTriggerRef} style={styles.moreMenuWrapper} collapsable={false}>
                                         <TouchableOpacity style={glassActionBtn} onPress={toggleMoreMenu}>
                                             <Ionicons name="ellipsis-horizontal" size={22} color={effectivePrimary} />
@@ -1470,7 +1640,16 @@ export default function EventScreen() {
                                     <View style={[...glassCard, styles.locationCard]}>
                                         <View style={styles.locationHeader}>
                                             <View style={styles.locationTextContainer}>
-                                                {(() => {
+                                                {isGuest ? (
+                                                    <>
+                                                        <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
+                                                            {event.location?.city ?? 'Standort'}
+                                                        </Text>
+                                                        <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
+                                                            Genaue Adresse nach Anmeldung sichtbar
+                                                        </Text>
+                                                    </>
+                                                ) : (() => {
                                                     const loc = event.location!;
                                                     const isPrivateStripped = event.location_is_private && !loc.street && loc.latitude == null;
                                                     if (isPrivateStripped) {
@@ -1512,7 +1691,16 @@ export default function EventScreen() {
                                                 })()}
                                             </View>
                                         </View>
-                                        {event.location_is_private && !event.location.street && event.location.latitude == null ? (
+                                        {isGuest ? (
+                                            guestFuzzyCoords ? (
+                                                <GuestMapPreview
+                                                    coords={guestFuzzyCoords}
+                                                    trueLat={mapCoords?.lat ?? guestFuzzyCoords.lat}
+                                                    isDark={isDark}
+                                                    onPress={() => router.push('/login')}
+                                                />
+                                            ) : null
+                                        ) : event.location_is_private && !event.location.street && event.location.latitude == null ? (
                                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, gap: 6 }}>
                                                 <Ionicons name="lock-closed-outline" size={14} color={colors.onSurfaceVariant} />
                                                 <Text style={{ color: colors.onSurfaceVariant, fontSize: 13, textAlign: 'center', flexShrink: 1 }}>
@@ -1556,7 +1744,7 @@ export default function EventScreen() {
                                 </View>
                             )}
 
-                            {event.media_urls && event.media_urls.length > 0 && (
+                            {!isGuest && event.media_urls && event.media_urls.length > 0 && (
                                 <View style={styles.section}>
                                     <EventImageGallery images={event.media_urls} />
                                 </View>
@@ -1564,7 +1752,22 @@ export default function EventScreen() {
 
                             {/* Desktop sticky bar inline at bottom of scroll */}
                             <View style={isPreview ? { opacity: 0.4 } : undefined} pointerEvents={isPreview ? 'none' : 'auto'}>
-                                {event.is_full && !hasTicketAccess ? (
+                                {isGuest ? (
+                                    <View style={[deskBarStyles.bar, { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)', backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)' }]}>
+                                        <View style={deskBarStyles.info}>
+                                            <Text style={[deskBarStyles.price, { color: colors.onSurface }]}>
+                                                {effectiveIsFree ? 'Kostenlos' : event.ticket_options && event.ticket_options.length > 0 ? `ab ${Math.min(...event.ticket_options.map(t => t.price)).toFixed(2)} €` : 'Kostenpflichtig'}
+                                            </Text>
+                                            <Text style={[deskBarStyles.hint, { color: colors.onSurfaceVariant }]}>Anmelden um teilzunehmen</Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            style={[deskBarStyles.btn, { backgroundColor: effectivePrimary }]}
+                                            onPress={() => router.push('/login')}
+                                        >
+                                            <Text style={[deskBarStyles.btnText, { color: effectiveOnPrimary }]}>Anmelden</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : event.is_full && !hasTicketAccess ? (
                                     <WaitlistSection
                                         event={event}
                                         onJoin={handleJoinWaitlist}
@@ -1623,6 +1826,12 @@ export default function EventScreen() {
                             >
                                 <Ionicons name="arrow-back" size={24} color="#ffffff" />
                             </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.homeButton}
+                                onPress={() => router.push('/events')}
+                            >
+                                <Ionicons name="compass-outline" size={22} color="#ffffff" />
+                            </TouchableOpacity>
 
                             {isPreview && (
                                 <View style={styles.previewBadge}>
@@ -1648,8 +1857,21 @@ export default function EventScreen() {
                             </View>
                         )}
 
+                        {/* Guest Banner */}
+                        {isGuest && (
+                            <TouchableOpacity
+                                style={guestBannerStyles.banner}
+                                onPress={() => router.push('/login')}
+                                activeOpacity={0.85}
+                            >
+                                <Ionicons name="lock-closed" size={16} color="#fff" />
+                                <Text style={guestBannerStyles.text}>Anmelden um alle Details zu sehen</Text>
+                                <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.7)" />
+                            </TouchableOpacity>
+                        )}
+
                         <View style={styles.content}>
-                            <View style={[...glassCard, styles.hostCard]}>
+                            <View style={[...glassCard, styles.hostCard, isGuest && { overflow: 'hidden' }]}>
                                 <View style={styles.hostInfo}>
                                     <View style={[styles.hostAvatar, { backgroundColor: effectivePrimary }]}>
                                         <Text style={[styles.hostAvatarText, { color: effectiveOnPrimary }]}>{hostInitial}</Text>
@@ -1659,18 +1881,19 @@ export default function EventScreen() {
                                         <Text style={[styles.hostSubtitle, { color: effectiveSecondary }]}>hat dich eingeladen</Text>
                                     </View>
                                 </View>
-                                {!event.is_host && (
+                                {!event.is_host && !isGuest && (
                                     <ReportMenuButton
                                         colors={colors}
                                         onReportEvent={() => setReportModalTarget('event')}
                                         onReportHost={() => setReportModalTarget('host')}
                                     />
                                 )}
+                                {isGuest && <GuestGate onPress={() => router.push('/login')} />}
                             </View>
 
                             {/* Action Buttons */}
                             <View style={[styles.actionButtons, isPreview && { opacity: 0.4 }]} pointerEvents={isPreview ? 'none' : 'auto'}>
-                                {(() => {
+                                {!isGuest && (() => {
                                     const hasAccess = effectiveIsFree
                                         ? rsvpStatus === 'Accepted'
                                         : (event.ticket ?? []).length > 0;
@@ -1684,21 +1907,23 @@ export default function EventScreen() {
                                         </TouchableOpacity>
                                     ) : null;
                                 })()}
-                                {rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 && !event.is_host && (
+                                {!isGuest && rsvpStatus === 'Accepted' && (event.custom_fields?.length ?? 0) > 0 && !event.is_host && (
                                     <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
                                         <Ionicons name="create-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben</Text>
                                     </TouchableOpacity>
                                 )}
-                                <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
-                                    <Ionicons name="calendar-outline" size={22} color={effectivePrimary} />
-                                    <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>ICS-Import</Text>
-                                </TouchableOpacity>
+                                {!isGuest && (
+                                    <TouchableOpacity style={glassActionBtn} onPress={handleCalendarDownload}>
+                                        <Ionicons name="calendar-outline" size={22} color={effectivePrimary} />
+                                        <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>ICS-Import</Text>
+                                    </TouchableOpacity>
+                                )}
                                 <TouchableOpacity style={glassActionBtn} onPress={handleShare}>
                                     <Ionicons name="share-outline" size={22} color={effectivePrimary} />
                                     <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Teilen</Text>
                                 </TouchableOpacity>
-                                {event.is_host && !useMehrMenu && (
+                                {!isGuest && event.is_host && !useMehrMenu && (
                                     <TouchableOpacity
                                         style={[glassActionBtn, event.is_cancelled && { opacity: 0.4 }]}
                                         onPress={() => router.push(`/event/${id}/manage`)}
@@ -1708,13 +1933,13 @@ export default function EventScreen() {
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Verwalten</Text>
                                     </TouchableOpacity>
                                 )}
-                                {showAngabenAendernHost && !useMehrMenu && (
+                                {!isGuest && showAngabenAendernHost && !useMehrMenu && (
                                     <TouchableOpacity style={glassActionBtn} onPress={openCustomFieldsModal}>
                                         <Ionicons name="create-outline" size={22} color={effectivePrimary} />
                                         <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Angaben ändern</Text>
                                     </TouchableOpacity>
                                 )}
-                                {useMehrMenu && (
+                                {!isGuest && useMehrMenu && (
                                     <View ref={moreMenuTriggerRef} style={styles.moreMenuWrapper} collapsable={false}>
                                         <TouchableOpacity style={glassActionBtn} onPress={toggleMoreMenu}>
                                             <Ionicons name="ellipsis-horizontal" size={22} color={effectivePrimary} />
@@ -1740,7 +1965,16 @@ export default function EventScreen() {
                                     <View style={[...glassCard, styles.locationCard]}>
                                         <View style={styles.locationHeader}>
                                             <View style={styles.locationTextContainer}>
-                                                {(() => {
+                                                {isGuest ? (
+                                                    <>
+                                                        <Text style={[styles.locationAddress, { color: colors.onSurface }]}>
+                                                            {event.location?.city ?? 'Standort'}
+                                                        </Text>
+                                                        <Text style={[styles.locationCity, { color: colors.onSurfaceVariant }]}>
+                                                            Genaue Adresse nach Anmeldung sichtbar
+                                                        </Text>
+                                                    </>
+                                                ) : (() => {
                                                     const loc = event.location!;
                                                     const isPrivateStripped = event.location_is_private && !loc.street && loc.latitude == null;
                                                     if (isPrivateStripped) {
@@ -1782,7 +2016,16 @@ export default function EventScreen() {
                                                 })()}
                                             </View>
                                         </View>
-                                        {event.location_is_private && !event.location.street && event.location.latitude == null ? (
+                                        {isGuest ? (
+                                            guestFuzzyCoords ? (
+                                                <GuestMapPreview
+                                                    coords={guestFuzzyCoords}
+                                                    trueLat={mapCoords?.lat ?? guestFuzzyCoords.lat}
+                                                    isDark={isDark}
+                                                    onPress={() => router.push('/login')}
+                                                />
+                                            ) : null
+                                        ) : event.location_is_private && !event.location.street && event.location.latitude == null ? (
                                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, gap: 6 }}>
                                                 <Ionicons name="lock-closed-outline" size={14} color={colors.onSurfaceVariant} />
                                                 <Text style={{ color: colors.onSurfaceVariant, fontSize: 13, textAlign: 'center', flexShrink: 1 }}>
@@ -1826,7 +2069,7 @@ export default function EventScreen() {
                                 </View>
                             )}
 
-                            {event.media_urls && event.media_urls.length > 0 && (
+                            {!isGuest && event.media_urls && event.media_urls.length > 0 && (
                                 <View style={styles.section}>
                                     <EventImageGallery images={event.media_urls} />
                                 </View>
@@ -1840,6 +2083,34 @@ export default function EventScreen() {
 
             {/* Sticky Bottom Bar — mobile only (hidden while ticket drawer is open) */}
             {!isDesktop && !drawerOpen && (() => {
+                if (isGuest) {
+                    return (
+                        <View style={[
+                            styles.stickyBar,
+                            { borderTopColor: colors.outlineVariant },
+                            isWeb
+                                ? { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
+                                : { backgroundColor: isDark ? 'rgba(18,19,26,0.85)' : 'rgba(255,255,255,0.85)' },
+                        ]}>
+                            <View style={styles.stickyBarInfo}>
+                                <Text style={[styles.stickyBarPrice, { color: colors.onSurface }]}>
+                                    {effectiveIsFree ? 'Kostenlos' : event.ticket_options && event.ticket_options.length > 0 ? `ab ${Math.min(...event.ticket_options.map(t => t.price)).toFixed(2)} €` : 'Kostenpflichtig'}
+                                </Text>
+                                <Text style={[styles.stickyBarHint, { color: colors.onSurfaceVariant }]}>
+                                    Anmelden um teilzunehmen
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.stickyBarButton, { backgroundColor: effectivePrimary }]}
+                                onPress={() => router.push('/login')}
+                            >
+                                <Text style={[styles.stickyBarButtonText, { color: effectiveOnPrimary }]}>
+                                    Anmelden
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    );
+                }
                 if (event.is_full && !hasTicketAccess) {
                     return (
                         <View pointerEvents={isPreview ? 'none' : 'auto'}>
@@ -2692,6 +2963,19 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.45)',
         zIndex: 10,
     },
+    homeButton: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 50 : 16,
+        left: 64,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 4,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        zIndex: 10,
+    },
     previewBadge: {
         position: 'absolute',
         top: Platform.OS === 'ios' ? 56 : 22,
@@ -3281,6 +3565,52 @@ const cancelledBannerStyles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         flex: 1,
+    },
+});
+
+const guestBannerStyles = StyleSheet.create({
+    banner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#b32053',
+        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 16,
+    },
+    text: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+        flex: 1,
+    },
+});
+
+const guestGateStyles = StyleSheet.create({
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+    },
+    pill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#b32053',
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+    },
+    pillText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
     },
 });
 

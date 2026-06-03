@@ -22,7 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { SkeletonEventCard } from '../components/atoms/SkeletonBox';
-import { api } from '../services/api';
+import { api, prefetchEvent } from '../services/api';
 import { authorize, getSession } from '../services/supabase';
 import { useSavedEvents } from '../contexts/SavedEventsContext';
 import { getGradientByIndex } from '../constants/gradients';
@@ -101,6 +101,8 @@ export default function EventListScreen() {
     const eventPeriodRef = React.useRef(eventPeriod);
     const searchQueryRef = React.useRef(searchQuery);
     const searchDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const tokenRef = React.useRef<string | null>(null);
+    const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     isOrganizerViewRef.current = isOrganizerView;
     eventPeriodRef.current = eventPeriod;
     searchQueryRef.current = searchQuery;
@@ -110,6 +112,7 @@ export default function EventListScreen() {
         setError(null);
         try {
             const token = await getSession();
+            tokenRef.current = token;
             let data: EventListResponse;
             if (isOrganizerViewRef.current) {
                 if (!token) { router.replace('/login'); return; }
@@ -143,6 +146,7 @@ export default function EventListScreen() {
         setError(null);
         try {
             const token = await getSession();
+            tokenRef.current = token;
             const data = await api.getPublicEvents(EVENTS_PER_PAGE, 0, token || undefined, filters, searchQueryRef.current);
             const more = data.events.length === EVENTS_PER_PAGE;
             cachedEvents = data.events;
@@ -165,6 +169,7 @@ export default function EventListScreen() {
         setLoadingMore(true);
         try {
             const token = await getSession();
+            tokenRef.current = token;
             const offset = eventsRef.current.length;
             let data: EventListResponse;
             if (isOrganizerViewRef.current) {
@@ -296,6 +301,14 @@ export default function EventListScreen() {
                     item.is_host && { borderColor: `${colors.primary}30`, borderWidth: 1 },
                 ]}
                 onPress={() => handleEventPress(item)}
+                onHoverIn={() => {
+                    hoverTimerRef.current = setTimeout(() => {
+                        prefetchEvent(item.event_id, tokenRef.current);
+                    }, 250);
+                }}
+                onHoverOut={() => {
+                    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+                }}
             >
                 <View style={styles.imageContainer}>
                     {item.image_url ? (

@@ -144,6 +144,9 @@ export default function EventHostScreen() {
                 <TouchableOpacity style={styles.backButton} onPress={handleBack}>
                     <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
                 </TouchableOpacity>
+                <TouchableOpacity style={styles.homeButton} onPress={() => router.push('/events' as any)}>
+                    <Ionicons name="compass-outline" size={20} color={colors.onSurface} />
+                </TouchableOpacity>
                 {isDesktop ? (
                     <View style={styles.desktopLayout}>
                         {/* Left: hero placeholder */}
@@ -182,6 +185,9 @@ export default function EventHostScreen() {
             <View style={[styles.root, { backgroundColor: colors.background }]}>
                 <TouchableOpacity style={styles.backButton} onPress={handleBack}>
                     <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.homeButton} onPress={() => router.push('/events' as any)}>
+                    <Ionicons name="compass-outline" size={20} color={colors.onSurface} />
                 </TouchableOpacity>
                 <View style={styles.centered}>
                     <Text style={[styles.errorText, { color: colors.error }]}>
@@ -281,6 +287,15 @@ export default function EventHostScreen() {
                 onPress={handleBack}
             >
                 <Ionicons name="arrow-back" size={22} color={colors.onSurface} />
+            </TouchableOpacity>
+            <TouchableOpacity
+                style={[
+                    styles.homeButton,
+                    { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' },
+                ]}
+                onPress={() => router.push('/events' as any)}
+            >
+                <Ionicons name="compass-outline" size={20} color={colors.onSurface} />
             </TouchableOpacity>
 
             {isDesktop ? (
@@ -1247,6 +1262,17 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: Platform.OS === 'ios' ? 50 : 16,
         left: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 20,
+    },
+    homeButton: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 50 : 16,
+        left: 64,
         width: 40,
         height: 40,
         borderRadius: 20,

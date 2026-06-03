@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -18,7 +18,7 @@ import Head from 'expo-router/head';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { SkeletonHostCard, SkeletonTicketCard } from '../components/atoms/SkeletonBox';
-import { api } from '../services/api';
+import { api, prefetchEvent } from '../services/api';
 import { getSession } from '../services/supabase';
 import { EventListItem } from '../types/events';
 import { useReminderSettings } from '@/src/contexts/ReminderSettingsContext';
@@ -96,6 +96,8 @@ export default function MyEventsScreen() {
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const { refresh: refreshReminders } = useReminderSettings();
+    const tokenRef = useRef<string | null>(null);
+    const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (!isWeb) return;
@@ -119,6 +121,7 @@ export default function MyEventsScreen() {
             router.replace('/login');
             return;
         }
+        tokenRef.current = token;
 
         if (!isRefresh) {
             setOrganizedLoading(true);
@@ -206,6 +209,14 @@ export default function MyEventsScreen() {
                 style={[styles.hostCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }, isCancelled && { opacity: 0.55 }]}
                 onPress={() => router.push(`/event/${event.event_id}/manage`)}
                 activeOpacity={0.85}
+                onHoverIn={() => {
+                    hoverTimerRef.current = setTimeout(() => {
+                        prefetchEvent(event.event_id, tokenRef.current);
+                    }, 250);
+                }}
+                onHoverOut={() => {
+                    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+                }}
             >
                 <View style={styles.hostCardRow}>
                     <View style={styles.hostCardThumb}>
@@ -341,6 +352,14 @@ export default function MyEventsScreen() {
                 ]}
                 onPress={() => router.push(showQR ? `/ticket/${event.event_id}` : `/event/${event.event_id}`)}
                 activeOpacity={0.85}
+                onHoverIn={() => {
+                    hoverTimerRef.current = setTimeout(() => {
+                        prefetchEvent(event.event_id, tokenRef.current);
+                    }, 250);
+                }}
+                onHoverOut={() => {
+                    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+                }}
             >
                 <View style={styles.cardBodyWithQR}>
                     <View style={styles.cardBodyContent}>
