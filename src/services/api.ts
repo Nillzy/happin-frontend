@@ -557,6 +557,12 @@ export const api = {
     },
 };
 
+export function prefetchEvent(eventId: string, token?: string | null) {
+    const cached = _eventCache.get(eventId);
+    if (cached && !cached.isPartial && Date.now() - cached.ts < CACHE_TTL) return;
+    void api.getEventById(eventId, token ?? undefined).catch(() => {});
+}
+
 export function invalidateTicketsCache() {
     _ticketsCache = null;
 }

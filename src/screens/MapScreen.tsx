@@ -23,6 +23,8 @@ const MAP_STYLE_DARK  = `https://api.maptiler.com/maps/019dfca2-7a0c-7ac9-bae7-d
 let cachedMarkers: MapMarker[] | null = null;
 let cachedCenter: { lat: number; lng: number } | null = null;
 let cachedCity: string | null = null;
+let lastViewedCenter: { lat: number; lng: number } | null = null;
+let lastViewedZoom: number | null = null;
 
 export default function MapScreen() {
     const { colors, isDark } = useTheme();
@@ -30,9 +32,11 @@ export default function MapScreen() {
     const { city, loaded: cityLoaded } = useUserCity();
 
     const [markers, setMarkers] = useState<MapMarker[]>(cachedMarkers ?? []);
-    const [center, setCenter] = useState(cachedCenter ?? BERLIN);
+    const [center, setCenter] = useState(lastViewedCenter ?? cachedCenter ?? BERLIN);
+    const [zoom, setZoom] = useState(lastViewedZoom ?? 11);
     const [loading, setLoading] = useState(cachedMarkers === null);
     const [error, setError] = useState(false);
+    const [readyToLoad, setReadyToLoad] = useState(cityLoaded);
 
     const loadingRef = useRef(false);
 
@@ -44,13 +48,26 @@ export default function MapScreen() {
     }, []);
 
     useEffect(() => {
-        if (!cityLoaded) return;
+        if (cityLoaded) setReadyToLoad(true);
+    }, [cityLoaded]);
+
+    // Fallback: proceed after 5s even if cityLoaded never fires
+    useEffect(() => {
+        const id = setTimeout(() => setReadyToLoad(true), 5000);
+        return () => clearTimeout(id);
+    }, []);
+
+    useEffect(() => {
+        if (!readyToLoad) return;
 
         if (cachedMarkers !== null && cachedCity !== null && city !== cachedCity) {
             cachedCity = city;
             geocodeCity(city).then((c) => {
                 cachedCenter = c;
+                lastViewedCenter = c;
+                lastViewedZoom = 11;
                 setCenter(c);
+                setZoom(11);
             });
             return;
         }
@@ -70,11 +87,14 @@ export default function MapScreen() {
 
                 const { events } = await api.getPublicEvents(50, 0, token ?? undefined);
 
-                const withCoords = events.filter((e: EventListItem) =>
+                const now = Date.now();
+                const upcomingEvents = events.filter((e: EventListItem) => new Date(e.starts_at).getTime() > now);
+
+                const withCoords = upcomingEvents.filter((e: EventListItem) =>
                     e.location?.latitude != null && e.location?.longitude != null
                 );
 
-                const needsGeocode = events.filter((e: EventListItem) =>
+                const needsGeocode = upcomingEvents.filter((e: EventListItem) =>
                     (e.location?.latitude == null || e.location?.longitude == null)
                     && (e.location?.street || e.location?.city)
                 );
@@ -122,7 +142,12 @@ export default function MapScreen() {
                 cachedCity = city;
 
                 setMarkers(pins);
-                setCenter(resolvedCenter);
+                if (!lastViewedCenter) {
+                    lastViewedCenter = resolvedCenter;
+                    lastViewedZoom = 11;
+                    setCenter(resolvedCenter);
+                    setZoom(11);
+                }
             } catch (err) {
                 console.error('[MapScreen] Fehler beim Laden:', err);
                 setError(true);
@@ -131,7 +156,7 @@ export default function MapScreen() {
                 setLoading(false);
             }
         })();
-    }, [cityLoaded, city]);
+    }, [readyToLoad, city]);
 
     return (
         <ScreenWithNav>
@@ -158,13 +183,18 @@ export default function MapScreen() {
                     </View>
                 ) : (
                     <View style={styles.mapWrapper}>
-                        <MapView
+                    <MapView
                             markers={markers}
                             centerLat={center.lat}
                             centerLng={center.lng}
+                            zoom={zoom}
                             isDark={isDark}
                             styleUrl={isDark ? MAP_STYLE_DARK : MAP_STYLE_LIGHT}
                             onMarkerPress={(eventId) => router.push(`/event/${eventId}` as any)}
+                            onPositionChanged={(lat, lng, z) => {
+                                lastViewedCenter = { lat, lng };
+                                lastViewedZoom = z;
+                            }}
                         />
                     </View>
                 )}
