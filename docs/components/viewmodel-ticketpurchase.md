@@ -8,6 +8,8 @@
 
 Das `TicketPurchaseViewModel` steuert den Ticketkauf-Workflow. Es zeigt verfügbare Ticket-Optionen an, leitet den Nutzer zum Stripe-Checkout weiter und zeigt gebuchte Tickets mit QR-Code an.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=TicketPurchaseViewModel>)
+
 ## Workflow (S2 – Ticketkauf)
 
 ```

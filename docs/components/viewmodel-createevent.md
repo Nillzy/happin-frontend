@@ -8,6 +8,8 @@
 
 Das `CreateEventViewModel` führt den Host durch den mehrstufigen Event-Erstellungsprozess. Die Erstellung ist in zwei Schritte aufgeteilt, um die Komplexität zu reduzieren.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=CreateEventViewModel>)
+
 ## Workflow (M6 – Event erstellen)
 
 ```

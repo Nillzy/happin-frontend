@@ -49,7 +49,6 @@ markdown_extensions:
 
 nav:
   - Startseite: index.md
-  - Architektur: architecture.md
   - Frontend-Komponenten:
     - Überblick: components/index.md
     - GUI-Frontends:
@@ -73,3 +72,4 @@ nav:
       - Sitzungssteuerung: components/sitzungssteuerung.md
       - Sitzungsverwaltung: components/sitzungsverwaltung.md
     - BackendAdapter: components/backend-adapter.md
+  - Architekturentwurf: architecture.md

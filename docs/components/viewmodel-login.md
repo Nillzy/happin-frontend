@@ -8,6 +8,8 @@
 
 Das `LoginViewModel` steuert den Login- und Registrierungsflow. Es implementiert den Workflow M1 (Nutzer anmelden) aus dem Pflichtenheft über ein zweistufiges OTP-Verfahren per E-Mail.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Umgesetzte%20Anforderungen-,LoginViewModel,-M1%20(Nutzer%2DAuthentifizierung>)
+
 ## Workflow (M1)
 
 ```

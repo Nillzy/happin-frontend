@@ -10,6 +10,8 @@ Die `Sitzungssteuerung` verwaltet alle zur Sitzung gehörenden Dialogkomponenten
 
 In der Implementierung entspricht die `Sitzungssteuerung` dem **React Navigation Stack Navigator**, der den Navigationszustand (welche Screens sind auf dem Stack) für die gesamte App-Sitzung verwaltet.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=gr%C3%BCn/rot%2C%20Mehrfachnutzungskontrolle)-,Sitzungssteuerung,-M1%20(Dialoge%20der>)
+
 ## Schnittstellen
 
 | Schnittstelle | Richtung | Beschreibung |

@@ -8,6 +8,8 @@
 
 Die `Sitzungsverwaltung` kennt alle angemeldeten Benutzer (also alle aktiven Sitzungen) und stellt deren Sitzungsdaten bereit. In einer Single-User-App wie Happin verwaltet sie die eine aktive Sitzung des eingeloggten Nutzers.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Co%2DHost%2DSitzung)-,Sitzungsverwaltung,-M1%20(Kenntnis%20aller>)
+
 ## Schnittstellen
 
 | Schnittstelle | Richtung | Beschreibung |
