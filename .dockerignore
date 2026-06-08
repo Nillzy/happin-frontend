@@ -40,7 +40,7 @@ coverage/
 # Documentation
 README.md
 docs/
-documentation/
+repo-docs/
 
 # CI/CD
 .gitlab-ci.yml
