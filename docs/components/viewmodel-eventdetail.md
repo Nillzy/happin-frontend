@@ -8,6 +8,8 @@
 
 Das `EventDetailViewModel` zeigt alle Details eines Events: Beschreibung, Ort, Datum, Bilder, Wettervorhersage, Ticket-Optionen und den RSVP-Status des Nutzers. Es ist der umfangreichste Screen der App.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=EventDetailViewModel>)
+
 ## Workflow (M3 – Event anzeigen, M4 – Event-Details)
 
 ```

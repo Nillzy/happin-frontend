@@ -8,6 +8,8 @@
 
 Das `NotificationViewModel` verwaltet In-App-Benachrichtigungen und Push-Erinnerungen. Es implementiert den Workflow K4 (Erinnerungen) und zeigt alle Benachrichtigungen des Nutzers an.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=NotificationViewModel>)
+
 ## Workflow (K4 – Erinnerungen)
 
 ```

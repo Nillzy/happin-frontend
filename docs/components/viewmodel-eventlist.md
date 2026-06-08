@@ -8,6 +8,8 @@
 
 Das `EventListViewModel` stellt die öffentliche, filterbare und paginierte Event-Liste bereit. Es implementiert den Workflow M11 (öffentliche Eventliste) und ist der zentrale Einstiegspunkt für die Event-Entdeckung.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=und%20Login%2DWorkflow)-,EventListViewModel,-M11%20(%C3%96ffentliche%20Eventliste>)
+
 ## Workflow (M11)
 
 ```

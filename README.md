@@ -229,7 +229,7 @@ router.replace('/login');
 router.back();
 ```
 
-Weitere Details: [`documentation/08-routing.md`](documentation/08-routing.md)
+Weitere Details: [`documentation/08-routing.md`](repo-docs/08-routing.md)
 
 ---
 
@@ -244,7 +244,7 @@ const { colors, isDark } = useTheme();
 // colors enthält alle MD3-Farbtokens für das aktive Theme
 ```
 
-Farbpaletten und Typografie: [`documentation/DESIGN.md`](documentation/DESIGN.md)
+Farbpaletten und Typografie: [`documentation/DESIGN.md`](repo-docs/DESIGN.md)
 
 ---
 
@@ -280,7 +280,7 @@ Die GitLab CI/CD Pipeline (`.gitlab-ci.yml`) läuft bei jedem Push auf `main` au
 
 ## Weiterführende Dokumentation
 
-Detaillierte technische Dokumentation liegt im Ordner [`documentation/`](documentation/).
+Detaillierte technische Dokumentation liegt im Ordner [`documentation/`](repo-docs/).
 
 **Neue Themen, die in keine bestehende Datei passen, erhalten eine eigene Datei und einen Eintrag in `00-index.md`.**
 
