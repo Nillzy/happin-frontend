@@ -8,6 +8,8 @@
 
 Das `HostDashboardViewModel` stellt alle Host-spezifischen Verwaltungsfunktionen bereit. Ein Host kann seine Events verwalten, die Teilnehmerliste einsehen, Tickets scannen und Gästelisten exportieren.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=HostDashboardViewModel>)
+
 ## Workflow (M7 – Host Dashboard)
 
 ```

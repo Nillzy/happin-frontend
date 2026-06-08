@@ -55,5 +55,5 @@ happin-frontend/
 
 ## Weiterführende Abschnitte
 
-- [Architektur](architecture.md) – Komponentendiagramm und Entwurfsvergleich
+- [Architekturentwurf](architecture.md) – Komponentendiagramm und Entwurfsvergleich
 - [Komponenten](components/index.md) – Jede Komponente auf einer eigenen Seite

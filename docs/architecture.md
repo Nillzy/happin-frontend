@@ -1,4 +1,4 @@
-# Architektur
+# Architekturentwurf
 
 ## Komponentendiagramm
 
@@ -31,19 +31,19 @@ Die Schnittstellen `DefinePresentation` (Ansichten definieren) und `DisplayData`
 
 Die Präsentationsschicht mit allen ViewModels entspricht dem Verzeichnis `src/screens/`. Jede Screen-Datei ist das konkrete ViewModel im Sinne des MVVM-Musters. Die `PresentationEvents`-Schnittstelle (Rückmeldung an die GUI-Frontends) ist über React-Navigation-Events und State-Updates realisiert.
 
-| Entwurfs-ViewModel | Implementierung |
-|---|---|
-| Login-Screen (M1) | `src/screens/LoginScreen.tsx` |
-| Öffentliche Eventliste (M11) | `src/screens/EventListScreen.tsx`, `src/screens/HomeScreen.tsx` |
-| Host Dashboard (M7) | `src/screens/EventHostScreen.tsx` |
-| Ticketkauf (S2) | `src/screens/TicketDetailScreen.tsx` (Checkout-Flow) |
-| RSVP (M5) | `src/screens/EventScreen.tsx` (RSVP-Bereich) |
-| Benachrichtigungen | `src/screens/NotificationsScreen.tsx` |
-| Event erstellen | `src/screens/EventCreateStepOneNew.tsx`, `src/screens/EventCreateStepTwo.tsx` |
-| Ticket scannen | `src/screens/ScanTicketScreen.tsx` |
-| Event-Detail | `src/screens/EventScreen.tsx` |
-| RSVP-Antworten (Host) | `src/screens/EventRsvpResponsesScreen.tsx` |
-| Gäste-Liste (Host) | `src/screens/EventGuestsScreen.tsx` |
+| Entwurfs-ViewModel | Implementierung | Im Architekturentwurf |
+|---|---|---|
+| Login-Screen (M1) | `src/screens/LoginScreen.tsx` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Umgesetzte%20Anforderungen-,LoginViewModel,-M1%20(Nutzer%2DAuthentifizierung>) |
+| Öffentliche Eventliste (M11) | `src/screens/EventListScreen.tsx`, `src/screens/HomeScreen.tsx` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=und%20Login%2DWorkflow)-,EventListViewModel,-M11%20(%C3%96ffentliche%20Eventliste>) |
+| Host Dashboard (M7) | `src/screens/EventHostScreen.tsx` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=HostDashboardViewModel>) |
+| Ticketkauf (S2) | `src/screens/TicketDetailScreen.tsx` (Checkout-Flow) | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=TicketPurchaseViewModel>) |
+| RSVP (M5) | `src/screens/EventScreen.tsx` (RSVP-Bereich) | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=S11%20(Meldefunktion)-,RSVPViewModel,-M5%20(RSVP%2DFormular>) |
+| Benachrichtigungen | `src/screens/NotificationsScreen.tsx` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=NotificationViewModel>) |
+| Event erstellen | `src/screens/EventCreateStepOneNew.tsx`, `src/screens/EventCreateStepTwo.tsx` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=CreateEventViewModel>) |
+| Ticket scannen | `src/screens/ScanTicketScreen.tsx` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Co%2DHost%2DVerwaltung)-,ScanTicketViewModel,-M9%20(QR%2DScanner>) |
+| Event-Detail | `src/screens/EventScreen.tsx` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=EventDetailViewModel>) |
+| RSVP-Antworten (Host) | `src/screens/EventRsvpResponsesScreen.tsx` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=S11%20(Meldefunktion)-,RSVPViewModel,-M5%20(RSVP%2DFormular>) |
+| Gäste-Liste (Host) | `src/screens/EventGuestsScreen.tsx` | [→](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=HostDashboardViewModel>) |
 
 ### Dialogkern
 
@@ -64,11 +64,15 @@ Der `DialogManager`, der Komponenten bei der Erzeugung eines Dialogs konfigurier
 
 *✅ umgesetzt – React Navigation Stack*
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=gr%C3%BCn/rot%2C%20Mehrfachnutzungskontrolle)-,Sitzungssteuerung,-M1%20(Dialoge%20der>)
+
 Die Sitzungssteuerung, die dialogzugehörige Komponenten verwaltet, entspricht dem **React Navigation Stack Navigator**. Er verwaltet den Navigationszustand und die History aller aktiven Screens einer Sitzung.
 
 ### Sitzungsverwaltung
 
 *✅ umgesetzt – AuthContext*
+
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Co%2DHost%2DSitzung)-,Sitzungsverwaltung,-M1%20(Kenntnis%20aller>)
 
 Die Sitzungsverwaltung, die alle angemeldeten Benutzer kennt, ist als `src/contexts/AuthContext.tsx` umgesetzt. Sie verwaltet die Supabase-Session, den Benutzer und stellt `signOut()` bereit.
 

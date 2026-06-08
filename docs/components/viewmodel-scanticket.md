@@ -8,6 +8,8 @@
 
 Das `ScanTicketViewModel` ermöglicht es Event-Hosts, QR-Code-Tickets beim Einlass zu scannen und zu validieren. Es implementiert den Workflow M8 (Ticketkontrolle).
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=Co%2DHost%2DVerwaltung)-,ScanTicketViewModel,-M9%20(QR%2DScanner>)
+
 ## Workflow (M8 – Ticket scannen)
 
 ```

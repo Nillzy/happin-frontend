@@ -8,6 +8,8 @@
 
 Das `RSVPViewModel` verwaltet die Zu- und Absage eines Nutzers zu einem Event. Es implementiert den Workflow M5 (RSVP) und ist direkt in den `EventScreen` eingebettet.
 
+[→ Im Architekturentwurf ansehen](<https://gitlab.com/groups/dhbw-se/se-tinf24b2/happin/-/wikis/Entwurf/Komponentendiagramm#:~:text=S11%20(Meldefunktion)-,RSVPViewModel,-M5%20(RSVP%2DFormular>)
+
 ## Workflow (M5)
 
 ```
