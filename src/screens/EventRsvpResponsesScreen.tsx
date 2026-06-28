@@ -9,7 +9,7 @@ import {
     ActivityIndicator,
     useWindowDimensions,
 } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getSession } from '../services/supabase';

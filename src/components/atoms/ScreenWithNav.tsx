@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 import { View, StyleSheet, Platform, useWindowDimensions } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 import BottomNavBar from './BottomNavBar';
 
 interface ScreenWithNavProps {

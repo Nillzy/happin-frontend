@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 import { GRADIENT_PAIRS, type GradientId } from '@/src/constants/gradients';
 import { api } from '@/src/services/api';
 import { uploadEventImage } from '@/src/services/supabase';

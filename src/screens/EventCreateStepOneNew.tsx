@@ -12,7 +12,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import Navbar from '../components/atoms/Navbar';

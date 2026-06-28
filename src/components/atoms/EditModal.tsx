@@ -11,7 +11,7 @@ import {
     Animated,
     Dimensions,
 } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 

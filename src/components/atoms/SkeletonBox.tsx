@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View, ViewStyle } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 
 export function SkeletonBox({ width, height, borderRadius = 8, style }: {
     width?: number | `${number}%` | 'auto';

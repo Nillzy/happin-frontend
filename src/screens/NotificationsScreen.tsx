@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 import { api } from '@/src/services/api';
 import { getSession } from '@/src/services/supabase';
 import { useNotifications } from '@/src/contexts/NotificationsContext';

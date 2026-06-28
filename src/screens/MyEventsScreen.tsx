@@ -12,7 +12,7 @@ import {
     LayoutAnimation,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import Navbar from '../components/atoms/Navbar';

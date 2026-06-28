@@ -8,7 +8,7 @@ import {
     StyleSheet,
     Platform,
 } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 
 interface ConfirmModalProps {
     visible: boolean;

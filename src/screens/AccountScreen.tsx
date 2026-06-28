@@ -17,7 +17,7 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
@@ -36,7 +36,7 @@ import {
     UserProfile,
     uploadProfilePicture,
 } from '../services/supabase';
-import { useUserCity } from '@/hooks/use-user-city';
+import { useUserCity } from '@/src/hooks/use-user-city';
 import CityAutocomplete from '../components/atoms/CityAutocomplete';
 import { searchCities } from '../services/geocoding';
 import { api } from '../services/api';

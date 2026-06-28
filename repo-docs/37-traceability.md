@@ -119,4 +119,4 @@ Auf den Komponentenseiten unter [`docs/components/`](../docs/components/) gibt e
 
 ## Verwandte Doku
 
-- [`34-documentation-concept.md`](34-documentation-concept.md) – Überblick über die Dokumentations-Ebenen (`repo-docs/`, `docs/`, Backend-`api-docs/`).
+- [`36-documentation-concept.md`](36-documentation-concept.md) – Überblick über die Dokumentations-Ebenen (`repo-docs/`, `docs/`, Backend-`api-docs/`).

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Platform, useWindowDimensions } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 import HappinLogo from './HappinLogo';
 import DarkLightToggle from './DarkLightToggle';
 import NotificationBell from './NotificationBell';

@@ -7,7 +7,7 @@ import {
     StyleSheet,
     ScrollView,
 } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 import type { CustomField, CustomFieldResponseItem } from '@/src/types/events';
 
 interface TicketInfo {

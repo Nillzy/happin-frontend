@@ -296,7 +296,7 @@ shadowRadius: 4
   - "Register"-Button → "ICS herunterladen"
   - `handleRegister` → `handleCalendarDownload` (Platform-Split Web/Native)
   - Pakete: expo-file-system, expo-sharing
-  - Dokumentation: siehe 28-kalender-export-frontend.md
+  - Dokumentation: siehe 30-kalender-export-frontend.md
 
 - **2026-05-05**: Initial implementiert
   - Luma-inspiriertes Layout

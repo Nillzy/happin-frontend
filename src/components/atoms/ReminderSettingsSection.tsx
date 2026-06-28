@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/hooks/use-theme';
 import { useReminderSettings } from '@/src/contexts/ReminderSettingsContext';
 import { REMINDER_LEAD_TIME_PRESETS } from '@/src/types/reminders';
 import {
