@@ -1,6 +1,8 @@
 # Documentation Index
 
-This is the central index for all project documentation in the `documentation/` folder.
+This is the central index for all project documentation in the `repo-docs/` folder.
+
+> **Note:** This repository has two documentation folders. **`repo-docs/`** (this folder) contains implementation-level documentation and serves as a working aid during development. **`docs/`** is a separate MkDocs site that describes the **architecture** of the frontend for stakeholders — it does not explain the repo itself. See [`34-documentation-concept.md`](./34-documentation-concept.md) for details.
 
 | File | Description |
 |------|-------------|
@@ -42,48 +44,3 @@ This is the central index for all project documentation in the `documentation/` 
 | [33-erinnerungen-k4.md](./33-erinnerungen-k4.md) | **Erinnerungen (K4)**: Hybrid-Push (Native lokal via expo-notifications + Web Push via Service Worker / Backend-Scheduler), Settings-Sektion im AccountScreen, Presets + Custom Lead-Time. |
 | [34-documentation-concept.md](./34-documentation-concept.md) | **Dokumentationskonzept**: Drei Dokus (`repo-docs/`, `docs/` via MkDocs unter `/docs`, Backend-Swagger unter `/api/docs`), Zielgruppen, Konventionen, `EXPO_PUBLIC_DEBUG=true` als Voraussetzung. |
 | [35-traceability.md](./35-traceability.md) | **Traceability-Konzept**: Rückreferenzen Code → Architekturentwurf → Pflichtenheft → Lastenheft, Mx/Sx/Kx-IDs, URL-Fragment-Anchor-Pattern für GitLab-Wiki-Links. |
-| [CLAUDE_PROMPT_BACKEND_INTEGRATION.md](./CLAUDE_PROMPT_BACKEND_INTEGRATION.md) | **Claude-Prompt für Backend-Integration**: Priorisierte TODO-Liste aller offenen Backend-Aufgaben (Draft-Flow, Bild-Upload, Unsplash-Proxy, Permissions, MyEvents-Daten). |
-| [CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md](./CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md) | Vollständiger Claude-Prompt für Event-Creation UI Redesign & Feature-Implementierung (Phasen 1-3). |
-| [EVENT_CREATION_UX_ANALYSIS.md](./EVENT_CREATION_UX_ANALYSIS.md) | UX-Analyse des bestehenden Event-Creation Flows mit identifizierten Problemen und Verbesserungsvorschlägen. |
-| [EVENT_CREATION_PHASE_1_IMPLEMENTATION.md](./EVENT_CREATION_PHASE_1_IMPLEMENTATION.md) | Phase 1 Implementation (P0): Titelbild-Upload, Location-Validation, Category-Chips mit Multi-Select. |
-| [EVENT_CREATION_APPLE_REDESIGN.md](./EVENT_CREATION_APPLE_REDESIGN.md) | Apple-Style Redesign des Event-Creation Flows mit 2-Step (Essentials + Details), SegmentedControl, FAB Navigation, Large Typography, 16px Cards. |
-
-## Wichtige Änderungen (Mai 2026)
-
-### UI/UX Updates
-- ✅ **Infinity Scroll** in EventListScreen (keine Pagination mehr)
-- ✅ **Saved Events** System mit Like-Funktionalität (Heart-Icon)
-- ✅ **Saved Events Grid**: Responsives Grid-Layout (1–5 Spalten) identisch zu Explore; Herz-Button (gefüllt) entfernt Event aus Liste
-- ✅ **Gradient-Auswahl** für Event-Titelbilder (4 Vorlagen)
-- ✅ **Stockbild-Vorschläge** im Titelbild-Modal: Unsplash-Suche basierend auf Eventtitel
-- ✅ **Dark-Mode-Toggle** von Navbar zu Account-Screen verschoben
-- ✅ **Explore Screen** ohne Überschriften, mit Suchleiste + Filter/Saved Buttons
-- ✅ **Footer entfernt** in Explore & Saved Events
-- ✅ **Kartenansicht** mit Event-Pins, stadtbasierter Zentrierung, Custom Map Styles, City Autocomplete + GPS-Button
-- ✅ **Web Input Outline** entfernt (`outlineStyle: 'none'` auf allen TextInputs)
-- ✅ **DatePicker kompakter**: Tageszellen feste Höhe 34px statt `aspectRatio: 1`
-- ✅ **DatePicker/TimePicker z-index**: Inline-Popover liegt korrekt über nachfolgenden Cards (`zIndex: 100` auf Datum&Uhrzeit-Card, `overflow: visible` auf ScrollView + Card)
-- ✅ **Account-Screen**: Sektionen „Meine Events" und „Meine Tickets" entfernt; GPS-Button als Happin-Pin-SVG (statt Emoji)
-- ✅ **ICS-Download-Button**: "Register"-Button im EventScreen → ICS-Datei herunterladen (Web: Browser-Download, Native: Share-Sheet)
-
-### Event-Management
-- ✅ **MyEventsScreen Redesign**: Collapsible Sections, QR-Code Ticket-Cards, Split-Navigation
-- ✅ **TicketDetailScreen**: Luma-style Bottom Sheet Modal mit QR-Code
-- ✅ **EventHostScreen Redesign**: Keine Tabs mehr, Gästelisten als separate Seiten
-- ✅ **EventGuestsScreen**: Dedizierte Seite pro Status (Zusagen/Absagen/Unsicher)
-- ✅ **Event Soft-Delete**: Hosts können Events löschen (48h Sichtbarkeitsfenster); "Abgesagt"-Badge in Listen, roter Banner in Detailansicht
-
-### Navigation
-- ✅ **"Dein Event" Badge**: Jetzt links oben (statt rechts), ohne Emoji
-- ✅ **"Zur Gast-Ansicht" Button**: Im EventHostScreen, navigiert zu normaler Event-Ansicht
-- ✅ **Gästelisten**: Öffnen als separate Seiten (`/event/[id]/guests?status=...`)
-- ✅ **Navbar bereinigt**: Account-Button entfernt (Konto-Tab in Bottom Nav); DarkLightToggle entfernt (im Account-Screen)
-- ✅ **Responsive Navigation**: Mobile → Bottom Nav, Desktop/Tablet (≥768px Web) → Top-Navbar mit Tab-Links + „Event erstellen"-Button
-- ✅ **Navbar auf Mobile unsichtbar**: Rendert `null` bei `width < 768` oder Native — kein Logo-Balken oben
-- ✅ **HappinLogo in Bottom Nav**: Klein (scale 0.7, opacity 0.8) unter dem Erstellen-Button
-- ✅ **Mobiler Zurück-Header**: EventCreate Step 1 & 2 zeigen auf Mobile `arrow-back` Icon + „Zurück" statt Navbar
-
-### Backend-Integration
-- ✅ **Infinity Scroll Backend-Fix**: Backend gibt jetzt Total-Count zurück (nicht nur Page-Count)
-- ✅ **Gradient-ID Support**: Backend speichert `gradient_id` (0-3) für Events ohne Bilder
-- ✅ **`person.city` Spalte**: Standortänderungen werden via `PATCH /api/v1/users/me/city` in die `person`-Tabelle geschrieben

@@ -131,7 +131,7 @@ happin-frontend/
 ├── assets/
 │   └── images/                   # App-Icons, Splash Screen, statische Bilder
 │
-├── documentation/                # Technische Projektdokumentation (siehe unten)
+├── repo-docs/                    # Technische Projektdokumentation (siehe unten)
 │
 ├── Dockerfile                    # Multi-Stage Build: Node (Build) + Nginx (Serve)
 ├── nginx.conf                    # Nginx-Konfiguration für den Web-Export
@@ -229,7 +229,7 @@ router.replace('/login');
 router.back();
 ```
 
-Weitere Details: [`documentation/08-routing.md`](repo-docs/08-routing.md)
+Weitere Details: [`repo-docs/08-routing.md`](repo-docs/08-routing.md)
 
 ---
 
@@ -244,7 +244,7 @@ const { colors, isDark } = useTheme();
 // colors enthält alle MD3-Farbtokens für das aktive Theme
 ```
 
-Farbpaletten und Typografie: [`documentation/DESIGN.md`](repo-docs/DESIGN.md)
+Farbpaletten und Typografie: [`repo-docs/DESIGN.md`](repo-docs/DESIGN.md)
 
 ---
 
@@ -280,8 +280,13 @@ Die GitLab CI/CD Pipeline (`.gitlab-ci.yml`) läuft bei jedem Push auf `main` au
 
 ## Weiterführende Dokumentation
 
-Detaillierte technische Dokumentation liegt im Ordner [`documentation/`](repo-docs/).
+Im Projekt gibt es **zwei getrennte Dokumentations-Ordner** mit unterschiedlichem Zweck:
 
-**Neue Themen, die in keine bestehende Datei passen, erhalten eine eigene Datei und einen Eintrag in `00-index.md`.**
+- [`repo-docs/`](repo-docs/) — Implementierungs-Doku für Entwickler und KI-Agenten. Feature-Historie, UI-Entscheidungen, Auth-Flows, Migrationspfade. **Arbeitshilfe während der Implementierung.**
+- [`docs/`](docs/) — Stakeholder-Doku (MkDocs). Beschreibt die **Architektur** des Frontends (ViewModels, Komponenten, Entwurf-vs-Implementierung). Erreichbar unter `/docs` bei `EXPO_PUBLIC_DEBUG=true`. **Erklärt nicht das Repo, sondern die Architektur.**
+
+Volle Erklärung: [`repo-docs/34-documentation-concept.md`](repo-docs/34-documentation-concept.md).
+
+**Neue Themen, die in keine bestehende Datei passen, erhalten eine eigene Datei in `repo-docs/` und einen Eintrag in `00-index.md`.**
 
 *DHBW Karlsruhe — Software Engineering TINF24B2 — Happin*
