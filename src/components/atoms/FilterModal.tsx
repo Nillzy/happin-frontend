@@ -10,7 +10,7 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/src/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import EditDrawer from './EditDrawer';
 import FilterChip from './FilterChip';
 import DatePicker from './DatePicker';

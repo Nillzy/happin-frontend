@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useTheme } from '@/src/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
 export default function ConnectReturnScreen() {
     const { colors } = useTheme();

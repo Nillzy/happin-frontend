@@ -26,7 +26,7 @@ import Svg, {
     Stop,
 } from 'react-native-svg';
 import { MAP_PATHS_PRIMARY, MAP_PATHS_SECONDARY, MAP_PATHS_MINOR } from '@/src/constants/berlin-map-paths';
-import { useTheme } from '@/src/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { getTimeBasedSlogan } from '../utils/getTimeBasedSlogan';

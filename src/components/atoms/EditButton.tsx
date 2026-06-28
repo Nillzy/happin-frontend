@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet } from 'react-native';
-import { useTheme } from '@/src/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import PencilIcon from './PencilIcon';
 
 interface EditButtonProps {

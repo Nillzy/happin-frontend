@@ -12,7 +12,7 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { useTheme } from '@/src/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
 interface TimePickerProps {
     value: string;

@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/src/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import Head from 'expo-router/head';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';

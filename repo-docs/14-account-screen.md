@@ -52,7 +52,7 @@ Vier `StatTile`-Kacheln via `GET /api/v1/users/me/stats`:
 
 ---
 
-## Stadteinstellung (`hooks/use-user-city.ts`)
+## Stadteinstellung (`hooks/useUserCity.ts`)
 
 ```typescript
 const { city, cityLabel, saveCity, loaded } = useUserCity();

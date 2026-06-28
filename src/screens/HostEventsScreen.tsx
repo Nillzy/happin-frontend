@@ -12,7 +12,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/src/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import Navbar from '../components/atoms/Navbar';
 import Footer from '../components/atoms/Footer';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';

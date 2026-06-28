@@ -8,7 +8,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useTheme } from '@/src/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import { CitySuggestion, searchCities } from '@/src/services/geocoding';
 
 interface CityAutocompleteProps {

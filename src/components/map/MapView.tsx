@@ -13,7 +13,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator, Text } from 'react-native';
-import { useTheme } from '@/src/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
 // Dynamic import für MapTiler SDK (nur Web)
 let MapTilerSDK: any = null;
