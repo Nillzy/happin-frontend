@@ -238,7 +238,7 @@ Weitere Details: [`repo-docs/08-routing.md`](repo-docs/08-routing.md)
 Das Design-System basiert auf **Material Design 3** und unterstützt Light Mode ("Happin Light") und Dark Mode ("Neon Horizon"). Das aktive Theme kann auch manuell über den `DarkLightToggle` umgeschaltet werden.
 
 ```typescript
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
 const { colors, isDark } = useTheme();
 // colors enthält alle MD3-Farbtokens für das aktive Theme

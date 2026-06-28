@@ -32,7 +32,7 @@ import EventBlurBackground from '../components/event/EventBlurBackground';
 import EventCategories from '../components/event/EventCategories';
 import EventImageGallery from '../components/atoms/EventImageGallery';
 import { WeatherBlock } from '../components/event/WeatherBlock';
-import MapView from '../components/MapView';
+import MapView from '../components/map/MapView';
 import { getSession, getUserProfile } from '../services/supabase';
 import { api, invalidateTicketsCache } from '../services/api';
 import { geocodeAddress } from '../services/geocoding';

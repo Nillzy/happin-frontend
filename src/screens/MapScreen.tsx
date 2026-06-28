@@ -7,7 +7,7 @@ import { useUserCity } from '@/src/utils/useUserCity';
 import Navbar from '../components/atoms/Navbar';
 import ScreenWithNav from '../components/atoms/ScreenWithNav';
 import { SkeletonBox } from '../components/atoms/SkeletonBox';
-import MapView, { MapMarker } from '../components/MapView';
+import MapView, { MapMarker } from '../components/map/MapView';
 import { api } from '../services/api';
 import { geocodeCity, geocodeAddress } from '../services/geocoding';
 import { getSession, authorize } from '../services/supabase';

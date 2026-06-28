@@ -95,18 +95,13 @@ This is an **Expo SDK 54** app (React Native 0.81 + React 19) targeting iOS, And
 
 ### Navigation
 
-The app uses **React Navigation** (not Expo Router's file-based routing despite `app/` existing). `app/_layout.tsx` and `app/index.tsx` are thin bootstraps that render `src/components/App.tsx`, which sets up the `NavigationContainer`. The real route tree lives in `src/navigation/RootNavigator.tsx` — a `createNativeStackNavigator` with three routes: `Home`, `Login`, `Event`.
+The app uses **Expo Router** file-based routing. Route files live in `src/app/`. The entry layout is `src/app/_layout.tsx`.
 
-Deep-link scheme: `happin://` (routes: `/`, `/login`, `/event`).
-
-Use the typed navigation wrapper instead of raw hooks:
-```typescript
-import { useAppNavigation } from '@/src/utils/useAppNavigation';
-```
+Deep-link scheme: `happinfrontend://` (configured via `scheme` in `app.json`).
 
 ### Theming
 
-Every screen gets colors through `useTheme()` from `hooks/use-theme.ts`. It returns `{ colors, isDark }` based on the system color scheme. Color tokens follow **Material Design 3** and are defined in `constants/colors.ts` with separate `light` and `dark` objects.
+Every screen gets colors through `useTheme()` from `src/contexts/ThemeContext.tsx`. It returns `{ colors, isDark }` based on the system color scheme. Color tokens follow **Material Design 3** and are defined in `src/constants/colors.ts` with separate `light` and `dark` objects.
 
 Always destructure `colors` from `useTheme()` at the top of a component — do not hard-code hex values in screen files.
 
@@ -150,22 +145,25 @@ Use React Native's `StyleSheet.create`. Styles that depend on the theme must be 
 
 ```
 src/
+  app/              # Expo Router route files
   components/
-    App.tsx           # Root: NavigationContainer + linking config
-    atoms/            # Smallest reusable pieces (SVG icons, etc.)
-  navigation/
-    RootNavigator.tsx # Stack navigator definition
-  screens/            # One file per screen
-  utils/              # Typed hooks and small helpers
-constants/            # Static data shared across screens (colors, SVG paths)
-hooks/                # Custom React hooks
+    atoms/          # Smallest reusable pieces (SVG icons, etc.)
+    auth/           # Auth-related components
+    event/          # Event-related components
+    map/            # Map-related components
+  contexts/         # React Context providers + hooks (useAuth, useTheme, ...)
+  constants/        # Static data shared across screens (colors, SVG paths, gradients)
+  screens/          # One file per screen
+  services/         # External interfaces (API, Supabase, push, reminders)
+  types/            # Global TypeScript types
+  utils/            # Pure functions and small helpers (incl. useUserCity)
 ```
 
 Screens own their local state (useState/useReducer). There is no global state library — keep state local until a clear cross-screen need emerges.
 
 ### SVG
 
-The Berlin map on `HomeScreen` is built from raw SVG path data in `constants/berlin-map-paths.ts` and rendered via `react-native-svg`. Custom icon components live in `src/components/atoms/icons.tsx`.
+The Berlin map on `HomeScreen` is built from raw SVG path data in `src/constants/berlin-map-paths.ts` and rendered via `react-native-svg`. Custom icon components live in `src/components/atoms/icons.tsx`.
 
 ## Documentation
 
@@ -174,7 +172,7 @@ The project has **two separate documentation folders** with different purposes �
 - **`repo-docs/`** — Implementation-level documentation for developers and AI agents working in the codebase. Tracks feature history, UI decisions, auth flows, migration paths, workarounds. Used as a working aid during implementation. **This is where you write.**
 - **`docs/`** — Stakeholder documentation rendered via MkDocs. Describes the **architecture** of the frontend (ViewModels, components, design-vs-implementation mapping). Served at `/docs` when `EXPO_PUBLIC_DEBUG=true`. **Do not document implementation details here.**
 
-See [`repo-docs/34-documentation-concept.md`](repo-docs/34-documentation-concept.md) for the full concept.
+See [`repo-docs/36-documentation-concept.md`](repo-docs/36-documentation-concept.md) for the full concept.
 
 `repo-docs/` is the source of truth for project context and design decisions:
 

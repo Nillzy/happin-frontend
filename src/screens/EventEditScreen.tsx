@@ -30,7 +30,7 @@ import DatePicker from '../components/atoms/DatePicker';
 import TimePicker from '../components/atoms/TimePicker';
 import ImageGalleryUploader from '../components/atoms/ImageGalleryUploader';
 import AddressAutocomplete from '../components/atoms/AddressAutocomplete';
-import MapView from '../components/MapView';
+import MapView from '../components/map/MapView';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
 import { getGradientByIndex, GRADIENT_PAIRS, type GradientId } from '../constants/gradients';

@@ -24,7 +24,7 @@ import CategorySelector from '../components/atoms/CategorySelector';
 import DatePicker from '../components/atoms/DatePicker';
 import TimePicker from '../components/atoms/TimePicker';
 import AddressAutocomplete from '../components/atoms/AddressAutocomplete';
-import MapView from '../components/MapView';
+import MapView from '../components/map/MapView';
 import { api } from '../services/api';
 import { getSession } from '../services/supabase';
 import { getGradient, type GradientId } from '../constants/gradients';
