@@ -12,12 +12,42 @@ npm start          # Start Expo, then scan QR code with Expo Go app
 
 # Quality
 npm run lint       # Run ESLint
+npm test           # Run all tests (Jest)
+npm run test:watch # Run tests in watch mode
+npm run test:coverage # Generate coverage report (HTML + LCOV)
 
 # Build
 npm run build      # Export web build to dist/ (Expo export --platform web)
 ```
 
-No test framework is configured yet.
+## Testing
+
+**Test Framework:** Jest 29.7.0 + ts-jest  
+**Test Suites:** 16 test files, 551 tests  
+**Execution Time:** ~7 seconds
+
+### Test Coverage
+- **Statement Coverage:** 94.04%
+- **Branch Coverage:** 82.84%
+- **Function Coverage:** 95.10%
+- **Line Coverage:** 95.17%
+
+### Running Tests
+```bash
+npm test              # Run all tests
+npm run test:watch    # Watch mode for development
+npm run test:coverage # Generate HTML report → open coverage/index.html
+```
+
+**Test Files:** Services, Utils, Types, Constants — see [repo-docs/TEST_COVERAGE_REPORT.md](repo-docs/TEST_COVERAGE_REPORT.md) for details.
+
+**Mocking Strategy:**  
+- MSW für API-Calls in Services
+- Global `fetch` mocking
+- Jest-Mocks für External SDKs (expo-secure-store, AsyncStorage, etc.)
+- TypeScript strict mode maintained
+
+See [TEST_SUMMARY.md](TEST_SUMMARY.md) for detailed test documentation.
 
 ## Local Development on Physical Devices
 
