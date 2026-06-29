@@ -9,7 +9,7 @@ import {
     View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import { type AddressSuggestion, searchAddresses, verifyAddressExists } from '@/src/services/geocoding';
 
 interface AddressAutocompleteProps {

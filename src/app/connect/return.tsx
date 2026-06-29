@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
-export default function ConnectRefreshScreen() {
+export default function ConnectReturnScreen() {
     const { colors } = useTheme();
     const router = useRouter();
     const { event_id } = useLocalSearchParams<{ event_id?: string }>();
@@ -15,15 +15,17 @@ export default function ConnectRefreshScreen() {
             } else {
                 router.replace('/my-events');
             }
-        }, 2000);
+        }, 1500);
         return () => clearTimeout(timer);
     }, [event_id]);
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <Text style={styles.checkmark}>✓</Text>
             <Text style={[styles.text, { color: colors.onSurface }]}>
-                Onboarding-Link abgelaufen. Bitte erneut versuchen.
+                Stripe-Konto erfolgreich eingerichtet!
             </Text>
+            <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 16 }} />
         </View>
     );
 }
@@ -35,8 +37,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 24,
     },
+    checkmark: {
+        fontSize: 48,
+        marginBottom: 16,
+    },
     text: {
-        fontSize: 16,
+        fontSize: 18,
         textAlign: 'center',
+        fontWeight: '600',
     },
 });

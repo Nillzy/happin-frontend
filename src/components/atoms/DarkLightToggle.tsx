@@ -8,7 +8,7 @@ import Animated, {
   interpolateColor,
 } from 'react-native-reanimated';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
 const TRACK_W = 56;
 const TRACK_H = 28;

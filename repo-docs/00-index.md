@@ -1,6 +1,8 @@
 # Documentation Index
 
-This is the central index for all project documentation in the `documentation/` folder.
+This is the central index for all project documentation in the `repo-docs/` folder.
+
+> **Note:** This repository has two documentation folders. **`repo-docs/`** (this folder) contains implementation-level documentation and serves as a working aid during development. **`docs/`** is a separate MkDocs site that describes the **architecture** of the frontend for stakeholders — it does not explain the repo itself. See [`36-documentation-concept.md`](./36-documentation-concept.md) for details.
 
 | File | Description |
 |------|-------------|
@@ -18,72 +20,28 @@ This is the central index for all project documentation in the `documentation/` 
 | [10-event-create-redesign.md](./10-event-create-redesign.md) | Event-Erstellungsflow: Draft-basierter 2-Step mit Live-Editing auf der Event-Route, Edit-Buttons, Modals, PATCH-Persistierung, Publish-Flow. |
 | [11-ticket-options.md](./11-ticket-options.md) | Ticket-Optionen: Preiskategorien, TicketOption-Type, Preisanzeige-Logik, Edit-Modal, API-Integration, Draft-Flow-Integration. |
 | [12-local-development-physical-devices.md](./12-local-development-physical-devices.md) | Lokale Entwicklung auf physischen Geräten (iPhone/Android): ngrok-Setup für Backend-Zugriff, Firewall-Probleme, Commands, Troubleshooting. |
-| [13-event-host-screen.md](./13-event-host-screen.md) | Event Host Screen: Verwaltungsoberfläche für Hosts mit Statistiken und Gästeliste. **VERALTET** - siehe 24-event-host-redesign-guest-navigation.md. |
+| [13-event-host-screen.md](./13-event-host-screen.md) | Event Host Screen: Verwaltungsoberfläche für Hosts mit Statistiken und Gästeliste. **VERALTET** — siehe 25-event-host-redesign-guest-navigation.md. |
 | [14-account-screen.md](./14-account-screen.md) | Konto-Screen: Profilbild-Platzhalter, Anzeigename bearbeiten, E-Mail, Statistiken, Events, Tickets, Standort (AsyncStorage + `person.city` im Backend), Dark-Mode-Toggle, Logout, Account löschen. |
 | [15-bottom-navigation.md](./15-bottom-navigation.md) | Bottom Navigation Bar: 5 Haupt-Tabs (Explore, Karte, Erstellen, Events, Konto) mit Ionicons, ScreenWithNav Wrapper, Mobile-First Design. |
 | [16-event-screen-redesign.md](./16-event-screen-redesign.md) | Event Detail Screen: Luma-inspiriertes Layout mit Hero Image, Action Buttons (inkl. ICS-Download), Location Card, Host Section, Material Design 3 Farben. |
-| [17-map-screen.md](./17-map-screen.md) | Kartenansicht (Tab „Karte"): MapTiler/MapLibre-Integration, plattformübergreifende MapView-Komponente, Geocoding beim Event-Erstellen, stadtbasierte Zentrierung, Custom Map Styles, City Autocomplete. |
-| [17-event-creation-apple-style-final.md](./17-event-creation-apple-style-final.md) | **Event Creation - Apple-Style Redesign (Final)**: Komplette Dokumentation des 2-Step Flows (Essentials + Details), SegmentedControl, ImageGalleryUploader, CategorySelector (Eventbrite-style), Full-width Buttons, Validation, Components, Migration Notes. **Aktualisiert mit Gradient-Auswahl** (siehe 23-gradient-selection.md). |
-| [18-event-detail-categories-gallery.md](./18-event-detail-categories-gallery.md) | **Event Detail - Kategorien & Galerie**: Integration von Kategorien-Chips und Bildergalerie in Event Detail Screen, EventImageGallery Component, Design-Entscheidungen, Material Design 3 Consistency. |
-| [20-map-screen-simple.md](./20-map-screen-simple.md) | **MapScreen - Einfache Kartenansicht**: Basis-Implementation mit MapTiler SDK, nur Zoom/Pan, keine Event-Marker, keine Interaktionen, Light/Dark Mode Support. |
-| [21-my-events-screen.md](./21-my-events-screen.md) | **MyEventsScreen - Event-Verwaltung**: Collapsible Sections (statt Filter-Chips), Ticket-Cards mit QR-Code & Split-Navigation, TicketDetailScreen Modal, Host-Cards, Badge-Counts, Empty States. |
-| [22-saved-events-like-functionality.md](./22-saved-events-like-functionality.md) | **Saved Events & Like-Funktionalität**: SavedEventsContext (AsyncStorage), Heart-Icon auf Event-Cards, SavedEventsScreen, Navigation von Explore, Persistierung, Performance-Optimierungen. |
-| [23-gradient-selection.md](./23-gradient-selection.md) | **Gradient-Auswahl für Event-Titelbilder**: 4 vordefinierte Gradients, ImageSelectionModal (Bottom Sheet), Integration in EventCreateStepTwo, Backend-Integration (gradient_id), Display-Logik. |
-| [24-event-host-redesign-guest-navigation.md](./24-event-host-redesign-guest-navigation.md) | **Event Host Screen Redesign**: Tab-Navigation entfernt, Gästelisten als separate Seiten (/event/[id]/guests?status=...), EventGuestsScreen, "Zur Gast-Ansicht" Button, Statistik-Cards anklickbar. |
-| [25-web-input-styling.md](./25-web-input-styling.md) | **Web Input Styling**: `outlineStyle: 'none'` auf allen TextInputs — entfernt den blauen Browser-Fokusrahmen, eigener Fokus-State via `borderColor`. |
-| [26-event-edit-screen-redesign.md](./26-event-edit-screen-redesign.md) | **Event Edit Screen Redesign**: Draft-basierter Erstellungsflow (Step 1 → Entwurf → EventEditScreen), generische Edit-Seite mit Live-Vorschau + Edit-Drawers, Ticket-Konfiguration, Backend-Anforderungen. |
-| [27-stock-image-suggestions.md](./27-stock-image-suggestions.md) | **Stockbild-Vorschläge**: Thematische Unsplash-Bilder im Titelbild-Modal basierend auf Eventtitel, Keyword-Extraktion, Fallback-Modus, Backend-Proxy-TODOs. |
-| [28-android-bottom-sheet-gestures.md](./28-android-bottom-sheet-gestures.md) | **Android Bottom Sheet & Gesture Patterns**: Korrekte Implementierung von Swipe-to-Dismiss Sheets (Animated.View + PanResponder statt Modal), ScrollView-Dismiss, ConfirmModal statt Alert.alert, Ref-Pattern für Closures. |
-| [29-kalender-export-frontend.md](./28-kalender-export-frontend.md) | **Kalender-Export (ICS) Frontend**: ICS-Download-Button im EventScreen, Platform-Split Web/Native (expo-file-system + expo-sharing), Auth-Token-Handling, Fehlerbehandlung. |
-| [30-google-wallet-frontend.md](./29-google-wallet-frontend.md) | **Google Wallet Integration Frontend**: `getWalletUrl` in api.ts, Handler im TicketDetailScreen, Platform-Split (nur Android + Web), Fehlerbehandlung. |
-| [30-explore-filter.md](./30-explore-filter.md) | **Explore Page: Filter UI** — FilterModal component, filter categories (Zeitraum, Kategorie, Standort, Kostenlos), state management, badge indicator. |
-| [31-event-soft-delete.md](31-event-soft-delete.md) | Event Soft-Delete Frontend: Delete-Button im EventHostScreen, Bestätigungsmodal, "Abgesagt"-Badge, roter Banner. |
-| [32-event-branding.md](./32-event-branding.md) | **Event-Branding**: Individuelle Primär-/Sekundärfarbe + 8 Gradient-Vorlagen, Design-Drawer im EventEditScreen, Live-Vorschau, Backend-Felder `accent_color_primary`/`accent_color_secondary`. |
-| [33-erinnerungen-k4.md](./33-erinnerungen-k4.md) | **Erinnerungen (K4)**: Hybrid-Push (Native lokal via expo-notifications + Web Push via Service Worker / Backend-Scheduler), Settings-Sektion im AccountScreen, Presets + Custom Lead-Time. |
-| [34-documentation-concept.md](./34-documentation-concept.md) | **Dokumentationskonzept**: Drei Dokus (`repo-docs/`, `docs/` via MkDocs unter `/docs`, Backend-Swagger unter `/api/docs`), Zielgruppen, Konventionen, `EXPO_PUBLIC_DEBUG=true` als Voraussetzung. |
-| [35-traceability.md](./35-traceability.md) | **Traceability-Konzept**: Rückreferenzen Code → Architekturentwurf → Pflichtenheft → Lastenheft, Mx/Sx/Kx-IDs, URL-Fragment-Anchor-Pattern für GitLab-Wiki-Links. |
-| [CLAUDE_PROMPT_BACKEND_INTEGRATION.md](./CLAUDE_PROMPT_BACKEND_INTEGRATION.md) | **Claude-Prompt für Backend-Integration**: Priorisierte TODO-Liste aller offenen Backend-Aufgaben (Draft-Flow, Bild-Upload, Unsplash-Proxy, Permissions, MyEvents-Daten). |
-| [CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md](./CLAUDE_PROMPT_EVENT_CREATION_REDESIGN.md) | Vollständiger Claude-Prompt für Event-Creation UI Redesign & Feature-Implementierung (Phasen 1-3). |
-| [EVENT_CREATION_UX_ANALYSIS.md](./EVENT_CREATION_UX_ANALYSIS.md) | UX-Analyse des bestehenden Event-Creation Flows mit identifizierten Problemen und Verbesserungsvorschlägen. |
-| [EVENT_CREATION_PHASE_1_IMPLEMENTATION.md](./EVENT_CREATION_PHASE_1_IMPLEMENTATION.md) | Phase 1 Implementation (P0): Titelbild-Upload, Location-Validation, Category-Chips mit Multi-Select. |
-| [EVENT_CREATION_APPLE_REDESIGN.md](./EVENT_CREATION_APPLE_REDESIGN.md) | Apple-Style Redesign des Event-Creation Flows mit 2-Step (Essentials + Details), SegmentedControl, FAB Navigation, Large Typography, 16px Cards. |
-
-## Wichtige Änderungen (Mai 2026)
-
-### UI/UX Updates
-- ✅ **Infinity Scroll** in EventListScreen (keine Pagination mehr)
-- ✅ **Saved Events** System mit Like-Funktionalität (Heart-Icon)
-- ✅ **Saved Events Grid**: Responsives Grid-Layout (1–5 Spalten) identisch zu Explore; Herz-Button (gefüllt) entfernt Event aus Liste
-- ✅ **Gradient-Auswahl** für Event-Titelbilder (4 Vorlagen)
-- ✅ **Stockbild-Vorschläge** im Titelbild-Modal: Unsplash-Suche basierend auf Eventtitel
-- ✅ **Dark-Mode-Toggle** von Navbar zu Account-Screen verschoben
-- ✅ **Explore Screen** ohne Überschriften, mit Suchleiste + Filter/Saved Buttons
-- ✅ **Footer entfernt** in Explore & Saved Events
-- ✅ **Kartenansicht** mit Event-Pins, stadtbasierter Zentrierung, Custom Map Styles, City Autocomplete + GPS-Button
-- ✅ **Web Input Outline** entfernt (`outlineStyle: 'none'` auf allen TextInputs)
-- ✅ **DatePicker kompakter**: Tageszellen feste Höhe 34px statt `aspectRatio: 1`
-- ✅ **DatePicker/TimePicker z-index**: Inline-Popover liegt korrekt über nachfolgenden Cards (`zIndex: 100` auf Datum&Uhrzeit-Card, `overflow: visible` auf ScrollView + Card)
-- ✅ **Account-Screen**: Sektionen „Meine Events" und „Meine Tickets" entfernt; GPS-Button als Happin-Pin-SVG (statt Emoji)
-- ✅ **ICS-Download-Button**: "Register"-Button im EventScreen → ICS-Datei herunterladen (Web: Browser-Download, Native: Share-Sheet)
-
-### Event-Management
-- ✅ **MyEventsScreen Redesign**: Collapsible Sections, QR-Code Ticket-Cards, Split-Navigation
-- ✅ **TicketDetailScreen**: Luma-style Bottom Sheet Modal mit QR-Code
-- ✅ **EventHostScreen Redesign**: Keine Tabs mehr, Gästelisten als separate Seiten
-- ✅ **EventGuestsScreen**: Dedizierte Seite pro Status (Zusagen/Absagen/Unsicher)
-- ✅ **Event Soft-Delete**: Hosts können Events löschen (48h Sichtbarkeitsfenster); "Abgesagt"-Badge in Listen, roter Banner in Detailansicht
-
-### Navigation
-- ✅ **"Dein Event" Badge**: Jetzt links oben (statt rechts), ohne Emoji
-- ✅ **"Zur Gast-Ansicht" Button**: Im EventHostScreen, navigiert zu normaler Event-Ansicht
-- ✅ **Gästelisten**: Öffnen als separate Seiten (`/event/[id]/guests?status=...`)
-- ✅ **Navbar bereinigt**: Account-Button entfernt (Konto-Tab in Bottom Nav); DarkLightToggle entfernt (im Account-Screen)
-- ✅ **Responsive Navigation**: Mobile → Bottom Nav, Desktop/Tablet (≥768px Web) → Top-Navbar mit Tab-Links + „Event erstellen"-Button
-- ✅ **Navbar auf Mobile unsichtbar**: Rendert `null` bei `width < 768` oder Native — kein Logo-Balken oben
-- ✅ **HappinLogo in Bottom Nav**: Klein (scale 0.7, opacity 0.8) unter dem Erstellen-Button
-- ✅ **Mobiler Zurück-Header**: EventCreate Step 1 & 2 zeigen auf Mobile `arrow-back` Icon + „Zurück" statt Navbar
-
-### Backend-Integration
-- ✅ **Infinity Scroll Backend-Fix**: Backend gibt jetzt Total-Count zurück (nicht nur Page-Count)
-- ✅ **Gradient-ID Support**: Backend speichert `gradient_id` (0-3) für Events ohne Bilder
-- ✅ **`person.city` Spalte**: Standortänderungen werden via `PATCH /api/v1/users/me/city` in die `person`-Tabelle geschrieben
+| [17-event-creation-apple-style-final.md](./17-event-creation-apple-style-final.md) | **Event Creation - Apple-Style Redesign (Final)**: Komplette Dokumentation des 2-Step Flows (Essentials + Details), SegmentedControl, ImageGalleryUploader, CategorySelector (Eventbrite-style), Full-width Buttons, Validation, Components, Migration Notes. **Aktualisiert mit Gradient-Auswahl** (siehe 24-gradient-selection.md). |
+| [18-map-screen.md](./18-map-screen.md) | Kartenansicht (Tab „Karte"): MapTiler/MapLibre-Integration, plattformübergreifende MapView-Komponente, Geocoding beim Event-Erstellen, stadtbasierte Zentrierung, Custom Map Styles, City Autocomplete. |
+| [19-pagination.md](./19-pagination.md) | **Pagination – Event-Liste**: Seitenweises Laden vom Backend, Infinity Scroll Pattern, Performance. |
+| [20-event-detail-categories-gallery.md](./20-event-detail-categories-gallery.md) | **Event Detail - Kategorien & Galerie**: Integration von Kategorien-Chips und Bildergalerie in Event Detail Screen, EventImageGallery Component, Design-Entscheidungen, Material Design 3 Consistency. |
+| [21-map-screen-simple.md](./21-map-screen-simple.md) | **MapScreen - Einfache Kartenansicht**: Basis-Implementation mit MapTiler SDK, nur Zoom/Pan, keine Event-Marker, keine Interaktionen, Light/Dark Mode Support. |
+| [22-my-events-screen.md](./22-my-events-screen.md) | **MyEventsScreen - Event-Verwaltung**: Collapsible Sections (statt Filter-Chips), Ticket-Cards mit QR-Code & Split-Navigation, TicketDetailScreen Modal, Host-Cards, Badge-Counts, Empty States. |
+| [23-saved-events-like-functionality.md](./23-saved-events-like-functionality.md) | **Saved Events & Like-Funktionalität**: SavedEventsContext (AsyncStorage), Heart-Icon auf Event-Cards, SavedEventsScreen, Navigation von Explore, Persistierung, Performance-Optimierungen. |
+| [24-gradient-selection.md](./24-gradient-selection.md) | **Gradient-Auswahl für Event-Titelbilder**: 4 vordefinierte Gradients, ImageSelectionModal (Bottom Sheet), Integration in EventCreateStepTwo, Backend-Integration (gradient_id), Display-Logik. |
+| [25-event-host-redesign-guest-navigation.md](./25-event-host-redesign-guest-navigation.md) | **Event Host Screen Redesign**: Tab-Navigation entfernt, Gästelisten als separate Seiten (/event/[id]/guests?status=...), EventGuestsScreen, "Zur Gast-Ansicht" Button, Statistik-Cards anklickbar. |
+| [26-web-input-styling.md](./26-web-input-styling.md) | **Web Input Styling**: `outlineStyle: 'none'` auf allen TextInputs — entfernt den blauen Browser-Fokusrahmen, eigener Fokus-State via `borderColor`. |
+| [27-event-edit-screen-redesign.md](./27-event-edit-screen-redesign.md) | **Event Edit Screen Redesign**: Draft-basierter Erstellungsflow (Step 1 → Entwurf → EventEditScreen), generische Edit-Seite mit Live-Vorschau + Edit-Drawers, Ticket-Konfiguration, Backend-Anforderungen. |
+| [28-stock-image-suggestions.md](./28-stock-image-suggestions.md) | **Stockbild-Vorschläge**: Thematische Unsplash-Bilder im Titelbild-Modal basierend auf Eventtitel, Keyword-Extraktion, Fallback-Modus, Backend-Proxy-TODOs. |
+| [29-android-bottom-sheet-gestures.md](./29-android-bottom-sheet-gestures.md) | **Android Bottom Sheet & Gesture Patterns**: Korrekte Implementierung von Swipe-to-Dismiss Sheets (Animated.View + PanResponder statt Modal), ScrollView-Dismiss, ConfirmModal statt Alert.alert, Ref-Pattern für Closures. |
+| [30-kalender-export-frontend.md](./30-kalender-export-frontend.md) | **Kalender-Export (ICS) Frontend**: ICS-Download-Button im EventScreen, Platform-Split Web/Native (expo-file-system + expo-sharing), Auth-Token-Handling, Fehlerbehandlung. |
+| [31-google-wallet-frontend.md](./31-google-wallet-frontend.md) | **Google Wallet Integration Frontend**: `getWalletUrl` in api.ts, Handler im TicketDetailScreen, Platform-Split (nur Android + Web), Fehlerbehandlung. |
+| [32-explore-filter.md](./32-explore-filter.md) | **Explore Page: Filter UI** — FilterModal component, filter categories (Zeitraum, Kategorie, Standort, Kostenlos), state management, badge indicator. |
+| [33-event-soft-delete.md](./33-event-soft-delete.md) | Event Soft-Delete Frontend: Delete-Button im EventHostScreen, Bestätigungsmodal, "Abgesagt"-Badge, roter Banner. |
+| [34-event-branding.md](./34-event-branding.md) | **Event-Branding**: Individuelle Primär-/Sekundärfarbe + 8 Gradient-Vorlagen, Design-Drawer im EventEditScreen, Live-Vorschau, Backend-Felder `accent_color_primary`/`accent_color_secondary`. |
+| [35-erinnerungen-k4.md](./35-erinnerungen-k4.md) | **Erinnerungen (K4)**: Hybrid-Push (Native lokal via expo-notifications + Web Push via Service Worker / Backend-Scheduler), Settings-Sektion im AccountScreen, Presets + Custom Lead-Time. |
+| [36-documentation-concept.md](./36-documentation-concept.md) | **Dokumentationskonzept**: Drei Dokus (`repo-docs/`, `docs/` via MkDocs unter `/docs`, Backend-Swagger unter `/api/docs`), Zielgruppen, Konventionen, `EXPO_PUBLIC_DEBUG=true` als Voraussetzung. |
+| [37-traceability.md](./37-traceability.md) | **Traceability-Konzept**: Rückreferenzen Code → Architekturentwurf → Pflichtenheft → Lastenheft, Mx/Sx/Kx-IDs, URL-Fragment-Anchor-Pattern für GitLab-Wiki-Links. |

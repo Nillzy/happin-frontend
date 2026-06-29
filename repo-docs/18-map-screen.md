@@ -127,7 +127,7 @@ ALTER TABLE "public"."location"
 
 Beim Öffnen des Karten-Tabs wird die gespeicherte Heimatstadt des Nutzers aus `AsyncStorage` gelesen und via `geocodeCity()` in Koordinaten umgewandelt. Die Karte zentriert sich dann auf diese Stadt.
 
-- Implementierung: `hooks/use-user-city.ts` + `src/services/geocoding.ts`
+- Implementierung: `hooks/useUserCity.ts` + `src/services/geocoding.ts`
 - Einstellung: AccountScreen → Sektion „Einstellungen" → „Mein Standort"
 - Europa-Einschränkung via `country`-Parameter (alle europäischen ISO-2-Codes), nicht via `bbox` (wird von der MapTiler API nicht zuverlässig erzwungen)
 - Fallback bei leerem/ungültigem Wert: **Berlin** (lat: 52.52, lng: 13.405)

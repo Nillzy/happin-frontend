@@ -94,7 +94,7 @@ happin-frontend/
 ├── assets/
 │   └── images/                   # App icons, splash screen, static images
 │
-├── documentation/                # Technical documentation (you are here)
+├── repo-docs/                    # Technical documentation (you are here)
 │
 ├── Dockerfile                    # Multi-stage build (Node build + Nginx serve)
 ├── nginx.conf                    # Nginx config for web export
