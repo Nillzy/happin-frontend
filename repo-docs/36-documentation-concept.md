@@ -18,7 +18,7 @@ Im Happin-Projekt existieren **zwei getrennte Dokumentationen im Frontend** mit 
 
 **Wer:** Mitglieder der Entwicklungsteams und KI-Agenten (Claude Code, Codex etc.).
 
-**Was:** Detaillierte Dokumentation jeder größeren UI- oder Logik-Änderung. Jedes neue Feature wird hier in einer eigenen Datei dokumentiert (z. B. `28-android-bottom-sheet-gestures.md`, `30-explore-filter.md`, `33-erinnerungen-k4.md`).
+**Was:** Detaillierte Dokumentation jeder größeren UI- oder Logik-Änderung. Jedes neue Feature wird hier in einer eigenen Datei dokumentiert (z. B. `29-android-bottom-sheet-gestures.md`, `32-explore-filter.md`, `35-erinnerungen-k4.md`).
 
 **Wo:** Markdown-Dateien direkt im Repository unter `repo-docs/`. Sie werden nicht gerendert, sondern in der IDE oder in GitLab gelesen.
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
 interface Category {
     id: string;

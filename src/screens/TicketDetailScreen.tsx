@@ -17,7 +17,7 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import type { ViewToken } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';

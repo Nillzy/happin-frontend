@@ -11,7 +11,7 @@ import {
     Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import Head from 'expo-router/head';
 import { Ionicons } from '@expo/vector-icons';

@@ -102,5 +102,5 @@ const handleAddToWallet = async () => {
 |-------|----------|
 | `src/services/api.ts` | `getWalletUrl(eventId, token?)` hinzugefügt |
 | `src/screens/TicketDetailScreen.tsx` | `handleAddToWallet`, `walletLoading`-State, `Linking`-Import, `Platform.OS !== 'ios'` Conditional |
-| `documentation/29-google-wallet-frontend.md` | Diese Dokumentation |
-| `documentation/00-index.md` | Eintrag für Dok 29 hinzugefügt |
+| `repo-docs/31-google-wallet-frontend.md` | Diese Dokumentation |
+| `repo-docs/00-index.md` | Eintrag für Dok 31 hinzugefügt |

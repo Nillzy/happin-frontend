@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
 interface FloatingActionButtonProps {
     onPress: () => void;

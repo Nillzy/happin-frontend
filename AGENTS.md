@@ -169,14 +169,21 @@ The Berlin map on `HomeScreen` is built from raw SVG path data in `constants/ber
 
 ## Documentation
 
-The `documentation/` folder is the source of truth for project context and design decisions:
+The project has **two separate documentation folders** with different purposes — do not confuse them:
 
-- `documentation/00-index.md` — index of all docs
-- `documentation/DESIGN.md` — complete design system (colors, typography, spacing, elevation, component specs for both themes)
+- **`repo-docs/`** — Implementation-level documentation for developers and AI agents working in the codebase. Tracks feature history, UI decisions, auth flows, migration paths, workarounds. Used as a working aid during implementation. **This is where you write.**
+- **`docs/`** — Stakeholder documentation rendered via MkDocs. Describes the **architecture** of the frontend (ViewModels, components, design-vs-implementation mapping). Served at `/docs` when `EXPO_PUBLIC_DEBUG=true`. **Do not document implementation details here.**
 
-**Always read the relevant docs before starting a task.** When making changes, document them in the appropriate file in `documentation/`. New topics that don't fit an existing file get their own file, registered in `00-index.md`.
+See [`repo-docs/34-documentation-concept.md`](repo-docs/34-documentation-concept.md) for the full concept.
 
-**All documentation must live in `documentation/` — never create doc files outside this folder.**
+`repo-docs/` is the source of truth for project context and design decisions:
+
+- `repo-docs/00-index.md` — index of all docs
+- `repo-docs/DESIGN.md` — complete design system (colors, typography, spacing, elevation, component specs for both themes)
+
+**Always read the relevant docs before starting a task.** When making changes, document them in the appropriate file in `repo-docs/`. New topics that don't fit an existing file get their own file, registered in `00-index.md`.
+
+**All implementation documentation must live in `repo-docs/` — never create doc files outside this folder.** (Exception: architectural docs belong in `docs/`.)
 Every major Change should be well documented (eventually in an own file).
 
 `DESIGN.md` in particular must be consulted before touching any UI. It defines:

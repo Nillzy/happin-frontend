@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image, Platform, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
 type Props = {
     imageUrl?: string | null;

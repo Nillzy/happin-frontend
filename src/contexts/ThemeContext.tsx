@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, type ThemeColors } from '@/constants/colors';
+import { Colors, type ThemeColors } from '@/src/constants/colors';
 
 const THEME_STORAGE_KEY = 'happin-theme-override';
 

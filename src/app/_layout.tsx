@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
-import { ThemeProvider } from '@/context/ThemeContext';
+import { ThemeProvider } from '@/src/contexts/ThemeContext';
 import { AuthProvider } from '@/src/contexts/AuthContext';
 import { SavedEventsProvider } from '@/src/contexts/SavedEventsContext';
 import { ReminderSettingsProvider } from '@/src/contexts/ReminderSettingsContext';

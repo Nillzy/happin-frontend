@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
 export interface FilterChipProps {
     label: string;

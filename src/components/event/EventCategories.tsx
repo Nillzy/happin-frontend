@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import EditButton from '../atoms/EditButton';
 import { CATEGORIES } from '../atoms/CategorySelector';
 

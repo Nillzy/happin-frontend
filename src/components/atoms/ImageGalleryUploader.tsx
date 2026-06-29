@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, TouchableOpacity, Image, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import { uploadEventImage } from '@/src/services/supabase';
 
 interface ImageGalleryUploaderProps {
