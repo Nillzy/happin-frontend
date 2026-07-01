@@ -45,7 +45,7 @@ npm run test:coverage # Generate HTML report → open coverage/index.html
 - Jest-Mocks für External SDKs (expo-secure-store, AsyncStorage, etc.)
 - TypeScript strict mode maintained
 
-See [repo-docs/38-test-summary.md](repo-docs/38-test-summary.md) for detailed test documentation.
+See [repo-docs/38-test-quality-guidelines.md](repo-docs/38-test-quality-guidelines.md) for detailed test quality guidelines.
 
 ## Local Development on Physical Devices
 
