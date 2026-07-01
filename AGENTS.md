@@ -39,15 +39,13 @@ npm run test:watch    # Watch mode for development
 npm run test:coverage # Generate HTML report → open coverage/index.html
 ```
 
-**Test Files:** Services, Utils, Types, Constants — see [repo-docs/TEST_COVERAGE_REPORT.md](repo-docs/TEST_COVERAGE_REPORT.md) for details.
-
 **Mocking Strategy:**  
 - MSW für API-Calls in Services
 - Global `fetch` mocking
 - Jest-Mocks für External SDKs (expo-secure-store, AsyncStorage, etc.)
 - TypeScript strict mode maintained
 
-See [TEST_SUMMARY.md](TEST_SUMMARY.md) for detailed test documentation.
+See [repo-docs/38-test-quality-guidelines.md](repo-docs/38-test-quality-guidelines.md) for detailed test quality guidelines.
 
 ## Local Development on Physical Devices
 

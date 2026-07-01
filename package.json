@@ -19,6 +19,7 @@
     "release:apk": "npm run build:apk && npm run upload:apk"
   },
   "dependencies": {
+    "@expo/metro-config": "54.0.16",
     "@expo/vector-icons": "^15.0.3",
     "@maplibre/maplibre-react-native": "^11.2.1",
     "@maptiler/sdk": "^4.0.1",
@@ -28,7 +29,7 @@
     "@react-navigation/native": "^7.1.8",
     "@supabase/supabase-js": "^2.105.1",
     "aes-js": "^3.1.2",
-    "expo": "~54.0.33",
+    "expo": "^54.0.35",
     "expo-calendar": "~15.0.8",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",
