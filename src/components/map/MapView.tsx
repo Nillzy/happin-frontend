@@ -14,6 +14,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator, Text } from 'react-native';
 import { useTheme } from '@/src/contexts/ThemeContext';
+import { getEnv } from '@/src/utils/env';
 
 // Dynamic import für MapTiler SDK (nur Web)
 let MapTilerSDK: any = null;
@@ -41,7 +42,7 @@ export default function MapView({
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const apiKey = process.env.EXPO_PUBLIC_MAPTILER_API_KEY;
+    const apiKey = getEnv('EXPO_PUBLIC_MAPTILER_API_KEY');
 
     // Map initialisieren (Web)
     useEffect(() => {

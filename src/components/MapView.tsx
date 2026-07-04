@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
+import { getEnv } from '@/src/utils/env';
 
 let MapLibre: any = null;
 if (Platform.OS !== 'web') {
@@ -403,7 +404,7 @@ function NativeMapView({
     onMapMoved,
     onPositionChanged,
 }: MapViewProps) {
-    const apiKey = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
+    const apiKey = getEnv('EXPO_PUBLIC_MAPTILER_KEY');
     const cameraRef = useRef<any>(null);
     const onMapMovedRef = useRef(onMapMoved);
     onMapMovedRef.current = onMapMoved;
@@ -565,7 +566,7 @@ export default function MapView({
     onMapMoved,
     onPositionChanged,
 }: MapViewProps) {
-    const apiKey = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
+    const apiKey = getEnv('EXPO_PUBLIC_MAPTILER_KEY');
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
     const mapInstanceRef = useRef<any>(null);
     const centerPinRef = useRef<HTMLDivElement | null>(null);

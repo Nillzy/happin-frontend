@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { LargeSecureStore } from "@/src/utils/LargeSecureStore";
+import { getEnv } from "@/src/utils/env";
 
 let _supabase: SupabaseClient | null = null;
 let _storage: LargeSecureStore | null = null;
@@ -33,8 +34,8 @@ function getStorage(): LargeSecureStore {
  */
 function getSupabase(): SupabaseClient {
     if (!_supabase) {
-        const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-        const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+        const url = getEnv('EXPO_PUBLIC_SUPABASE_URL');
+        const key = getEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY');
         if (!url || !key) {
             throw new Error('Missing Supabase environment variables');
         }
@@ -121,7 +122,7 @@ export async function getUserProfile(): Promise<UserProfile | null> {
     try {
         const token = await getSession();
         if (token) {
-            const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+            const backendUrl = getEnv('EXPO_PUBLIC_BACKEND_URL');
             const res = await fetch(`${backendUrl}/api/v1/users/me/profile`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -155,7 +156,7 @@ export async function updateName(firstName: string, lastName: string): Promise<v
     const token = await getSession();
     if (!token) throw new Error('Not authenticated');
 
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+    const backendUrl = getEnv('EXPO_PUBLIC_BACKEND_URL');
     const res = await fetch(`${backendUrl}/api/v1/users/me/name`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -173,7 +174,7 @@ export async function updateCity(city: string): Promise<void> {
     const token = await getSession();
     if (!token) return;
 
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+    const backendUrl = getEnv('EXPO_PUBLIC_BACKEND_URL');
     await fetch(`${backendUrl}/api/v1/users/me/city`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -185,7 +186,7 @@ export async function fetchCityFromBackend(): Promise<string> {
     const token = await getSession();
     if (!token) return '';
 
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+    const backendUrl = getEnv('EXPO_PUBLIC_BACKEND_URL');
     const res = await fetch(`${backendUrl}/api/v1/users/me/profile`, {
         headers: { Authorization: `Bearer ${token}` },
     });
@@ -202,7 +203,7 @@ export async function signOut(): Promise<void> {
 export async function deleteAccount(): Promise<void> {
     const token = await getSession();
     if (!token) throw new Error('Not authenticated');
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+    const backendUrl = getEnv('EXPO_PUBLIC_BACKEND_URL');
     const res = await fetch(`${backendUrl}/api/v1/users/me`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
@@ -215,7 +216,7 @@ export async function updateEmail(newEmail: string): Promise<void> {
     const token = await getSession();
     if (!token) throw new Error('Not authenticated');
 
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+    const backendUrl = getEnv('EXPO_PUBLIC_BACKEND_URL');
     const checkRes = await fetch(`${backendUrl}/api/v1/users/check-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
