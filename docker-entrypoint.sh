@@ -11,6 +11,10 @@ window._env_ = {
 };
 EOF
 
-sed -i 's|<head>|<head><script src="/env-config.js"></script>|' /usr/share/nginx/html/index.html
+find /usr/share/nginx/html -name "*.html" | while read -r f; do
+  if ! grep -q 'env-config.js' "$f"; then
+    sed -i 's|<head>|<head><script src="/env-config.js"></script>|g' "$f"
+  fi
+done
 
 exec nginx -g "daemon off;"
