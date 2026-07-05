@@ -37,6 +37,7 @@ import {
     uploadProfilePicture,
 } from '../services/supabase';
 import { useUserCity } from '@/src/utils/useUserCity';
+import { getEnv } from '@/src/utils/env';
 import CityAutocomplete from '../components/atoms/CityAutocomplete';
 import { searchCities } from '../services/geocoding';
 import { api } from '../services/api';
@@ -343,7 +344,7 @@ export default function AccountScreen() {
                 longitude = pos.coords.longitude;
             }
 
-            const apiKey = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
+            const apiKey = getEnv('EXPO_PUBLIC_MAPTILER_KEY');
             const res = await fetch(
                 `https://api.maptiler.com/geocoding/${longitude},${latitude}.json?key=${apiKey}&language=de`
             );
