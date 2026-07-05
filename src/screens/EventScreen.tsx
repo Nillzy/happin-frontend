@@ -43,6 +43,7 @@ import { SkeletonBox } from '../components/atoms/SkeletonBox';
 import ConfirmModal from '../components/atoms/ConfirmModal';
 import { useReminderSettings } from '@/src/contexts/ReminderSettingsContext';
 import { formatCheckoutError, openCheckoutUrl, showCheckoutAlert } from '@/src/utils/openCheckoutUrl';
+import { getEnv } from '@/src/utils/env';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HERO_HEIGHT = SCREEN_WIDTH * 0.56; // ~16:9
@@ -755,7 +756,7 @@ export default function EventScreen() {
         if (Platform.OS === 'web') {
             try {
                 const token = await getSession();
-                const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+                const baseUrl = getEnv('EXPO_PUBLIC_BACKEND_URL');
                 const url = `${baseUrl}/api/v1/events/${event.event_id}/calendar.ics`;
                 const headers: Record<string, string> = token
                     ? { Authorization: `Bearer ${token}` }

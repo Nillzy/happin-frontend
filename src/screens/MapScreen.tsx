@@ -11,13 +11,10 @@ import MapView, { MapMarker } from '../components/MapView';
 import { api } from '../services/api';
 import { geocodeCity, geocodeAddress } from '../services/geocoding';
 import { getSession, authorize } from '../services/supabase';
+import { getEnv } from '@/src/utils/env';
 import type { EventListItem } from '../types/events';
 
 const BERLIN = { lat: 52.52, lng: 13.405 };
-const API_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
-
-const MAP_STYLE_LIGHT = `https://api.maptiler.com/maps/019dfc91-be68-7eb0-a241-e7a2d1d21b6a/style.json?key=${API_KEY}`;
-const MAP_STYLE_DARK  = `https://api.maptiler.com/maps/019dfca2-7a0c-7ac9-bae7-dfa64252c3f0/style.json?key=${API_KEY}`;
 
 // Modul-Level Cache — überlebt Tab-Wechsel
 let cachedMarkers: MapMarker[] | null = null;
@@ -30,6 +27,9 @@ export default function MapScreen() {
     const { colors, isDark } = useTheme();
     const router = useRouter();
     const { city, loaded: cityLoaded } = useUserCity();
+    const apiKey = getEnv('EXPO_PUBLIC_MAPTILER_KEY');
+    const MAP_STYLE_LIGHT = `https://api.maptiler.com/maps/019dfc91-be68-7eb0-a241-e7a2d1d21b6a/style.json?key=${apiKey}`;
+    const MAP_STYLE_DARK  = `https://api.maptiler.com/maps/019dfca2-7a0c-7ac9-bae7-dfa64252c3f0/style.json?key=${apiKey}`;
 
     const [markers, setMarkers] = useState<MapMarker[]>(cachedMarkers ?? []);
     const [center, setCenter] = useState(lastViewedCenter ?? cachedCenter ?? BERLIN);

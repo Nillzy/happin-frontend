@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { getEnv } from '@/src/utils/env';
 import type { EventListResponse, EventListItem, EventDetailResponse, EventCreateRequest, EventUpdateRequest, TicketOption, RsvpStatus, RsvpResponse, UserTicket, UserTicketListResponse, CustomField, CustomFieldResponseItem, TicketResponses, EventFilterParams, FilterPeriod, RefundSummary } from '@/src/types/events';
 import type { ParticipantListResponse, RemoveParticipantsResponse, ScanTicketResponse } from '@/src/types/host';
 import type { NotificationListResponse } from '@/src/types/notifications';
@@ -11,7 +12,7 @@ import type { NotificationListResponse } from '@/src/types/notifications';
  * - Fallback: localhost for development
  */
 function getBackendUrl(): string {
-    const envUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+    const envUrl = getEnv('EXPO_PUBLIC_BACKEND_URL');
 
     if (envUrl && envUrl.includes('ngrok')) {
         return envUrl;

@@ -1,3 +1,5 @@
+import { getEnv } from '@/src/utils/env';
+
 const BERLIN = { lat: 52.52, lng: 13.405 };
 
 const EUROPE_COUNTRIES =
@@ -35,7 +37,7 @@ const REGION_CODES: Record<string, string> = {
 const EXCLUDE_TYPES = new Set(['locality', 'neighbourhood', 'place', 'poi', 'address', 'postal_code', 'major_landform', 'continental_marine']);
 
 export async function searchCities(query: string): Promise<CitySuggestion[]> {
-    const key = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+    const key = getEnv('EXPO_PUBLIC_MAPTILER_KEY');
     if (!key || query.trim().length < 2) return [];
 
     try {
@@ -90,7 +92,7 @@ export async function geocodeAddress(
     postalCode: string | null | undefined,
     country: string | null | undefined,
 ): Promise<{ lat: number; lng: number } | null> {
-    const key = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+    const key = getEnv('EXPO_PUBLIC_MAPTILER_KEY');
     if (!key) return null;
 
     const parts: string[] = [];
@@ -130,7 +132,7 @@ export interface AddressSuggestion {
 }
 
 export async function searchAddresses(query: string): Promise<AddressSuggestion[]> {
-    const key = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+    const key = getEnv('EXPO_PUBLIC_MAPTILER_KEY');
     if (!key || query.trim().length < 2) return [];
 
     try {
@@ -186,7 +188,7 @@ export async function searchAddresses(query: string): Promise<AddressSuggestion[
 
 // Wandelt Koordinaten in eine AddressSuggestion um (Reverse-Geocoding).
 export async function reverseGeocode(lat: number, lng: number): Promise<AddressSuggestion | null> {
-    const key = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+    const key = getEnv('EXPO_PUBLIC_MAPTILER_KEY');
     if (!key) return null;
 
     try {
@@ -242,7 +244,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<AddressS
 // Prüft via Reverse-Geocoding ob an den gegebenen Koordinaten tatsächlich
 // die erwartete Hausnummer existiert. Gibt false zurück wenn nicht.
 export async function verifyAddressExists(address: AddressSuggestion): Promise<boolean> {
-    const key = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+    const key = getEnv('EXPO_PUBLIC_MAPTILER_KEY');
     // Ohne Hausnummer gibt es nichts zu verifizieren — Adresse ist gültig
     if (!address.houseNumber) return true;
     if (!key) return false;
@@ -272,7 +274,7 @@ export async function verifyAddressExists(address: AddressSuggestion): Promise<b
 export async function geocodeCity(
     city: string,
 ): Promise<{ lat: number; lng: number }> {
-    const key = process.env.EXPO_PUBLIC_MAPTILER_KEY;
+    const key = getEnv('EXPO_PUBLIC_MAPTILER_KEY');
     if (!key || !city.trim()) return BERLIN;
 
     try {
